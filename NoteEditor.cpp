@@ -73,11 +73,7 @@ void NoteEditor::SaveSettings()
 
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
-	settings.setValue("geo", this->saveGeometry());
-
-	settings.beginGroup("group");
-	settings.setValue("other", "something");
-	settings.endGroup();
+	settings.setValue("geoNoteEditor", this->saveGeometry());
 }
 
 void NoteEditor::LoadSettings()
@@ -86,11 +82,7 @@ void NoteEditor::LoadSettings()
 
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
-	this->restoreGeometry(settings.value("geo").toByteArray());
-
-	settings.beginGroup("group");
-	if(0) qDebug() << settings.value("other");
-	settings.endGroup();
+	this->restoreGeometry(settings.value("geoNoteEditor").toByteArray());
 }
 
 
