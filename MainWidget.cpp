@@ -11,6 +11,7 @@
 #include <QVBoxLayout>
 #include <QPushButton>
 #include <QTextEdit>
+#include <QDateTimeEdit>
 
 #include "MyQDifferent.h"
 #include "MyQDialogs.h"
@@ -30,11 +31,17 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	btn1->setFixedWidth(25);
 	hlo1->addWidget(btn1);
 	connect(btn1,&QPushButton::clicked,[this](){
-		notes.push_back(std::make_unique<Note>());
-		notes.back()->name = MyQDialogs::InputText("Введите название заметки");
+		QString newName = MyQDialogs::InputText("Введите название заметки", "", 400, 150);
+		if(newName.isEmpty()) return;
+
+		notes.emplace_back(std::make_unique<Note>());
+		auto newNote = notes.back().get();
+		newNote->name = std::move(newName);
 		table->setRowCount(table->rowCount()+1);
 		table->setItem(table->rowCount()-1, 0, new QTableWidgetItem);
-		table->item(table->rowCount()-1, 0)->setText(notes.back()->name);
+		table->item(table->rowCount()-1, 0)->setText(newNote->name);
+
+		CreateNotifyEditor(newNote, table->rowCount()-1);
 	});
 
 	QPushButton *btnRemove = new QPushButton("-");
@@ -57,10 +64,11 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 		table->item(index, 0)->setText(notes[index]->name);
 	});
 
+
 	hlo1->addStretch();
 
 	table = new QTableWidget;
-	table->setColumnCount(1);
+	table->setColumnCount(2);
 	hlo2->addWidget(table);
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
 		auto editor = new NoteEditor(*notes[r].get());
@@ -70,14 +78,14 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	settingsFile = MyQDifferent::PathToExe()+"/files/settings.ini";
 	QTimer::singleShot(0,this,[this]
 	{
-		//move(10,10);
-		//resize(1870,675);
 		LoadSettings();
 		for(auto &note:notes)
 		{
 			table->setRowCount(table->rowCount()+1);
 			table->setItem(table->rowCount()-1, 0, new QTableWidgetItem);
 			table->item(table->rowCount()-1, 0)->setText(note->name);
+
+			CreateNotifyEditor(note.get(), table->rowCount()-1);
 		}
 	});
 }
@@ -103,6 +111,8 @@ void MainWidget::SaveSettings()
 {
 	QDir().mkpath(MyQDifferent::PathToExe()+"/files");
 
+
+	MyQFileDir::WriteFile(settingsFile, "");
 	QSettings settings(settingsFile, QSettings::IniFormat);
 	settings.setValue("geoMainWidget", this->saveGeometry());
 	QString widths;
@@ -111,8 +121,13 @@ void MainWidget::SaveSettings()
 
 	settings.beginGroup("notes");
 	auto keys = settings.childKeys();
-	for(auto &key:keys) settings.remove(key);
-	for(auto &note:notes) settings.setValue(note->name, note->content.code);
+	for(auto &note:notes)
+	{
+		settings.beginGroup(note->name);
+		settings.setValue("content", note->content.code);
+		settings.setValue("notification", note->notification);
+		settings.endGroup();
+	}
 	settings.endGroup();
 }
 
@@ -133,17 +148,31 @@ void MainWidget::LoadSettings()
 
 	QStringList widths = settings.value("columnWidths").toString().split(";", QString::SkipEmptyParts);
 	if(table->columnCount() != widths.size()) qdbg << "LoadSettings error table->columnCount() != widths.size()";
-	for(int i=0; i<table->columnCount() & i < widths.size(); i++) table->setColumnWidth(i, widths[i].toUInt());
+	for(int i=0; i<table->columnCount() && i < widths.size(); i++) table->setColumnWidth(i, widths[i].toUInt());
 
 	settings.beginGroup("notes");
-	auto keys = settings.childKeys();
-	for(auto &key:keys)
+	auto groups = settings.childGroups();
+	for(auto &group:groups)
 	{
+		settings.beginGroup(group);
 		auto &newNote = notes.emplace_back(std::make_unique<Note>());
-		newNote->name = key;
-		newNote->content.code = settings.value(key).toString();
+		newNote->name = group;
+		newNote->content.code = settings.value("content").toString();
+		newNote->notification = settings.value("notification").toDateTime();
+		settings.endGroup();
 	}
 	settings.endGroup();
+}
+
+void MainWidget::CreateNotifyEditor(Note * noteToConnect, int rowIndex)
+{
+	auto dtEdit = new QDateTimeEdit(noteToConnect->notification);
+	dtEdit->setDisplayFormat("dd.MM.yyyy HH:mm");
+	dtEdit->setCalendarPopup(true);
+	table->setCellWidget(rowIndex, 1, dtEdit);
+	connect(dtEdit, &QDateTimeEdit::dateTimeChanged, [noteToConnect](const QDateTime &datetime){
+		noteToConnect->notification = datetime;
+	});
 }
 
 

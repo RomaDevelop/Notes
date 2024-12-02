@@ -11,7 +11,7 @@ struct HTML
 
 struct Note
 {
-	QDateTime notification;
+	QDateTime notification = QDateTime::currentDateTime();
 	QString name;
 	HTML content;
 };

@@ -27,5 +27,7 @@ private:
 	QString settingsFile;
 	void SaveSettings();
 	void LoadSettings();
+
+	void CreateNotifyEditor(Note * noteToConnect, int rowIndex);
 };
 #endif // MAINWIDGET_H
