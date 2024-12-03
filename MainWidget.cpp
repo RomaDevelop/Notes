@@ -12,6 +12,8 @@
 #include <QPushButton>
 #include <QTextEdit>
 #include <QDateTimeEdit>
+#include <QSystemTrayIcon>
+#include <QApplication>
 
 #include "MyQDifferent.h"
 #include "MyQDialogs.h"
@@ -68,7 +70,7 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	hlo1->addStretch();
 
 	table = new QTableWidget;
-	table->setColumnCount(2);
+	table->setColumnCount(4);
 	hlo2->addWidget(table);
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
 		auto editor = new NoteEditor(*notes[r].get());
@@ -88,6 +90,8 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 			CreateNotifyEditor(note.get(), table->rowCount()-1);
 		}
 	});
+
+	CreateTrayIcon();
 }
 
 MainWidget::~MainWidget()
@@ -95,13 +99,24 @@ MainWidget::~MainWidget()
 
 }
 
+void MainWidget::CreateTrayIcon()
+{
+	auto icon = new QSystemTrayIcon(this);
+	icon->setIcon(QApplication::style()->standardIcon(QStyle::SP_ArrowForward));
+	icon->setToolTip("Notes");
+	icon->show();
+	connect(icon, &QSystemTrayIcon::activated, [this](){
+		showNormal();
+	});
+}
+
 void MainWidget::closeEvent(QCloseEvent * event)
 {
-//	auto answ = QMessageBox::question(this,"Закрытие ...","...");
-//	if(0){}
-//	else if(answ == QMessageBox::Yes) {/*ничего не делаем*/}
-//	else if(answ == QMessageBox::No) { event->ignore(); return; }
-//	else { qCritical() << "not realesed button 0x" + QString::number(answ,16); return; }
+	//	auto answ = QMessageBox::question(this,"Закрытие ...","...");
+	//	if(0){}
+	//	else if(answ == QMessageBox::Yes) {/*ничего не делаем*/}
+	//	else if(answ == QMessageBox::No) { event->ignore(); return; }
+	//	else { qCritical() << "not realesed button 0x" + QString::number(answ,16); return; }
 
 	SaveSettings();
 	event->accept();
@@ -125,6 +140,7 @@ void MainWidget::SaveSettings()
 	{
 		settings.beginGroup(note->name);
 		settings.setValue("content", note->content.code);
+		settings.setValue("activeNotify", note->activeNotify);
 		settings.setValue("notification", note->notification);
 		settings.endGroup();
 	}
@@ -158,6 +174,7 @@ void MainWidget::LoadSettings()
 		auto &newNote = notes.emplace_back(std::make_unique<Note>());
 		newNote->name = group;
 		newNote->content.code = settings.value("content").toString();
+		newNote->activeNotify = settings.value("activeNotify").toBool();
 		newNote->notification = settings.value("notification").toDateTime();
 		settings.endGroup();
 	}
@@ -166,12 +183,35 @@ void MainWidget::LoadSettings()
 
 void MainWidget::CreateNotifyEditor(Note * noteToConnect, int rowIndex)
 {
+	auto chActive = new QCheckBox;
+	chActive->setChecked(noteToConnect->activeNotify);
+	connect(chActive, &QCheckBox::stateChanged, [noteToConnect, chActive](int){
+		noteToConnect->activeNotify = chActive->isChecked();
+	});
+
+	auto wCh = new QWidget;
+	auto loWCH = new QHBoxLayout(wCh);
+	loWCH->setAlignment(Qt::AlignCenter);
+	loWCH->setContentsMargins(0,0,0,0);
+	loWCH->addWidget(chActive);
+	table->setCellWidget(rowIndex, 1, wCh);
+
 	auto dtEdit = new QDateTimeEdit(noteToConnect->notification);
 	dtEdit->setDisplayFormat("dd.MM.yyyy HH:mm");
 	dtEdit->setCalendarPopup(true);
-	table->setCellWidget(rowIndex, 1, dtEdit);
-	connect(dtEdit, &QDateTimeEdit::dateTimeChanged, [noteToConnect](const QDateTime &datetime){
+	table->setCellWidget(rowIndex, 2, dtEdit);
+
+	auto dtReschEdit = new QDateTimeEdit(noteToConnect->notifyReschedule);
+	dtEdit->setDisplayFormat("dd.MM.yyyy HH:mm");
+	dtEdit->setCalendarPopup(true);
+	table->setCellWidget(rowIndex, 3, dtReschEdit);
+
+	connect(dtEdit, &QDateTimeEdit::dateTimeChanged, [noteToConnect, dtReschEdit](const QDateTime &datetime){
 		noteToConnect->notification = datetime;
+		dtReschEdit->setDateTime(datetime);
+	});
+	connect(dtReschEdit, &QDateTimeEdit::dateTimeChanged, [noteToConnect](const QDateTime &datetime){
+		noteToConnect->notifyReschedule = datetime;
 	});
 }
 

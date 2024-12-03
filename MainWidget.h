@@ -21,6 +21,8 @@ public:
 	~MainWidget();
 
 private:
+	void CreateTrayIcon();
+
 	void closeEvent (QCloseEvent *event) override;
 	//void resizeEvent(QResizeEvent * event) override { }
 	//void moveEvent(QMoveEvent * event) override { }

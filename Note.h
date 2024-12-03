@@ -11,7 +11,9 @@ struct HTML
 
 struct Note
 {
+	bool activeNotify = false;
 	QDateTime notification = QDateTime::currentDateTime();
+	QDateTime notifyReschedule = QDateTime::currentDateTime();
 	QString name;
 	HTML content;
 };
