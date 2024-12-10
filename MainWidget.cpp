@@ -18,6 +18,8 @@
 #include "MyQDifferent.h"
 #include "MyQDialogs.h"
 #include "MyQFileDir.h"
+#include "MyQExecute.h"
+#include "CodeMarkers.h"
 
 #include "NoteEditor.h"
 
@@ -69,6 +71,13 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 
 	hlo1->addStretch();
 
+	QPushButton *btnSettings = new QPushButton("Settings");
+	btnSettings->setFixedWidth(QFontMetrics(btnSettings->font()).horizontalAdvance(btnSettings->text()) + 20);
+	hlo1->addWidget(btnSettings);
+	connect(btnSettings,&QPushButton::clicked,[this](){
+		MyQExecute::Execute(settingsFile);
+	});
+
 	table = new QTableWidget;
 	table->setColumnCount(4);
 	hlo2->addWidget(table);
@@ -92,12 +101,10 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	});
 
 	CreateTrayIcon();
+	CreateNotesChecker();
 }
 
-MainWidget::~MainWidget()
-{
 
-}
 
 void MainWidget::CreateTrayIcon()
 {
@@ -108,6 +115,31 @@ void MainWidget::CreateTrayIcon()
 	connect(icon, &QSystemTrayIcon::activated, [this](){
 		showNormal();
 	});
+}
+
+void MainWidget::CreateNotesChecker()
+{
+	QTimer *tChecher = new QTimer(this);
+	connect(tChecher, &QTimer::timeout, [this](){
+		if(0) CodeMarkers::to_do("Нужно адекватный алгоритм проверки чтобы не ломалось если будет много задач");
+		QDateTime currentDateTime = QDateTime::currentDateTime();
+		std::vector<Note*> alarmedNotes;
+		for(auto &note:notes)
+		{
+			if(currentDateTime >= note->notifyReschedule)
+			{
+				note->alarm = true;
+				alarmedNotes.emplace_back(note.get());
+				qdbg << "alarm" << note->name;
+			}
+			else note->alarm = false;
+		}
+
+		if(!alarmedNotes.empty())
+			widgetAlarms.GiveNotes(alarmedNotes);
+
+	});
+	tChecher->start(1000);
 }
 
 void MainWidget::closeEvent(QCloseEvent * event)
@@ -126,7 +158,6 @@ void MainWidget::SaveSettings()
 {
 	QDir().mkpath(MyQDifferent::PathToExe()+"/files");
 
-
 	MyQFileDir::WriteFile(settingsFile, "");
 	QSettings settings(settingsFile, QSettings::IniFormat);
 	settings.setValue("geoMainWidget", this->saveGeometry());
@@ -136,12 +167,18 @@ void MainWidget::SaveSettings()
 
 	settings.beginGroup("notes");
 	auto keys = settings.childKeys();
-	for(auto &note:notes)
+	for(uint i=0; i<notes.size(); i++)
 	{
-		settings.beginGroup(note->name);
+		auto& note = notes[i];
+		QString groupName = QSn(i);
+		groupName = groupName.rightJustified(5,'0');
+		groupName.prepend("note");
+		settings.beginGroup(groupName);
+		settings.setValue("name", note->name);
 		settings.setValue("content", note->content.code);
 		settings.setValue("activeNotify", note->activeNotify);
 		settings.setValue("notification", note->notification);
+		settings.setValue("notifyReschedule", note->notifyReschedule);
 		settings.endGroup();
 	}
 	settings.endGroup();
@@ -172,10 +209,11 @@ void MainWidget::LoadSettings()
 	{
 		settings.beginGroup(group);
 		auto &newNote = notes.emplace_back(std::make_unique<Note>());
-		newNote->name = group;
+		newNote->name = settings.value("name").toString();;
 		newNote->content.code = settings.value("content").toString();
 		newNote->activeNotify = settings.value("activeNotify").toBool();
 		newNote->notification = settings.value("notification").toDateTime();
+		newNote->notifyReschedule = settings.value("notifyReschedule").toDateTime();
 		settings.endGroup();
 	}
 	settings.endGroup();
@@ -215,6 +253,26 @@ void MainWidget::CreateNotifyEditor(Note * noteToConnect, int rowIndex)
 	});
 }
 
+WidgetAlarms::WidgetAlarms(QWidget * parent)
+	: QWidget(parent)
+{
+	QVBoxLayout *vlo_main = new QVBoxLayout(this);
+	QHBoxLayout *hlo1 = new QHBoxLayout;
+	QHBoxLayout *hlo2 = new QHBoxLayout;
+	vlo_main->addLayout(hlo1);
+	vlo_main->addLayout(hlo2);
 
+	table = new QTableWidget;
+	hlo2->addWidget(table);
+}
 
+void WidgetAlarms::GiveNotes(const std::vector<Note *> & notes)
+{
 
+}
+
+void WidgetAlarms::closeEvent(QCloseEvent * event)
+{
+	geometry = saveGeometry();
+	event->accept();
+}
