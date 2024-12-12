@@ -19,6 +19,7 @@
 #include "MyQDialogs.h"
 #include "MyQFileDir.h"
 #include "MyQExecute.h"
+#include "MyQTableWidget.h"
 #include "CodeMarkers.h"
 
 #include "NoteEditor.h"
@@ -130,13 +131,15 @@ void MainWidget::CreateNotesChecker()
 			{
 				note->alarm = true;
 				alarmedNotes.emplace_back(note.get());
-				qdbg << "alarm" << note->name;
 			}
 			else note->alarm = false;
 		}
 
 		if(!alarmedNotes.empty())
+		{
 			widgetAlarms.GiveNotes(alarmedNotes);
+			widgetAlarms.show();
+		}
 
 	});
 	tChecher->start(1000);
@@ -156,10 +159,10 @@ void MainWidget::closeEvent(QCloseEvent * event)
 
 void MainWidget::SaveSettings()
 {
-	QDir().mkpath(MyQDifferent::PathToExe()+"/files");
-
+	QDir().mkpath(QFileInfo(settingsFile).path());
 	MyQFileDir::WriteFile(settingsFile, "");
 	QSettings settings(settingsFile, QSettings::IniFormat);
+
 	settings.setValue("geoMainWidget", this->saveGeometry());
 	QString widths;
 	for(int i=0; i<table->columnCount(); i++) widths += QSn(table->columnWidth(i)) += ";";
@@ -197,7 +200,7 @@ void MainWidget::LoadSettings()
 
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
-	this->restoreGeometry(settings.value("geoMainWidget").toByteArray());
+	restoreGeometry(settings.value("geoMainWidget").toByteArray());
 
 	QStringList widths = settings.value("columnWidths").toString().split(";", QString::SkipEmptyParts);
 	if(table->columnCount() != widths.size()) qdbg << "LoadSettings error table->columnCount() != widths.size()";
@@ -251,28 +254,4 @@ void MainWidget::CreateNotifyEditor(Note * noteToConnect, int rowIndex)
 	connect(dtReschEdit, &QDateTimeEdit::dateTimeChanged, [noteToConnect](const QDateTime &datetime){
 		noteToConnect->notifyReschedule = datetime;
 	});
-}
-
-WidgetAlarms::WidgetAlarms(QWidget * parent)
-	: QWidget(parent)
-{
-	QVBoxLayout *vlo_main = new QVBoxLayout(this);
-	QHBoxLayout *hlo1 = new QHBoxLayout;
-	QHBoxLayout *hlo2 = new QHBoxLayout;
-	vlo_main->addLayout(hlo1);
-	vlo_main->addLayout(hlo2);
-
-	table = new QTableWidget;
-	hlo2->addWidget(table);
-}
-
-void WidgetAlarms::GiveNotes(const std::vector<Note *> & notes)
-{
-
-}
-
-void WidgetAlarms::closeEvent(QCloseEvent * event)
-{
-	geometry = saveGeometry();
-	event->accept();
 }

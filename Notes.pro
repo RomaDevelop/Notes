@@ -11,13 +11,15 @@ CONFIG += c++17
 SOURCES += \
     Note.cpp \
     NoteEditor.cpp \
+    WidgetNotifie.cpp \
     main.cpp \
     MainWidget.cpp
 
 HEADERS += \
     MainWidget.h \
     Note.h \
-    NoteEditor.h
+    NoteEditor.h \
+    WidgetNotifie.h
 
 INCLUDEPATH += \
     ../include

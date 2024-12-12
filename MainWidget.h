@@ -8,23 +8,7 @@
 #include <QDateTime>
 
 #include "Note.h"
-
-class WidgetAlarms : public QWidget
-{
-	Q_OBJECT
-public:
-	QTableWidget *table;
-
-	std::vector<Note*> notes;
-
-	explicit WidgetAlarms(QWidget *parent = nullptr);
-	~WidgetAlarms() = default;
-	void GiveNotes(const std::vector<Note*> &notes);
-
-private:
-	QByteArray geometry;
-	void closeEvent (QCloseEvent *event) override;
-};
+#include "WidgetNotifie.h"
 
 class MainWidget : public QWidget
 {
