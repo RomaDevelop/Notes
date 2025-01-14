@@ -8,6 +8,8 @@
 #include "MyQFileDir.h"
 #include "MyQDifferent.h"
 
+#include "NoteEditor.h"
+
 WidgetAlarms::WidgetAlarms(QWidget * parent)
 	: QWidget(parent)
 {
@@ -23,6 +25,9 @@ WidgetAlarms::WidgetAlarms(QWidget * parent)
 	table->setColumnCount(1);
 	table->setHorizontalHeader(nullptr);
 	hlo2->addWidget(table);
+	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
+		NoteEditor::MakeNoteEditor(*notes[r]);
+	});
 }
 
 void WidgetAlarms::GiveNotes(const std::vector<Note *> & givingNotes)

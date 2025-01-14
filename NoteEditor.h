@@ -1,5 +1,7 @@
-#ifndef WIDGET_H
-#define WIDGET_H
+#ifndef NoteEditor_H
+#define NoteEditor_H
+
+#include <set>
 
 #include <QWidget>
 #include <QTextEdit>
@@ -9,15 +11,13 @@
 class NoteEditor : public QWidget
 {
 	Q_OBJECT
+
 public:
-
-	Note &note;
-	QTextEdit *textEdit;
-
-	explicit NoteEditor(Note &note, QWidget *parent = nullptr);
+	static void MakeNoteEditor(Note &note);
 	~NoteEditor();
 
 private:
+	explicit NoteEditor(Note &note, QWidget *parent = nullptr);
 	void closeEvent (QCloseEvent *event) override;
 	//void resizeEvent(QResizeEvent * event) override { }
 	//void moveEvent(QMoveEvent * event) override { }
@@ -25,6 +25,10 @@ private:
 	void SaveSettings();
 	void LoadSettings();
 
+	Note &note;
+	QTextEdit *textEdit;
+
+	inline static std::map<Note*,NoteEditor*> existingEditors;
 };
 
-#endif // WIDGET_H
+#endif

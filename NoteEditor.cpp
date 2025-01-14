@@ -11,6 +11,7 @@
 #include <QVBoxLayout>
 #include <QPushButton>
 
+#include "MyQWidgetLib.h"
 #include "MyQDifferent.h"
 
 NoteEditor::NoteEditor(Note &note, QWidget *parent):
@@ -52,6 +53,22 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 NoteEditor::~NoteEditor()
 {
 
+}
+
+void NoteEditor::MakeNoteEditor(Note & note)
+{
+	if(auto existingEditor = existingEditors.find(&note); existingEditor == existingEditors.end())
+	{
+		auto editor = new NoteEditor(note);
+		editor->show();
+		existingEditors[&note] = editor;
+	}
+	else
+	{
+		existingEditor->second->show();
+		MyQWidgetLib::SetTopMost(existingEditor->second,true);
+		MyQWidgetLib::SetTopMost(existingEditor->second,false);
+	}
 }
 
 void NoteEditor::closeEvent(QCloseEvent * event)

@@ -19,6 +19,7 @@
 #include "MyQDialogs.h"
 #include "MyQFileDir.h"
 #include "MyQExecute.h"
+#include "MyQWidgetLib.h"
 #include "MyQTableWidget.h"
 #include "CodeMarkers.h"
 
@@ -72,19 +73,25 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 
 	hlo1->addStretch();
 
-	QPushButton *btnSettings = new QPushButton("Settings");
+	QPushButton *btnSettings = new QPushButton("Settings.ini");
 	btnSettings->setFixedWidth(QFontMetrics(btnSettings->font()).horizontalAdvance(btnSettings->text()) + 20);
 	hlo1->addWidget(btnSettings);
 	connect(btnSettings,&QPushButton::clicked,[this](){
 		MyQExecute::Execute(settingsFile);
 	});
 
+	QPushButton *btnToTray = new QPushButton("To tray");
+	btnToTray->setFixedWidth(QFontMetrics(btnToTray->font()).horizontalAdvance(btnToTray->text()) + 20);
+	hlo1->addWidget(btnToTray);
+	connect(btnToTray,&QPushButton::clicked,[this](){
+		hide();
+	});
+
 	table = new QTableWidget;
 	table->setColumnCount(4);
 	hlo2->addWidget(table);
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
-		auto editor = new NoteEditor(*notes[r].get());
-		editor->show();
+		NoteEditor::MakeNoteEditor(*notes[r].get());
 	});
 
 	settingsFile = MyQDifferent::PathToExe()+"/files/settings.ini";
@@ -105,8 +112,6 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	CreateNotesChecker();
 }
 
-
-
 void MainWidget::CreateTrayIcon()
 {
 	auto icon = new QSystemTrayIcon(this);
@@ -115,6 +120,8 @@ void MainWidget::CreateTrayIcon()
 	icon->show();
 	connect(icon, &QSystemTrayIcon::activated, [this](){
 		showNormal();
+		MyQWidgetLib::SetTopMost(this,true);
+		MyQWidgetLib::SetTopMost(this,false);
 	});
 }
 
@@ -147,14 +154,19 @@ void MainWidget::CreateNotesChecker()
 
 void MainWidget::closeEvent(QCloseEvent * event)
 {
-	//	auto answ = QMessageBox::question(this,"Закрытие ...","...");
-	//	if(0){}
-	//	else if(answ == QMessageBox::Yes) {/*ничего не делаем*/}
-	//	else if(answ == QMessageBox::No) { event->ignore(); return; }
-	//	else { qCritical() << "not realesed button 0x" + QString::number(answ,16); return; }
+	auto answ = MyQDialogs::CustomDialog("Завершение работы приложения","Вы уверены, что хотите завершить работу приложения?"
+																		"\n\n(уведомления на задачи не будут поступать)"
+																		"\n(можно свернуть в трей, приложение продолжит работать)",
+										 {"Завершить", "Свернуть в трей", "Ничего не делать"});
+	if(0){}
+	else if(answ == "Завершить") {/*ничего не делаем*/}
+	else if(answ == "Свернуть в трей") { hide(); event->ignore(); return; }
+	else if(answ == "Ничего не делать") { event->ignore(); return; }
+	else { QMbc(0,"error", "not realesed button " + answ); event->ignore(); return; }
 
 	SaveSettings();
 	event->accept();
+	QApplication::exit();
 }
 
 void MainWidget::SaveSettings()
