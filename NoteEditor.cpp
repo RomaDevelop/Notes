@@ -52,7 +52,11 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 
 NoteEditor::~NoteEditor()
 {
-
+	if(auto thisEditor = existingEditors.find(&note); thisEditor != existingEditors.end())
+	{
+		existingEditors.erase(thisEditor);
+	}
+	else QMbc(0,"Error", "destructor called, but this editor not in the existingEditors");
 }
 
 void NoteEditor::MakeNoteEditor(Note & note)
@@ -65,9 +69,16 @@ void NoteEditor::MakeNoteEditor(Note & note)
 	}
 	else
 	{
-		existingEditor->second->show();
-		MyQWidgetLib::SetTopMost(existingEditor->second,true);
-		MyQWidgetLib::SetTopMost(existingEditor->second,false);
+		if(existingEditor->second->isMinimized())
+		{
+			existingEditor->second->showNormal();
+		}
+		else
+		{
+			existingEditor->second->show();
+			MyQWidgetLib::SetTopMost(existingEditor->second,true);
+			MyQWidgetLib::SetTopMost(existingEditor->second,false);
+		}
 	}
 }
 
@@ -82,6 +93,7 @@ void NoteEditor::closeEvent(QCloseEvent * event)
 	SaveSettings();
 	note.content.code = textEdit->toHtml();
 	event->accept();
+	this->deleteLater();
 }
 
 void NoteEditor::SaveSettings()
