@@ -1,4 +1,4 @@
-#include "MainWidget.h"
+#include "MainWidgetNotes.h"
 
 #include <QDebug>
 #include <QCloseEvent>
@@ -41,13 +41,10 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 		if(newName.isEmpty()) return;
 
 		notes.emplace_back(std::make_unique<Note>());
-		auto newNote = notes.back().get();
+		Note* newNote = notes.back().get();
 		newNote->name = std::move(newName);
-		table->setRowCount(table->rowCount()+1);
-		table->setItem(table->rowCount()-1, 0, new QTableWidgetItem);
-		table->item(table->rowCount()-1, 0)->setText(newNote->name);
 
-		CreateNotifyEditor(newNote, table->rowCount()-1);
+		MakeNewRowInMainTable(newNote);
 	});
 
 	QPushButton *btnRemove = new QPushButton("-");
@@ -69,7 +66,6 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 		notes[index]->name = MyQDialogs::InputText("Измените название заметки", notes[index]->name);
 		table->item(index, 0)->setText(notes[index]->name);
 	});
-
 
 	hlo1->addStretch();
 
@@ -100,11 +96,7 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 		LoadSettings();
 		for(auto &note:notes)
 		{
-			table->setRowCount(table->rowCount()+1);
-			table->setItem(table->rowCount()-1, 0, new QTableWidgetItem);
-			table->item(table->rowCount()-1, 0)->setText(note->name);
-
-			CreateNotifyEditor(note.get(), table->rowCount()-1);
+			MakeNewRowInMainTable(note.get());
 		}
 	});
 
@@ -134,7 +126,7 @@ void MainWidget::CreateNotesChecker()
 		std::vector<Note*> alarmedNotes;
 		for(auto &note:notes)
 		{
-			if(currentDateTime >= note->notifyReschedule)
+			if(currentDateTime >= note->dtPostpone)
 			{
 				note->alarm = true;
 				alarmedNotes.emplace_back(note.get());
@@ -142,12 +134,10 @@ void MainWidget::CreateNotesChecker()
 			else note->alarm = false;
 		}
 
+		widgetAlarms.GiveNotes(alarmedNotes);
 		if(!alarmedNotes.empty())
-		{
-			widgetAlarms.GiveNotes(alarmedNotes);
 			widgetAlarms.show();
-		}
-
+		else widgetAlarms.hide();
 	});
 	tChecher->start(1000);
 }
@@ -192,8 +182,8 @@ void MainWidget::SaveSettings()
 		settings.setValue("name", note->name);
 		settings.setValue("content", note->content.code);
 		settings.setValue("activeNotify", note->activeNotify);
-		settings.setValue("notification", note->notification);
-		settings.setValue("notifyReschedule", note->notifyReschedule);
+		settings.setValue("notification", note->dtNotify);
+		settings.setValue("notifyPostpone", note->dtPostpone);
 		settings.endGroup();
 	}
 	settings.endGroup();
@@ -227,43 +217,77 @@ void MainWidget::LoadSettings()
 		newNote->name = settings.value("name").toString();;
 		newNote->content.code = settings.value("content").toString();
 		newNote->activeNotify = settings.value("activeNotify").toBool();
-		newNote->notification = settings.value("notification").toDateTime();
-		newNote->notifyReschedule = settings.value("notifyReschedule").toDateTime();
+		newNote->dtNotify = settings.value("notification").toDateTime();
+		newNote->dtPostpone = settings.value("notifyPostpone").toDateTime();
 		settings.endGroup();
 	}
 	settings.endGroup();
 }
 
-void MainWidget::CreateNotifyEditor(Note * noteToConnect, int rowIndex)
+int MainWidget::RowOfNote(Note * note)
 {
-	auto chActive = new QCheckBox;
-	chActive->setChecked(noteToConnect->activeNotify);
-	connect(chActive, &QCheckBox::stateChanged, [noteToConnect, chActive](int){
-		noteToConnect->activeNotify = chActive->isChecked();
-	});
+	for(uint i=0; i<notes.size(); i++)
+		if(note == notes[i].get()) return i;
+	if(note) QMbError("RowOfNote: ROW NOT FOUND for note " + note->name + " ("+note->dtNotify.toString()+")");
+	else QMbError("RowOfNote: nullptr row");
+	return -1;
+}
 
+namespace ColIndexes {
+	const int name = 0;
+	const int chBox = name+1;
+	const int notifyDTedit = chBox+1;
+	const int postponeDTedit = notifyDTedit+1;
+}
+
+void MainWidget::MakeNewRowInMainTable(Note * newNote)
+{
+	newNote->ConnectUpdated([this, newNote](){ UpdateRowFromNote(newNote, RowOfNote(newNote)); });
+
+	table->setRowCount(table->rowCount()+1);
+
+	int rowIndex = table->rowCount()-1;
+
+	table->setItem(rowIndex, ColIndexes::name, new QTableWidgetItem);
+
+	auto chActive = new QCheckBox;
+	connect(chActive, &QCheckBox::stateChanged, [newNote, chActive](int){
+		newNote->activeNotify = chActive->isChecked();
+	});
 	auto wCh = new QWidget;
 	auto loWCH = new QHBoxLayout(wCh);
 	loWCH->setAlignment(Qt::AlignCenter);
 	loWCH->setContentsMargins(0,0,0,0);
 	loWCH->addWidget(chActive);
-	table->setCellWidget(rowIndex, 1, wCh);
+	table->setCellWidget(rowIndex, ColIndexes::chBox, wCh);
 
-	auto dtEdit = new QDateTimeEdit(noteToConnect->notification);
-	dtEdit->setDisplayFormat("dd.MM.yyyy HH:mm");
-	dtEdit->setCalendarPopup(true);
-	table->setCellWidget(rowIndex, 2, dtEdit);
+	auto dtEditNotify = new QDateTimeEdit;
+	dtEditNotify->setDisplayFormat("dd.MM.yyyy HH:mm");
+	dtEditNotify->setCalendarPopup(true);
+	table->setCellWidget(rowIndex, ColIndexes::notifyDTedit, dtEditNotify);
 
-	auto dtReschEdit = new QDateTimeEdit(noteToConnect->notifyReschedule);
-	dtEdit->setDisplayFormat("dd.MM.yyyy HH:mm");
-	dtEdit->setCalendarPopup(true);
-	table->setCellWidget(rowIndex, 3, dtReschEdit);
+	auto dtEditPostpone = new QDateTimeEdit;
+	dtEditNotify->setDisplayFormat("dd.MM.yyyy HH:mm");
+	dtEditNotify->setCalendarPopup(true);
+	table->setCellWidget(rowIndex, ColIndexes::postponeDTedit, dtEditPostpone);
 
-	connect(dtEdit, &QDateTimeEdit::dateTimeChanged, [noteToConnect, dtReschEdit](const QDateTime &datetime){
-		noteToConnect->notification = datetime;
-		dtReschEdit->setDateTime(datetime);
+	rowViews.emplace_back(table->item(rowIndex, ColIndexes::name), chActive, dtEditNotify, dtEditPostpone);
+
+	UpdateRowFromNote(newNote, rowIndex);
+
+	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [newNote, dtEditPostpone](const QDateTime &datetime){
+		newNote->dtNotify = datetime;
+		dtEditPostpone->setDateTime(datetime);
 	});
-	connect(dtReschEdit, &QDateTimeEdit::dateTimeChanged, [noteToConnect](const QDateTime &datetime){
-		noteToConnect->notifyReschedule = datetime;
+	connect(dtEditPostpone, &QDateTimeEdit::dateTimeChanged, [newNote](const QDateTime &datetime){
+		newNote->dtPostpone = datetime;
 	});
+}
+
+void MainWidget::UpdateRowFromNote(Note * note, int row)
+{
+	rowViews[row].item->setText(note->name);
+	rowViews[row].chBox->setChecked(note->activeNotify);
+	rowViews[row].dteNotify->setDateTime(note->dtNotify);
+	rowViews[row].dtePostpone->setDateTime(note->dtPostpone);
 }

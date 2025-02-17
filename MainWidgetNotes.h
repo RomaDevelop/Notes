@@ -6,6 +6,10 @@
 #include <QWidget>
 #include <QTableWidget>
 #include <QDateTime>
+#include <QCheckBox>
+#include <QDateTimeEdit>
+
+#include "declare_struct.h"
 
 #include "Note.h"
 #include "WidgetNotifie.h"
@@ -15,7 +19,8 @@ class MainWidget : public QWidget
 	Q_OBJECT
 public:
 	QTableWidget *table;
-
+	declare_struct_4_fields_no_move(RowView, QTableWidgetItem*, item, QCheckBox*, chBox, QDateTimeEdit*, dteNotify, QDateTimeEdit*, dtePostpone);
+	std::vector<RowView> rowViews;
 	std::vector<std::unique_ptr<Note>> notes;
 	WidgetAlarms widgetAlarms;
 
@@ -33,7 +38,11 @@ private:
 	void SaveSettings();
 	void LoadSettings();
 
-	void CreateNotifyEditor(Note * noteToConnect, int rowIndex);
+	int RowOfNote(Note* note);
+
+	void MakeNewRowInMainTable(Note* newNote);
+	void UpdateRowFromNote(Note* note, int row);
+	void NoteUpdated(Note* note);
 };
 
 

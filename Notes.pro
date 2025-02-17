@@ -10,15 +10,15 @@ CONFIG += c++17
 
 SOURCES += \
     ../include/MyQWidgetLib.cpp \
+    MainWidgetNotes.cpp \
     Note.cpp \
     NoteEditor.cpp \
     WidgetNotifie.cpp \
-    main.cpp \
-    MainWidget.cpp
+    main.cpp
 
 HEADERS += \
     ../include/MyQWidgetLib.h \
-    MainWidget.h \
+    MainWidgetNotes.h \
     Note.h \
     NoteEditor.h \
     WidgetNotifie.h

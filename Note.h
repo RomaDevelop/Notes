@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <memory>
+#include <functional>
 
 #include <QDateTime>
 #include <QString>
@@ -16,12 +17,17 @@ struct HTML
 struct Note
 {
 	bool activeNotify = false;
-	QDateTime notification = QDateTime::currentDateTime();
-	QDateTime notifyReschedule = QDateTime::currentDateTime();
+	QDateTime dtNotify = QDateTime::currentDateTime();
+	QDateTime dtPostpone = QDateTime::currentDateTime();
 	bool alarm = false;
 
 	QString name;
 	HTML content;
+
+	void ConnectUpdated(std::function<void()> aUpdated);
+	void EmitUpdated();
+private:
+	std::function<void()> updated;
 
 };
 

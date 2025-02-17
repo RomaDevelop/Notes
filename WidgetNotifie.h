@@ -16,7 +16,7 @@ public:
 	QTableWidget *table;
 
 	explicit WidgetAlarms(QWidget *parent = nullptr);
-	~WidgetAlarms() = default;
+	~WidgetAlarms();
 	void GiveNotes(const std::vector<Note*> &givingNotes);
 
 	QByteArray geometry;
@@ -30,6 +30,7 @@ private:
 	QString settingsFile;
 	void showEvent(QShowEvent *event) override;
 	void closeEvent (QCloseEvent *event) override;
+	void SaveSettings();
 };
 
 #endif // WIDGETNOTIFIE_H

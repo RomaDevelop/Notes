@@ -1,4 +1,4 @@
-#include "MainWidget.h"
+#include "MainWidgetNotes.h"
 
 #include <QApplication>
 
