@@ -4,6 +4,7 @@
 #include <vector>
 #include <set>
 
+#include <QLabel>
 #include <QTableWidget>
 #include <QWidget>
 
@@ -25,12 +26,21 @@ public:
 private:
 	std::vector<Note*> notes;
 	void AddNote(Note* note);
+	QString GenLabelText(Note* note);
 	void RemoveNote(int index);
+	void RemoveNote(Note* aNote, bool showError);
+
+	enum menuPostponeCase {changeDtNotify, setPostpone};
+	enum { indexForAll = -1 };
+	void ShowMenuPostpone(QPoint pos, menuPostponeCase, int index);
 
 	QString settingsFile;
 	void showEvent(QShowEvent *event) override;
 	void closeEvent (QCloseEvent *event) override;
 	void SaveSettings();
+
+protected:
+	void resizeEvent(QResizeEvent *event) override;
 };
 
 #endif // WIDGETNOTIFIE_H

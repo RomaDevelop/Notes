@@ -14,6 +14,7 @@
 #include <QDateTimeEdit>
 #include <QSystemTrayIcon>
 #include <QApplication>
+#include <QScrollBar>
 
 #include "MyQDifferent.h"
 #include "MyQDialogs.h"
@@ -25,6 +26,21 @@
 
 #include "NoteEditor.h"
 
+namespace ColIndexes {
+	const int name = 0;
+	const int chBox = name+1;
+	const int notifyDTedit = chBox+1;
+	const int postponeDTedit = notifyDTedit+1;
+
+	const int colsCount = postponeDTedit+1;
+
+	//const int nameWidth = -1;
+	const int chBoxWidth = 60;
+	const int notifyDTeditWidth = 130;
+	const int postponeDTeditWidth = 130;
+}
+
+
 MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 {
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
@@ -33,18 +49,15 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	vlo_main->addLayout(hlo1);
 	vlo_main->addLayout(hlo2);
 
-	QPushButton *btn1 = new QPushButton("+");
-	btn1->setFixedWidth(25);
-	hlo1->addWidget(btn1);
-	connect(btn1,&QPushButton::clicked,[this](){
+	QPushButton *btnPlus = new QPushButton("+");
+	btnPlus->setFixedWidth(25);
+	hlo1->addWidget(btnPlus);
+	connect(btnPlus,&QPushButton::clicked,[this](){
 		QString newName = MyQDialogs::InputText("Введите название заметки", "", 400, 150);
 		if(newName.isEmpty()) return;
 
-		notes.emplace_back(std::make_unique<Note>());
-		Note* newNote = notes.back().get();
-		newNote->name = std::move(newName);
-
-		MakeNewRowInMainTable(newNote);
+		auto dt = QDateTime::currentDateTime();
+		MakeNewNote(newName, false, dt, dt, Note::StartText());
 	});
 
 	QPushButton *btnRemove = new QPushButton("-");
@@ -53,7 +66,13 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	connect(btnRemove,&QPushButton::clicked,[this](){
 		int index = table->currentRow();
 		if(table->rowCount() == 0 ||  index < 0 || index >= table->rowCount()) return;
+		if(!notes[index]->file.isEmpty())
+		{
+			if(!QFile::remove(notes[index]->file)) QMbError("Error removing file " + notes[index]->file);
+		}
 		notes.erase(notes.begin() + index);
+
+		rowViews.erase(rowViews.begin() + index);
 		table->removeRow(index);
 	});
 
@@ -64,10 +83,24 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 		int index = table->currentRow();
 		if(table->rowCount() == 0 ||  index < 0 || index >= table->rowCount()) return;
 		notes[index]->name = MyQDialogs::InputText("Измените название заметки", notes[index]->name);
+		notes[index]->file = MakeNameFileToSaveNote(notes[index].get(), index);
+		WriteNoteToFile(notes[index].get(), notes[index]->file);
+		if(!notes[index]->file.isEmpty())
+		{
+			if(!QFile::remove(notes[index]->file)) QMbError("Error removing file " + notes[index]->file);
+			notes[index]->file.clear();
+		}
 		table->item(index, 0)->setText(notes[index]->name);
 	});
 
 	hlo1->addStretch();
+
+	QPushButton *btnSavePath = new QPushButton("Sava path");
+	btnSavePath->setFixedWidth(QFontMetrics(btnSavePath->font()).horizontalAdvance(btnSavePath->text()) + 20);
+	hlo1->addWidget(btnSavePath);
+	connect(btnSavePath,&QPushButton::clicked,[this](){
+		MyQExecute::OpenDir(notesSavesPath);
+	});
 
 	QPushButton *btnSettings = new QPushButton("Settings.ini");
 	btnSettings->setFixedWidth(QFontMetrics(btnSettings->font()).horizontalAdvance(btnSettings->text()) + 20);
@@ -84,20 +117,20 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	});
 
 	table = new QTableWidget;
+	table->verticalHeader()->hide();
 	table->setColumnCount(4);
+	table->setHorizontalHeaderLabels({"Наименование","","Начало","Отложено на..."});
 	hlo2->addWidget(table);
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
 		NoteEditor::MakeNoteEditor(*notes[r].get());
 	});
 
-	settingsFile = MyQDifferent::PathToExe()+"/files/settings.ini";
+	QDir().mkpath(notesSavesPath);
+	MyQFileDir::RemoveOldFiles(notesSavesPath, 30);
+
 	QTimer::singleShot(0,this,[this]
 	{
 		LoadSettings();
-		for(auto &note:notes)
-		{
-			MakeNewRowInMainTable(note.get());
-		}
 	});
 
 	CreateTrayIcon();
@@ -126,18 +159,13 @@ void MainWidget::CreateNotesChecker()
 		std::vector<Note*> alarmedNotes;
 		for(auto &note:notes)
 		{
-			if(currentDateTime >= note->dtPostpone)
+			if(note->CheckAlarm(currentDateTime))
 			{
-				note->alarm = true;
 				alarmedNotes.emplace_back(note.get());
 			}
-			else note->alarm = false;
 		}
 
 		widgetAlarms.GiveNotes(alarmedNotes);
-		if(!alarmedNotes.empty())
-			widgetAlarms.show();
-		else widgetAlarms.hide();
 	});
 	tChecher->start(1000);
 }
@@ -159,34 +187,50 @@ void MainWidget::closeEvent(QCloseEvent * event)
 	QApplication::exit();
 }
 
+QString MainWidget::MakeNameFileToSaveNote(Note * note, int index)
+{
+	QString fileName = notesSavesPath;
+	fileName += "/note";
+	fileName += QSn(index).rightJustified(5,'0');
+	fileName += "-";
+	fileName += QString(note->name).replace(QRegularExpression("[\\\\/:*?\"<>|]"), "_");
+	fileName += ".txt";
+	return fileName;
+}
+
+void MainWidget::WriteNoteToFile(Note * note, const QString & fileName)
+{
+	QString endValue = "[endValue]\n";
+	QString dtFormat = "yyyy.MM.dd hh:mm:ss";
+
+	QString noteText;
+	noteText.append(note->name + endValue);
+	noteText.append(QSn(note->activeNotify) + endValue);
+	noteText.append(note->dtNotify.toString(dtFormat) + endValue);
+	noteText.append(note->dtPostpone.toString(dtFormat) + endValue);
+	noteText.append(note->content.code + endValue);
+	if(!MyQFileDir::WriteFile(fileName, noteText))
+	{
+		QMbError("Во время сохранения произошла ошибка, сейчас будет показан файл который не сохранился, сохраните содержимое самостоятельно");
+		MyQDialogs::ShowText(noteText);
+	}
+}
+
 void MainWidget::SaveSettings()
 {
-	QDir().mkpath(QFileInfo(settingsFile).path());
 	MyQFileDir::WriteFile(settingsFile, "");
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
 	settings.setValue("geoMainWidget", this->saveGeometry());
-	QString widths;
-	for(int i=0; i<table->columnCount(); i++) widths += QSn(table->columnWidth(i)) += ";";
-	settings.setValue("columnWidths", widths);
 
-	settings.beginGroup("notes");
-	auto keys = settings.childKeys();
-	for(uint i=0; i<notes.size(); i++)
+	/*for(uint i=0; i<notes.size(); i++)
 	{
 		auto& note = notes[i];
-		QString groupName = QSn(i);
-		groupName = groupName.rightJustified(5,'0');
-		groupName.prepend("note");
-		settings.beginGroup(groupName);
-		settings.setValue("name", note->name);
-		settings.setValue("content", note->content.code);
-		settings.setValue("activeNotify", note->activeNotify);
-		settings.setValue("notification", note->dtNotify);
-		settings.setValue("notifyPostpone", note->dtPostpone);
-		settings.endGroup();
-	}
-	settings.endGroup();
+
+		QString fileName = MakeNameFileToSaveNote(note.get(), i);
+
+		WriteNoteToFile(note.get(), fileName);
+	}*/
 }
 
 void MainWidget::LoadSettings()
@@ -204,24 +248,20 @@ void MainWidget::LoadSettings()
 
 	restoreGeometry(settings.value("geoMainWidget").toByteArray());
 
-	QStringList widths = settings.value("columnWidths").toString().split(";", QString::SkipEmptyParts);
-	if(table->columnCount() != widths.size()) qdbg << "LoadSettings error table->columnCount() != widths.size()";
-	for(int i=0; i<table->columnCount() && i < widths.size(); i++) table->setColumnWidth(i, widths[i].toUInt());
-
-	settings.beginGroup("notes");
-	auto groups = settings.childGroups();
-	for(auto &group:groups)
+	QString endValue = "[endValue]\n";
+	QString dtFormat = "yyyy.MM.dd hh:mm:ss";
+	auto files = QDir(notesSavesPath).entryList(QDir::Files,QDir::Name);
+	for(auto &file:files)
 	{
-		settings.beginGroup(group);
-		auto &newNote = notes.emplace_back(std::make_unique<Note>());
-		newNote->name = settings.value("name").toString();;
-		newNote->content.code = settings.value("content").toString();
-		newNote->activeNotify = settings.value("activeNotify").toBool();
-		newNote->dtNotify = settings.value("notification").toDateTime();
-		newNote->dtPostpone = settings.value("notifyPostpone").toDateTime();
-		settings.endGroup();
+		auto fileContent = MyQFileDir::ReadFile1(notesSavesPath + "/" + file);
+		auto fileParts = fileContent.split(endValue, QString::SkipEmptyParts);
+		if(fileParts.size() != 5) { QMbError("Wrong LoadSettings file " + notesSavesPath + "/" + file); continue; }
+
+		MakeNewNote(fileParts[0], fileParts[1].toInt(),
+				QDateTime().fromString(fileParts[2], dtFormat),
+				QDateTime().fromString(fileParts[3], dtFormat),
+				fileParts[4]);
 	}
-	settings.endGroup();
 }
 
 int MainWidget::RowOfNote(Note * note)
@@ -233,11 +273,24 @@ int MainWidget::RowOfNote(Note * note)
 	return -1;
 }
 
-namespace ColIndexes {
-	const int name = 0;
-	const int chBox = name+1;
-	const int notifyDTedit = chBox+1;
-	const int postponeDTedit = notifyDTedit+1;
+Note & MainWidget::MakeNewNote(QString name, bool activeNotify, QDateTime dtNotify, QDateTime dtPostpone, QString content)
+{
+	notes.emplace_back(std::make_unique<Note>());
+	Note* newNote = notes.back().get();
+	newNote->name = std::move(name);
+	newNote->file = MakeNameFileToSaveNote(newNote, notes.size()-1);
+	newNote->activeNotify = activeNotify;
+	newNote->dtNotify = dtNotify;
+	newNote->dtPostpone = dtPostpone;
+	newNote->content.code = content;
+
+	WriteNoteToFile(newNote, newNote->file);
+
+	newNote->ConnectContentUpdated([this, newNote](){ WriteNoteToFile(newNote, newNote->file); });
+
+	MakeNewRowInMainTable(newNote);
+
+	return *newNote;
 }
 
 void MainWidget::MakeNewRowInMainTable(Note * newNote)
@@ -262,32 +315,60 @@ void MainWidget::MakeNewRowInMainTable(Note * newNote)
 	table->setCellWidget(rowIndex, ColIndexes::chBox, wCh);
 
 	auto dtEditNotify = new QDateTimeEdit;
-	dtEditNotify->setDisplayFormat("dd.MM.yyyy HH:mm");
+	dtEditNotify->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
 	dtEditNotify->setCalendarPopup(true);
 	table->setCellWidget(rowIndex, ColIndexes::notifyDTedit, dtEditNotify);
 
 	auto dtEditPostpone = new QDateTimeEdit;
-	dtEditNotify->setDisplayFormat("dd.MM.yyyy HH:mm");
-	dtEditNotify->setCalendarPopup(true);
+	dtEditPostpone->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
 	table->setCellWidget(rowIndex, ColIndexes::postponeDTedit, dtEditPostpone);
 
 	rowViews.emplace_back(table->item(rowIndex, ColIndexes::name), chActive, dtEditNotify, dtEditPostpone);
 
 	UpdateRowFromNote(newNote, rowIndex);
 
-	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [newNote, dtEditPostpone](const QDateTime &datetime){
+	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [this, newNote, dtEditPostpone](const QDateTime &datetime){
 		newNote->dtNotify = datetime;
-		dtEditPostpone->setDateTime(datetime);
-	});
-	connect(dtEditPostpone, &QDateTimeEdit::dateTimeChanged, [newNote](const QDateTime &datetime){
 		newNote->dtPostpone = datetime;
+
+		dtEditPostpone->blockSignals(true);
+		dtEditPostpone->setDateTime(datetime);
+		dtEditPostpone->blockSignals(false);
+
+		WriteNoteToFile(newNote, newNote->file);
+	});
+	connect(dtEditPostpone, &QDateTimeEdit::dateTimeChanged, [this, newNote](const QDateTime &datetime){
+		newNote->dtPostpone = datetime;
+
+		WriteNoteToFile(newNote, newNote->file);
 	});
 }
 
 void MainWidget::UpdateRowFromNote(Note * note, int row)
 {
-	rowViews[row].item->setText(note->name);
+	rowViews[row].item->setText("   " + note->name);
 	rowViews[row].chBox->setChecked(note->activeNotify);
 	rowViews[row].dteNotify->setDateTime(note->dtNotify);
 	rowViews[row].dtePostpone->setDateTime(note->dtPostpone);
+}
+
+void MainWidget::resizeEvent(QResizeEvent * event)
+{
+	QWidget::resizeEvent(event);
+	int columnCount = table->columnCount();
+
+	if (columnCount != ColIndexes::colsCount)
+	{
+		static bool preinted = false;
+		if(!preinted) { preinted = true; QMbError("resizeEvent wrong columnCount"); }
+		return;
+	}
+
+	table->setColumnWidth(ColIndexes::chBox, ColIndexes::chBoxWidth);
+	table->setColumnWidth(ColIndexes::notifyDTedit, ColIndexes::notifyDTeditWidth);
+	table->setColumnWidth(ColIndexes::postponeDTedit, ColIndexes::postponeDTeditWidth);
+
+	int nameWidth = table->width() - (ColIndexes::chBoxWidth+ColIndexes::notifyDTeditWidth+ColIndexes::postponeDTeditWidth + ColIndexes::colsCount);
+	if(table->verticalScrollBar()->isVisible()) nameWidth -= table->verticalScrollBar()->width();
+	table->setColumnWidth(ColIndexes::name, nameWidth);
 }

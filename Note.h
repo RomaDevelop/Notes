@@ -19,15 +19,23 @@ struct Note
 	bool activeNotify = false;
 	QDateTime dtNotify = QDateTime::currentDateTime();
 	QDateTime dtPostpone = QDateTime::currentDateTime();
-	bool alarm = false;
 
 	QString name;
+	QString file;
 	HTML content;
+	static const QString& StartText() { static QString str = "Введите текст"; return str; }
 
-	void ConnectUpdated(std::function<void()> aUpdated);
+	bool CheckAlarm(const QDateTime &dateToCompare);
+
+	void ConnectUpdated(std::function<void()> aUpdatedCb);
 	void EmitUpdated();
+
+
+	void ConnectContentUpdated(std::function<void()> cb);
+	void EmitContentUpdated();
 private:
-	std::function<void()> updated;
+	std::function<void()> updatedCb;
+	std::function<void()> contentUpdatedCb;
 
 };
 

@@ -36,6 +36,16 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 		cursor.setCharFormat(format);
 	});
 
+	QPushButton *btnUnderlined = new QPushButton("U");
+	btnUnderlined->setFixedWidth(25);
+	hlo1->addWidget(btnUnderlined);
+	connect(btnUnderlined,&QPushButton::clicked,[this](){
+		auto cursor = textEdit->textCursor();
+		auto format = cursor.charFormat();
+		format.setFontUnderline(true);
+		cursor.setCharFormat(format);
+	});
+
 	QPushButton *btnAplus = new QPushButton("A+");
 	btnAplus->setFixedWidth(30);
 	hlo1->addWidget(btnAplus);
@@ -61,7 +71,7 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 	textEdit = new QTextEdit;
 	hlo2->addWidget(textEdit);
 
-	if(note.content.code.isEmpty()) note.content.code = "<span style='font-size: 14pt;'>sdvsd</span>";
+	if(note.content.code == Note::StartText()) note.content.code = "<span style='font-size: 14pt;'>"+Note::StartText()+"</span>";
 	textEdit->setHtml(note.content.code);
 
 	settingsFile = MyQDifferent::PathToExe()+"/files/settings_note_editor.ini";
@@ -76,6 +86,7 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 NoteEditor::~NoteEditor()
 {
 	note.content.code = textEdit->toHtml();
+	note.EmitContentUpdated();
 	if(auto thisEditor = existingEditors.find(&note); thisEditor != existingEditors.end())
 	{
 		existingEditors.erase(thisEditor);

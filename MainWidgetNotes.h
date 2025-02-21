@@ -9,6 +9,7 @@
 #include <QCheckBox>
 #include <QDateTimeEdit>
 
+#include "MyQDifferent.h"
 #include "declare_struct.h"
 
 #include "Note.h"
@@ -34,15 +35,24 @@ private:
 	void closeEvent (QCloseEvent *event) override;
 	//void resizeEvent(QResizeEvent * event) override { }
 	//void moveEvent(QMoveEvent * event) override { }
-	QString settingsFile;
+	QString filesPath = MyQDifferent::PathToExe()+"/files";
+	QString settingsFile = filesPath + "/settings.ini";
+	QString notesSavesPath = filesPath + "/notes";
+	QString MakeNameFileToSaveNote(Note * note, int index);
+	void WriteNoteToFile(Note * note, const QString &fileName);
+
 	void SaveSettings();
 	void LoadSettings();
 
 	int RowOfNote(Note* note);
 
+	Note& MakeNewNote(QString name, bool activeNotify, QDateTime dtNotify, QDateTime dtPostpone, QString content);
 	void MakeNewRowInMainTable(Note* newNote);
 	void UpdateRowFromNote(Note* note, int row);
 	void NoteUpdated(Note* note);
+
+protected:
+	void resizeEvent(QResizeEvent *event) override;
 };
 
 
