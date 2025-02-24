@@ -26,7 +26,7 @@ public:
 	WidgetAlarms widgetAlarms;
 
 	explicit MainWidget(QWidget *parent = nullptr);
-	~MainWidget() = default;
+	~MainWidget();
 
 private:
 	void CreateTrayIcon();

@@ -45,11 +45,11 @@ WidgetAlarms::WidgetAlarms(QWidget * parent)
 	hlo2->addWidget(btnReschedule);
 	hlo2->addWidget(btnPostpone);
 	connect(btnReschedule, &QPushButton::clicked, [this, btnReschedule](){
-		ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, indexForAll);
+		ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, NoteForPostponeAll());
 	});
 
 	connect(btnPostpone, &QPushButton::clicked, [this, btnPostpone](){
-		ShowMenuPostpone(btnPostpone->mapToGlobal(QPoint(0, btnPostpone->height())), setPostpone, indexForAll);
+		ShowMenuPostpone(btnPostpone->mapToGlobal(QPoint(0, btnPostpone->height())), setPostpone, NoteForPostponeAll());
 	});
 }
 
@@ -96,11 +96,11 @@ void WidgetAlarms::AddNote(Note * note)
 	hlo->addWidget(btnPostpone);
 	hlo->addSpacing(5);
 
-	connect(btnReschedule, &QPushButton::clicked, [this, btnReschedule, row](){
-		ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, row);
+	connect(btnReschedule, &QPushButton::clicked, [this, btnReschedule, note](){
+		ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, note);
 	});
-	connect(btnPostpone, &QPushButton::clicked, [this, btnPostpone, row](){
-		ShowMenuPostpone(btnPostpone->mapToGlobal(QPoint(0, btnPostpone->height())), setPostpone, row);
+	connect(btnPostpone, &QPushButton::clicked, [this, btnPostpone, note](){
+		ShowMenuPostpone(btnPostpone->mapToGlobal(QPoint(0, btnPostpone->height())), setPostpone, note);
 	});
 }
 
@@ -126,7 +126,7 @@ void WidgetAlarms::RemoveNote(Note * aNote, bool showError)
 	if(showError) QMbError("RemoveNote: note " + aNote->name + " not found");
 }
 
-void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCaseValue, int index)
+void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCaseValue, Note* note)
 {
 	static QMenu *menu = nullptr;
 	static menuPostponeCase menuPostponeCaseCurrent;
@@ -144,11 +144,12 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 		delays = 		{{"5 минут", 60*5}, {"10 минут", 60*10}, {"15 минут", 60*15}, {"20 минут", 60*20},
 						 {"25 минут", 60*25}, {"30 минут", 60*30}, {"35 минут", 60*35}, {"40 минут", 60*40},
 						 {"45 минут", 60*45}, {"50 минут", 60*50}, {"1 час", 60*60}, {"1,5 часа", 60*90},
-						 {"2 часа", 60*120}, {"3 часа", 60*180}, {"4 часа", 60*240}, {"Ввести вручную", -1}};
+						 {"2 часа", 60*120}, {"3 часа", 60*180}, {"4 часа", 60*240}, {"5 часов", 60*240},
+						 {"6 часов", 60*240}, {"7 часов", 60*240}, {"8 часов", 60*240}, {"Ввести вручную", -1}};
 	else QMbError("wrong menuPostponeCaseValue");
 
-	std::vector<Note*> notesToTo { notes[index] };
-	if(index == indexForAll)
+	std::vector<Note*> notesToTo { note };
+	if(note == NoteForPostponeAll())
 	{
 		notesToTo = notes;
 	}
@@ -158,7 +159,7 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 		int delaySecs = delay.seconds;
 
 		if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify && delay.seconds != -1)
-			delay.text = notesToTo[0]->dtNotify.addSecs(delaySecs).toString("dd MMM yyyy hh:mm:ss (ddd)");
+			delay.text = QDateTime::currentDateTime().addSecs(delaySecs).toString("dd MMM yyyy (ddd)");
 			// если это кнопка Перенести и не выбрано Ввести вручную, то ставим конкретную дату исходя из даты первой заметки
 
 		menu->addAction(new QAction(delay.text, menu));
@@ -179,15 +180,18 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 				else QMbError("Error button name " + res.button);
 			}
 
-			QDateTime dtNewNotify = notesToTo[0]->dtNotify.addSecs(itogDelaySecs);
 			for(uint i=0; i<notesToTo.size(); i++)
 			{
 				if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
 					notesToTo[i]->dtPostpone = QDateTime::currentDateTime().addSecs(itogDelaySecs);
 				else if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
 				{
-					notesToTo[i]->dtNotify = dtNewNotify;
-					notesToTo[i]->dtPostpone = dtNewNotify;
+					// get today with note time
+					QDateTime newDT(QDate::currentDate(), notesToTo[i]->dtNotify.time());
+					newDT = newDT.addSecs(itogDelaySecs);
+
+					notesToTo[i]->dtNotify = newDT;
+					notesToTo[i]->dtPostpone = notesToTo[i]->dtNotify;
 				}
 				if(!notesToTo[i]->CheckAlarm(QDateTime::currentDateTime()))
 					RemoveNote(notesToTo[i], false);

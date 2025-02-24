@@ -31,8 +31,8 @@ private:
 	void RemoveNote(Note* aNote, bool showError);
 
 	enum menuPostponeCase {changeDtNotify, setPostpone};
-	enum { indexForAll = -1 };
-	void ShowMenuPostpone(QPoint pos, menuPostponeCase, int index);
+	static Note* NoteForPostponeAll() { return nullptr; }
+	void ShowMenuPostpone(QPoint pos, menuPostponeCase, Note* note);
 
 	QString settingsFile;
 	void showEvent(QShowEvent *event) override;

@@ -137,6 +137,13 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	CreateNotesChecker();
 }
 
+MainWidget::~MainWidget()
+{
+	/// не надо тут пытаться сохранять задачи
+	/// ибо при завершении работы программы инициированном ОС они не будут успевать сохраняться
+	/// сохранение задач должно надежно происходить при их изменении
+}
+
 void MainWidget::CreateTrayIcon()
 {
 	auto icon = new QSystemTrayIcon(this);
@@ -182,6 +189,11 @@ void MainWidget::closeEvent(QCloseEvent * event)
 	else if(answ == "Ничего не делать") { event->ignore(); return; }
 	else { QMbc(0,"error", "not realesed button " + answ); event->ignore(); return; }
 
+
+	/// не надо тут пытаться сохранять задачи
+	/// ибо при завершении работы программы инициированном ОС они не будут успевать сохраняться
+	/// сохранение задач должно надежно происходить при их изменении
+
 	SaveSettings();
 	event->accept();
 	QApplication::exit();
@@ -221,16 +233,11 @@ void MainWidget::SaveSettings()
 	MyQFileDir::WriteFile(settingsFile, "");
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
+	/// не надо тут пытаться сохранять задачи
+	/// ибо при завершении работы программы инициированном ОС они не будут успевать сохраняться
+	/// сохранение задач должно надежно происходить при их изменении
+
 	settings.setValue("geoMainWidget", this->saveGeometry());
-
-	/*for(uint i=0; i<notes.size(); i++)
-	{
-		auto& note = notes[i];
-
-		QString fileName = MakeNameFileToSaveNote(note.get(), i);
-
-		WriteNoteToFile(note.get(), fileName);
-	}*/
 }
 
 void MainWidget::LoadSettings()
