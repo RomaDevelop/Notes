@@ -126,6 +126,19 @@ void WidgetAlarms::RemoveNote(Note * aNote, bool showError)
 	if(showError) QMbError("RemoveNote: note " + aNote->name + " not found");
 }
 
+QDateTime AddSecsFromToday(const QDateTime &dt, qint64 secs)
+{
+
+	QDateTime newDT(QDate::currentDate(), dt.time());	// get today with dt time
+	newDT = newDT.addSecs(secs);						// add secs
+	return newDT;
+}
+
+QDateTime AddSecsFromNow(qint64 secs)
+{
+	return QDateTime::currentDateTime().addSecs(secs);
+}
+
 void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCaseValue, Note* note)
 {
 	static QMenu *menu = nullptr;
@@ -136,16 +149,17 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 	declare_struct_2_fields_move(Delay, QString, text, int, seconds);
 	std::vector<Delay> delays;
 	const int secondsInDay = 60*60*24;
+	const int handInput = -1;
 	if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
 		delays = 		{{"1 день", secondsInDay}, {"2 дня", secondsInDay*2}, {"3 дня", secondsInDay*3}, {"4 дня", secondsInDay*4},
 						 {"5 дней", secondsInDay*5}, {"6 дней", secondsInDay*6}, {"7 дней", secondsInDay*7},
-						 {"Ввести вручную", -1}};
+						 {"Ввести вручную", handInput}};
 	else if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
 		delays = 		{{"5 минут", 60*5}, {"10 минут", 60*10}, {"15 минут", 60*15}, {"20 минут", 60*20},
 						 {"25 минут", 60*25}, {"30 минут", 60*30}, {"35 минут", 60*35}, {"40 минут", 60*40},
 						 {"45 минут", 60*45}, {"50 минут", 60*50}, {"1 час", 60*60}, {"1,5 часа", 60*90},
 						 {"2 часа", 60*120}, {"3 часа", 60*180}, {"4 часа", 60*240}, {"5 часов", 60*240},
-						 {"6 часов", 60*240}, {"7 часов", 60*240}, {"8 часов", 60*240}, {"Ввести вручную", -1}};
+						 {"6 часов", 60*240}, {"7 часов", 60*240}, {"8 часов", 60*240}, {"Ввести вручную", handInput}};
 	else QMbError("wrong menuPostponeCaseValue");
 
 	std::vector<Note*> notesToTo { note };
@@ -158,15 +172,37 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 	{
 		int delaySecs = delay.seconds;
 
-		if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify && delay.seconds != -1)
-			delay.text = QDateTime::currentDateTime().addSecs(delaySecs).toString("dd MMM yyyy (ddd)");
-			// если это кнопка Перенести и не выбрано Ввести вручную, то ставим конкретную дату исходя из даты первой заметки
+		if(delay.seconds != handInput)
+		{
+			if(notesToTo.size() == 1) // если обрабатываеся одна зазача
+			{
+				if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
+				{
+					delay.text += AddSecsFromNow(delaySecs).toString(" (hh:mm::ss)");
+				}
+				else if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
+				{
+					delay.text = AddSecsFromToday(notesToTo[0]->dtNotify, delaySecs).toString("dd MMM yyyy hh:mm::ss (ddd)");
+				}
+			}
+			else // если обрабатываеся много зазач
+			{
+				if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
+				{
+					delay.text += AddSecsFromNow(delaySecs).toString(" (hh:mm::ss)");
+				}
+				else if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
+				{
+					delay.text = QDateTime::currentDateTime().addSecs(delaySecs).toString("dd MMM yyyy (ddd)");
+				}
+			}
+		}
 
 		menu->addAction(new QAction(delay.text, menu));
 
 		connect(menu->actions().back(), &QAction::triggered, [this, notesToTo, delaySecs](){
 			int itogDelaySecs = delaySecs; // почему то не давал изменять значение delaySecs внутри лямбды
-			if(itogDelaySecs == -1)
+			if(itogDelaySecs == handInput)
 			{
 				auto res = MyQDialogs::InputLineExt("Введите значение", "", {"Секунд","Минут","Часов","Отмена"}, 500);
 				if(res.line.isEmpty()) return;
@@ -183,14 +219,10 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 			for(uint i=0; i<notesToTo.size(); i++)
 			{
 				if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
-					notesToTo[i]->dtPostpone = QDateTime::currentDateTime().addSecs(itogDelaySecs);
+					notesToTo[i]->dtPostpone = AddSecsFromNow(itogDelaySecs);
 				else if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
 				{
-					// get today with note time
-					QDateTime newDT(QDate::currentDate(), notesToTo[i]->dtNotify.time());
-					newDT = newDT.addSecs(itogDelaySecs);
-
-					notesToTo[i]->dtNotify = newDT;
+					notesToTo[i]->dtNotify = AddSecsFromToday(notesToTo[i]->dtNotify, itogDelaySecs);
 					notesToTo[i]->dtPostpone = notesToTo[i]->dtNotify;
 				}
 				if(!notesToTo[i]->CheckAlarm(QDateTime::currentDateTime()))
