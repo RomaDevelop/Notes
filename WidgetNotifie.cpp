@@ -158,8 +158,8 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 		delays = 		{{"5 минут", 60*5}, {"10 минут", 60*10}, {"15 минут", 60*15}, {"20 минут", 60*20},
 						 {"25 минут", 60*25}, {"30 минут", 60*30}, {"35 минут", 60*35}, {"40 минут", 60*40},
 						 {"45 минут", 60*45}, {"50 минут", 60*50}, {"1 час", 60*60}, {"1,5 часа", 60*90},
-						 {"2 часа", 60*120}, {"3 часа", 60*180}, {"4 часа", 60*240}, {"5 часов", 60*240},
-						 {"6 часов", 60*240}, {"7 часов", 60*240}, {"8 часов", 60*240}, {"Ввести вручную", handInput}};
+						 {"2 часа", 60*60*2}, {"3 часа", 60*60*3}, {"4 часа", 60*60*4}, {"5 часов", 60*60*5},
+						 {"6 часов", 60*60*6}, {"7 часов", 60*60*7}, {"8 часов", 60*60*8}, {"Ввести вручную", handInput}};
 	else QMbError("wrong menuPostponeCaseValue");
 
 	std::vector<Note*> notesToTo { note };
@@ -183,6 +183,10 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 				else if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
 				{
 					delay.text = AddSecsFromToday(notesToTo[0]->dtNotify, delaySecs).toString("dd MMM yyyy hh:mm::ss (ddd)");
+					if(delaySecs == secondsInDay)
+						delay.text = AddSecsFromToday(notesToTo[0]->dtNotify, delaySecs).toString("завтра hh:mm::ss (ddd)");
+					if(delaySecs == secondsInDay*2)
+						delay.text = AddSecsFromToday(notesToTo[0]->dtNotify, delaySecs).toString("послезавтра hh:mm::ss (ddd)");
 				}
 			}
 			else // если обрабатываеся много зазач
@@ -204,13 +208,14 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 			int itogDelaySecs = delaySecs; // почему то не давал изменять значение delaySecs внутри лямбды
 			if(itogDelaySecs == handInput)
 			{
-				auto res = MyQDialogs::InputLineExt("Введите значение", "", {"Секунд","Минут","Часов","Отмена"}, 500);
+				auto res = MyQDialogs::InputLineExt("Введите значение", "", {"Секунд","Минут","Часов","Дней","Отмена"}, 500);
 				if(res.line.isEmpty()) return;
-				if(!IsUInt(res.line)) QMbError("Input is not number" + res.line);
+				if(!IsUInt(res.line)) { QMbError("Input is not number" + res.line); return; }
 				if(0) ;
 				else if(res.button == "Секунд") itogDelaySecs = res.line.toUInt();
 				else if(res.button == "Минут") itogDelaySecs = res.line.toUInt()*60;
 				else if(res.button == "Часов") itogDelaySecs = res.line.toUInt()*60*60;
+				else if(res.button == "Дней") itogDelaySecs = res.line.toUInt()*60*60*24;
 				else if(res.button == "Отмена") return;
 				else if(res.button.isEmpty()) return;
 				else QMbError("Error button name " + res.button);
