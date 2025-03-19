@@ -128,10 +128,9 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	QDir().mkpath(notesSavesPath);
 	MyQFileDir::RemoveOldFiles(notesSavesPath, 30);
 
-	QTimer::singleShot(0,this,[this]
-	{
-		LoadSettings();
-	});
+	QTimer::singleShot(0,this,[this]{ LoadSettings(); });
+
+	QTimer::singleShot(200,this,[this]{ FitColWidth(); });
 
 	CreateTrayIcon();
 	CreateNotesChecker();
@@ -359,9 +358,8 @@ void MainWidget::UpdateRowFromNote(Note * note, int row)
 	rowViews[row].dtePostpone->setDateTime(note->dtPostpone);
 }
 
-void MainWidget::resizeEvent(QResizeEvent * event)
+void MainWidget::FitColWidth()
 {
-	QWidget::resizeEvent(event);
 	int columnCount = table->columnCount();
 
 	if (columnCount != ColIndexes::colsCount)
@@ -375,7 +373,13 @@ void MainWidget::resizeEvent(QResizeEvent * event)
 	table->setColumnWidth(ColIndexes::notifyDTedit, ColIndexes::notifyDTeditWidth);
 	table->setColumnWidth(ColIndexes::postponeDTedit, ColIndexes::postponeDTeditWidth);
 
-	int nameWidth = table->width() - (ColIndexes::chBoxWidth+ColIndexes::notifyDTeditWidth+ColIndexes::postponeDTeditWidth + ColIndexes::colsCount);
-	if(table->verticalScrollBar()->isVisible()) nameWidth -= table->verticalScrollBar()->width();
+	int nameWidth = table->width() - (ColIndexes::chBoxWidth+ColIndexes::notifyDTeditWidth+ColIndexes::postponeDTeditWidth);
+	if(table->verticalScrollBar()->isVisible()) nameWidth -= table->verticalScrollBar()->width() + 2;
 	table->setColumnWidth(ColIndexes::name, nameWidth);
+}
+
+void MainWidget::resizeEvent(QResizeEvent * event)
+{
+	QWidget::resizeEvent(event);
+	FitColWidth();
 }

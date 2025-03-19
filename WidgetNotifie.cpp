@@ -247,6 +247,9 @@ void WidgetAlarms::showEvent(QShowEvent * event)
 
 	QSettings settings(settingsFile, QSettings::IniFormat);
 	restoreGeometry(settings.value("geo").toByteArray());
+
+	QTimer::singleShot(200,this,[this]{ FitColWidth(); });
+
 	event->accept();
 }
 
@@ -265,9 +268,8 @@ void WidgetAlarms::SaveSettings()
 	settings.setValue("geo", saveGeometry());
 }
 
-void WidgetAlarms::resizeEvent(QResizeEvent * event)
+void WidgetAlarms::FitColWidth()
 {
-	QWidget::resizeEvent(event);
 	int columnCount = table->columnCount();
 
 	if (columnCount != 1)
@@ -281,5 +283,11 @@ void WidgetAlarms::resizeEvent(QResizeEvent * event)
 	int columnWidth = table->width();
 	if(table->verticalScrollBar()->isVisible()) columnWidth -= table->verticalScrollBar()->width();
 	table->setColumnWidth(0, columnWidth);
+}
+
+void WidgetAlarms::resizeEvent(QResizeEvent * event)
+{
+	QWidget::resizeEvent(event);
+	FitColWidth();
 }
 

@@ -51,6 +51,8 @@ private:
 	void UpdateRowFromNote(Note* note, int row);
 	void NoteUpdated(Note* note);
 
+	void FitColWidth();
+
 protected:
 	void resizeEvent(QResizeEvent *event) override;
 };

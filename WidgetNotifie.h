@@ -39,6 +39,8 @@ private:
 	void closeEvent (QCloseEvent *event) override;
 	void SaveSettings();
 
+	void FitColWidth();
+
 protected:
 	void resizeEvent(QResizeEvent *event) override;
 };
