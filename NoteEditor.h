@@ -7,6 +7,7 @@
 #include <QTextEdit>
 
 #include "Note.h"
+#include "MyQTextEdit.h"
 
 class NoteEditor : public QWidget
 {
@@ -26,7 +27,7 @@ private:
 	void LoadSettings();
 
 	Note &note;
-	QTextEdit *textEdit;
+	MyQTextEdit *textEdit;
 
 	inline static std::map<Note*,NoteEditor*> existingEditors;
 };

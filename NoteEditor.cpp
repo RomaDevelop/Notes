@@ -68,7 +68,8 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 
 	hlo1->addStretch();
 
-	textEdit = new QTextEdit;
+	textEdit = new MyQTextEdit;
+	textEdit->richTextPaste = false;
 	hlo2->addWidget(textEdit);
 
 	if(note.content.code == Note::StartText()) note.content.code = "<span style='font-size: 14pt;'>"+Note::StartText()+"</span>";

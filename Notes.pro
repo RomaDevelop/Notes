@@ -17,6 +17,7 @@ SOURCES += \
     main.cpp
 
 HEADERS += \
+    ../include/MyQTextEdit.h \
     ../include/MyQWidgetLib.h \
     MainWidgetNotes.h \
     Note.h \
