@@ -208,7 +208,7 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 			int itogDelaySecs = delaySecs; // почему то не давал изменять значение delaySecs внутри лямбды
 			if(itogDelaySecs == handInput)
 			{
-				auto res = MyQDialogs::InputLineExt("Введите значение", "", {"Секунд","Минут","Часов","Дней","Отмена"}, 500);
+				auto res = MyQDialogs::InputLineExt("Введите значение", "", "", {"Секунд","Минут","Часов","Дней","Отмена"}, 500);
 				if(res.line.isEmpty()) return;
 				if(!IsUInt(res.line)) { QMbError("Input is not number" + res.line); return; }
 				if(0) ;
@@ -281,7 +281,7 @@ void WidgetAlarms::FitColWidth()
 	}
 
 	int columnWidth = table->width();
-	if(table->verticalScrollBar()->isVisible()) columnWidth -= table->verticalScrollBar()->width();
+	if(table->verticalScrollBar()->isVisible()) columnWidth -= table->verticalScrollBar()->width() + 5;
 	table->setColumnWidth(0, columnWidth);
 }
 
