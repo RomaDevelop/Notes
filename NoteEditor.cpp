@@ -11,7 +11,7 @@
 #include <QVBoxLayout>
 #include <QPushButton>
 
-#include "MyQWidgetLib.h"
+#include "PlatformDependent.h"
 #include "MyQDifferent.h"
 
 NoteEditor::NoteEditor(Note &note, QWidget *parent):
@@ -112,8 +112,8 @@ void NoteEditor::MakeNoteEditor(Note & note)
 		else
 		{
 			existingEditor->second->show();
-			MyQWidgetLib::SetTopMost(existingEditor->second,true);
-			MyQWidgetLib::SetTopMost(existingEditor->second,false);
+			PlatformDependent::SetTopMost(existingEditor->second,true);
+			PlatformDependent::SetTopMost(existingEditor->second,false);
 		}
 	}
 }

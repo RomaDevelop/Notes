@@ -9,7 +9,7 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-    ../include/MyQWidgetLib.cpp \
+    ../include/PlatformDependent.cpp \
     MainWidgetNotes.cpp \
     Note.cpp \
     NoteEditor.cpp \
@@ -18,7 +18,7 @@ SOURCES += \
 
 HEADERS += \
     ../include/MyQTextEdit.h \
-    ../include/MyQWidgetLib.h \
+    ../include/PlatformDependent.h \
     MainWidgetNotes.h \
     Note.h \
     NoteEditor.h \

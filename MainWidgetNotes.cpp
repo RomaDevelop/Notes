@@ -20,7 +20,7 @@
 #include "MyQDialogs.h"
 #include "MyQFileDir.h"
 #include "MyQExecute.h"
-#include "MyQWidgetLib.h"
+#include "PlatformDependent.h"
 #include "MyQTableWidget.h"
 #include "CodeMarkers.h"
 
@@ -151,8 +151,8 @@ void MainWidget::CreateTrayIcon()
 	icon->show();
 	connect(icon, &QSystemTrayIcon::activated, [this](){
 		showNormal();
-		MyQWidgetLib::SetTopMost(this,true);
-		MyQWidgetLib::SetTopMost(this,false);
+		PlatformDependent::SetTopMost(this,true);
+		PlatformDependent::SetTopMost(this,false);
 	});
 }
 
