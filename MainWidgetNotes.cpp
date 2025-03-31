@@ -24,6 +24,7 @@
 #include "MyQTableWidget.h"
 #include "CodeMarkers.h"
 
+#include "MainWidgetNotes.h"
 #include "NoteEditor.h"
 
 namespace ColIndexes {
@@ -40,9 +41,24 @@ namespace ColIndexes {
 	const int postponeDTeditWidth = 130;
 }
 
+void MainWidget::UpdateNotesIndexes()
+{
+	if(0) CodeMarkers::to_do("do not resave all note file for change index");
+	for(int i=0; i<(int)notes.size(); i++)
+	{
+		if(notes[i]->index != i)
+		{
+			notes[i]->index = i;
+			notes[i]->SaveNote();
+		}
+	}
+}
 
 MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 {
+	Note::notesSavesPath = filesPath + "/notes";
+	Note::notesBackupsPath = filesPath + "/notes_backups";
+
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
 	QHBoxLayout *hlo1 = new QHBoxLayout;
 	QHBoxLayout *hlo2 = new QHBoxLayout;
@@ -58,6 +74,7 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 
 		auto dt = QDateTime::currentDateTime();
 		MakeNewNote(newName, false, dt, dt, Note::StartText());
+		UpdateNotesIndexes();
 	});
 
 	QPushButton *btnRemove = new QPushButton("-");
@@ -71,35 +88,19 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 			if(!QFile::remove(notes[index]->file)) QMbError("Error removing file " + notes[index]->file);
 		}
 		notes.erase(notes.begin() + index);
+		UpdateNotesIndexes();
 
 		rowViews.erase(rowViews.begin() + index);
 		table->removeRow(index);
 	});
 
-	QPushButton *btnRename = new QPushButton("Rename");
-	btnRename->setFixedWidth(QFontMetrics(btnRename->font()).horizontalAdvance(btnRename->text()) + 20);
-	hlo1->addWidget(btnRename);
-	connect(btnRename,&QPushButton::clicked,[this](){
-		int index = table->currentRow();
-		if(table->rowCount() == 0 ||  index < 0 || index >= table->rowCount()) return;
-		notes[index]->name = MyQDialogs::InputText("Измените название заметки", notes[index]->name);
-		notes[index]->file = MakeNameFileToSaveNote(notes[index].get(), index);
-		WriteNoteToFile(notes[index].get(), notes[index]->file);
-		if(!notes[index]->file.isEmpty())
-		{
-			if(!QFile::remove(notes[index]->file)) QMbError("Error removing file " + notes[index]->file);
-			notes[index]->file.clear();
-		}
-		table->item(index, 0)->setText(notes[index]->name);
-	});
-
 	hlo1->addStretch();
 
-	QPushButton *btnSavePath = new QPushButton("Sava path");
+	QPushButton *btnSavePath = new QPushButton("Save path");
 	btnSavePath->setFixedWidth(QFontMetrics(btnSavePath->font()).horizontalAdvance(btnSavePath->text()) + 20);
 	hlo1->addWidget(btnSavePath);
-	connect(btnSavePath,&QPushButton::clicked,[this](){
-		MyQExecute::OpenDir(notesSavesPath);
+	connect(btnSavePath,&QPushButton::clicked,[](){
+		MyQExecute::OpenDir(Note::notesSavesPath);
 	});
 
 	QPushButton *btnSettings = new QPushButton("Settings.ini");
@@ -125,10 +126,12 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 		NoteEditor::MakeNoteEditor(*notes[r].get());
 	});
 
-	QDir().mkpath(notesSavesPath);
-	MyQFileDir::RemoveOldFiles(notesSavesPath, 30);
+	QDir().mkpath(Note::notesSavesPath);
 
-	QTimer::singleShot(0,this,[this]{ LoadSettings(); });
+	QTimer::singleShot(0,this,[this]{
+		LoadSettings();
+		LoadNotes();
+	});
 
 	QTimer::singleShot(200,this,[this]{ FitColWidth(); });
 
@@ -198,35 +201,6 @@ void MainWidget::closeEvent(QCloseEvent * event)
 	QApplication::exit();
 }
 
-QString MainWidget::MakeNameFileToSaveNote(Note * note, int index)
-{
-	QString fileName = notesSavesPath;
-	fileName += "/note";
-	fileName += QSn(index).rightJustified(5,'0');
-	fileName += "-";
-	fileName += QString(note->name).replace(QRegularExpression("[\\\\/:*?\"<>|]"), "_");
-	fileName += ".txt";
-	return fileName;
-}
-
-void MainWidget::WriteNoteToFile(Note * note, const QString & fileName)
-{
-	QString endValue = "[endValue]\n";
-	QString dtFormat = "yyyy.MM.dd hh:mm:ss";
-
-	QString noteText;
-	noteText.append(note->name + endValue);
-	noteText.append(QSn(note->activeNotify) + endValue);
-	noteText.append(note->dtNotify.toString(dtFormat) + endValue);
-	noteText.append(note->dtPostpone.toString(dtFormat) + endValue);
-	noteText.append(note->content.code + endValue);
-	if(!MyQFileDir::WriteFile(fileName, noteText))
-	{
-		QMbError("Во время сохранения произошла ошибка, сейчас будет показан файл который не сохранился, сохраните содержимое самостоятельно");
-		MyQDialogs::ShowText(noteText);
-	}
-}
-
 void MainWidget::SaveSettings()
 {
 	MyQFileDir::WriteFile(settingsFile, "");
@@ -253,15 +227,26 @@ void MainWidget::LoadSettings()
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
 	restoreGeometry(settings.value("geoMainWidget").toByteArray());
+}
+
+void MainWidget::LoadNotes()
+{
+	if(!QDir().mkpath(Note::notesBackupsPath)) QMbError("mkpath error " + Note::notesBackupsPath);
+	MyQFileDir::RemoveOldFiles(Note::notesBackupsPath, 1000);
 
 	QString endValue = "[endValue]\n";
 	QString dtFormat = "yyyy.MM.dd hh:mm:ss";
-	auto files = QDir(notesSavesPath).entryList(QDir::Files,QDir::Name);
+	QString currentDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName);
+	auto files = QDir(Note::notesSavesPath).entryList(QDir::Files,QDir::Name);
 	for(auto &file:files)
 	{
-		auto fileContent = MyQFileDir::ReadFile1(notesSavesPath + "/" + file);
+		QString filePathName = Note::notesSavesPath + "/" + file;
+		if(!QFile::copy(filePathName, Note::notesBackupsPath + "/" + currentDt + " " + file))
+			QMbError("creation backup note error for file  " + file);
+
+		auto fileContent = MyQFileDir::ReadFile1(filePathName);
 		auto fileParts = fileContent.split(endValue, QString::SkipEmptyParts);
-		if(fileParts.size() != 5) { QMbError("Wrong LoadSettings file " + notesSavesPath + "/" + file); continue; }
+		if(fileParts.size() != 5) { QMbError("Wrong LoadSettings file " + Note::notesSavesPath + "/" + file); continue; }
 
 		MakeNewNote(fileParts[0], fileParts[1].toInt(),
 				QDateTime().fromString(fileParts[2], dtFormat),
@@ -284,22 +269,23 @@ Note & MainWidget::MakeNewNote(QString name, bool activeNotify, QDateTime dtNoti
 	notes.emplace_back(std::make_unique<Note>());
 	Note* newNote = notes.back().get();
 	newNote->name = std::move(name);
-	newNote->file = MakeNameFileToSaveNote(newNote, notes.size()-1);
 	newNote->activeNotify = activeNotify;
 	newNote->dtNotify = dtNotify;
 	newNote->dtPostpone = dtPostpone;
 	newNote->content.code = content;
 
-	WriteNoteToFile(newNote, newNote->file);
+	int newNoteIndex = MakeNewRowInMainTable(newNote);
 
-	newNote->ConnectContentUpdated([this, newNote](){ WriteNoteToFile(newNote, newNote->file); });
+	newNote->index = newNoteIndex;
 
-	MakeNewRowInMainTable(newNote);
+	newNote->SaveNote();
+
+	newNote->ConnectUpdated([newNote](){ newNote->SaveNote(); });
 
 	return *newNote;
 }
 
-void MainWidget::MakeNewRowInMainTable(Note * newNote)
+int MainWidget::MakeNewRowInMainTable(Note * newNote)
 {
 	newNote->ConnectUpdated([this, newNote](){ UpdateRowFromNote(newNote, RowOfNote(newNote)); });
 
@@ -333,7 +319,7 @@ void MainWidget::MakeNewRowInMainTable(Note * newNote)
 
 	UpdateRowFromNote(newNote, rowIndex);
 
-	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [this, newNote, dtEditPostpone](const QDateTime &datetime){
+	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [newNote, dtEditPostpone](const QDateTime &datetime){
 		newNote->dtNotify = datetime;
 		newNote->dtPostpone = datetime;
 
@@ -341,13 +327,14 @@ void MainWidget::MakeNewRowInMainTable(Note * newNote)
 		dtEditPostpone->setDateTime(datetime);
 		dtEditPostpone->blockSignals(false);
 
-		WriteNoteToFile(newNote, newNote->file);
+		newNote->SaveNote();
 	});
-	connect(dtEditPostpone, &QDateTimeEdit::dateTimeChanged, [this, newNote](const QDateTime &datetime){
+	connect(dtEditPostpone, &QDateTimeEdit::dateTimeChanged, [newNote](const QDateTime &datetime){
 		newNote->dtPostpone = datetime;
-
-		WriteNoteToFile(newNote, newNote->file);
+		newNote->SaveNote();
 	});
+
+	return rowIndex;
 }
 
 void MainWidget::UpdateRowFromNote(Note * note, int row)

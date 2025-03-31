@@ -20,23 +20,24 @@ struct Note
 	QDateTime dtNotify = QDateTime::currentDateTime();
 	QDateTime dtPostpone = QDateTime::currentDateTime();
 
+	int index = -1;
 	QString name;
 	QString file;
 	HTML content;
 	static const QString& StartText() { static QString str = "Введите текст"; return str; }
+
+	void SaveNote();
+	QString MakeNameFileToSaveNote();
+	inline static QString notesSavesPath;
+	inline static QString notesBackupsPath;
 
 	bool CheckAlarm(const QDateTime &dateToCompare);
 
 	void ConnectUpdated(std::function<void()> aUpdatedCb);
 	void EmitUpdated();
 
-
-	void ConnectContentUpdated(std::function<void()> cb);
-	void EmitContentUpdated();
 private:
-	std::function<void()> updatedCb;
-	std::function<void()> contentUpdatedCb;
-
+	std::vector<std::function<void()>> updatedCbs;
 };
 
 #endif // NOTE_H

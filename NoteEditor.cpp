@@ -21,14 +21,18 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 	setWindowTitle(note.name + " - NoteEditor");
 
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
-	QHBoxLayout *hlo1 = new QHBoxLayout;
-	QHBoxLayout *hlo2 = new QHBoxLayout;
-	vlo_main->addLayout(hlo1);
-	vlo_main->addLayout(hlo2);
+	QHBoxLayout *hloButtons = new QHBoxLayout;
+	QHBoxLayout *hloTextEdit = new QHBoxLayout;
+
+	leName = new QLineEdit(note.name);
+	vlo_main->addWidget(leName);
+
+	vlo_main->addLayout(hloButtons);
+	vlo_main->addLayout(hloTextEdit);
 
 	QPushButton *btnBold = new QPushButton("B");
 	btnBold->setFixedWidth(25);
-	hlo1->addWidget(btnBold);
+	hloButtons->addWidget(btnBold);
 	connect(btnBold,&QPushButton::clicked,[this](){
 		auto cursor = textEdit->textCursor();
 		auto format = cursor.charFormat();
@@ -38,7 +42,7 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 
 	QPushButton *btnUnderlined = new QPushButton("U");
 	btnUnderlined->setFixedWidth(25);
-	hlo1->addWidget(btnUnderlined);
+	hloButtons->addWidget(btnUnderlined);
 	connect(btnUnderlined,&QPushButton::clicked,[this](){
 		auto cursor = textEdit->textCursor();
 		auto format = cursor.charFormat();
@@ -48,7 +52,7 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 
 	QPushButton *btnAplus = new QPushButton("A+");
 	btnAplus->setFixedWidth(30);
-	hlo1->addWidget(btnAplus);
+	hloButtons->addWidget(btnAplus);
 	connect(btnAplus,&QPushButton::clicked,[this](){
 		auto cursor = textEdit->textCursor();
 		auto format = cursor.charFormat();
@@ -58,7 +62,7 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 
 	QPushButton *btnAminis = new QPushButton("A-");
 	btnAminis->setFixedWidth(30);
-	hlo1->addWidget(btnAminis);
+	hloButtons->addWidget(btnAminis);
 	connect(btnAminis,&QPushButton::clicked,[this](){
 		auto cursor = textEdit->textCursor();
 		auto format = cursor.charFormat();
@@ -66,11 +70,11 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 		cursor.setCharFormat(format);
 	});
 
-	hlo1->addStretch();
+	hloButtons->addStretch();
 
 	textEdit = new MyQTextEdit;
 	textEdit->richTextPaste = false;
-	hlo2->addWidget(textEdit);
+	hloTextEdit->addWidget(textEdit);
 
 	if(note.content.code == Note::StartText()) note.content.code = "<span style='font-size: 14pt;'>"+Note::StartText()+"</span>";
 	textEdit->setHtml(note.content.code);
@@ -87,7 +91,8 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 NoteEditor::~NoteEditor()
 {
 	note.content.code = textEdit->toHtml();
-	note.EmitContentUpdated();
+	note.name = leName->text();
+	note.EmitUpdated();
 	if(auto thisEditor = existingEditors.find(&note); thisEditor != existingEditors.end())
 	{
 		existingEditors.erase(thisEditor);
