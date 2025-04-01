@@ -31,6 +31,9 @@ struct Note
 	inline static QString notesSavesPath;
 	inline static QString notesBackupsPath;
 
+	void Remove();
+	std::function<void()> removeWorker;
+
 	bool CheckAlarm(const QDateTime &dateToCompare);
 
 	void ConnectUpdated(std::function<void()> aUpdatedCb);

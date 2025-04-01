@@ -13,9 +13,9 @@
 #include "declare_struct.h"
 
 #include "Note.h"
-#include "WidgetNotifie.h"
+#include "WidgetAlarms.h"
 
-class MainWidget : public QWidget
+class WidgetMain : public QWidget
 {
 	Q_OBJECT
 public:
@@ -26,12 +26,13 @@ public:
 	void UpdateNotesIndexes();
 	WidgetAlarms widgetAlarms;
 
-	explicit MainWidget(QWidget *parent = nullptr);
-	~MainWidget();
+	explicit WidgetMain(QWidget *parent = nullptr);
+	~WidgetMain();
 
 private:
 	void CreateTrayIcon();
-	void CreateNotesChecker();
+	void CreateNotesAlarmChecker();
+	void CheckNotesForAlarm();
 
 	void closeEvent (QCloseEvent *event) override;
 	//void resizeEvent(QResizeEvent * event) override { }
@@ -47,8 +48,9 @@ private:
 
 	Note& MakeNewNote(QString name, bool activeNotify, QDateTime dtNotify, QDateTime dtPostpone, QString content);
 	int MakeNewRowInMainTable(Note* newNote); // returns index
-	void UpdateRowFromNote(Note* note, int row);
-	void NoteUpdated(Note* note);
+	void UpdateRowFromNote(Note * note, int row);
+
+	void RemoveNote(int index);
 
 	void FitColWidth();
 

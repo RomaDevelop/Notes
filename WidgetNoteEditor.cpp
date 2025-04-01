@@ -1,4 +1,4 @@
-#include "NoteEditor.h"
+#include "WidgetNoteEditor.h"
 
 #include <QDebug>
 #include <QCloseEvent>
@@ -14,7 +14,7 @@
 #include "PlatformDependent.h"
 #include "MyQDifferent.h"
 
-NoteEditor::NoteEditor(Note &note, QWidget *parent):
+WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	QWidget(parent),
 	note {note}
 {
@@ -88,7 +88,7 @@ NoteEditor::NoteEditor(Note &note, QWidget *parent):
 	});
 }
 
-NoteEditor::~NoteEditor()
+WidgetNoteEditor::~WidgetNoteEditor()
 {
 	note.content.code = textEdit->toHtml();
 	note.name = leName->text();
@@ -100,11 +100,11 @@ NoteEditor::~NoteEditor()
 	else QMbc(0,"Error", "destructor called, but this editor not in the existingEditors");
 }
 
-void NoteEditor::MakeNoteEditor(Note & note)
+void WidgetNoteEditor::MakeNoteEditor(Note & note)
 {
 	if(auto existingEditor = existingEditors.find(&note); existingEditor == existingEditors.end())
 	{
-		auto editor = new NoteEditor(note);
+		auto editor = new WidgetNoteEditor(note);
 		editor->show();
 		existingEditors[&note] = editor;
 	}
@@ -123,7 +123,7 @@ void NoteEditor::MakeNoteEditor(Note & note)
 	}
 }
 
-void NoteEditor::closeEvent(QCloseEvent * event)
+void WidgetNoteEditor::closeEvent(QCloseEvent * event)
 {
 	//	auto answ = QMessageBox::question(this,"Закрытие ...","...");
 	//	if(0){}
@@ -136,7 +136,7 @@ void NoteEditor::closeEvent(QCloseEvent * event)
 	this->deleteLater();
 }
 
-void NoteEditor::SaveSettings()
+void WidgetNoteEditor::SaveSettings()
 {
 	QDir().mkpath(MyQDifferent::PathToExe()+"/files");
 
@@ -145,7 +145,7 @@ void NoteEditor::SaveSettings()
 	settings.setValue("geoNoteEditor", saveGeometry());
 }
 
-void NoteEditor::LoadSettings()
+void WidgetNoteEditor::LoadSettings()
 {
 	if(!QFile::exists(settingsFile)) return;
 

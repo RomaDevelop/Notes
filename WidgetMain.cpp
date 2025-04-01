@@ -1,4 +1,4 @@
-#include "MainWidgetNotes.h"
+#include "WidgetMain.h"
 
 #include <QDebug>
 #include <QCloseEvent>
@@ -24,8 +24,7 @@
 #include "MyQTableWidget.h"
 #include "CodeMarkers.h"
 
-#include "MainWidgetNotes.h"
-#include "NoteEditor.h"
+#include "WidgetNoteEditor.h"
 
 namespace ColIndexes {
 	const int name = 0;
@@ -41,7 +40,7 @@ namespace ColIndexes {
 	const int postponeDTeditWidth = 130;
 }
 
-void MainWidget::UpdateNotesIndexes()
+void WidgetMain::UpdateNotesIndexes()
 {
 	if(0) CodeMarkers::to_do("do not resave all note file for change index");
 	for(int i=0; i<(int)notes.size(); i++)
@@ -54,7 +53,7 @@ void MainWidget::UpdateNotesIndexes()
 	}
 }
 
-MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
+WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 {
 	Note::notesSavesPath = filesPath + "/notes";
 	Note::notesBackupsPath = filesPath + "/notes_backups";
@@ -80,19 +79,7 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	QPushButton *btnRemove = new QPushButton("-");
 	btnRemove->setFixedWidth(25);
 	hlo1->addWidget(btnRemove);
-	connect(btnRemove,&QPushButton::clicked,[this](){
-		int index = table->currentRow();
-		if(table->rowCount() == 0 ||  index < 0 || index >= table->rowCount()) return;
-		if(!notes[index]->file.isEmpty())
-		{
-			if(!QFile::remove(notes[index]->file)) QMbError("Error removing file " + notes[index]->file);
-		}
-		notes.erase(notes.begin() + index);
-		UpdateNotesIndexes();
-
-		rowViews.erase(rowViews.begin() + index);
-		table->removeRow(index);
-	});
+	connect(btnRemove,&QPushButton::clicked,[this](){ RemoveNote(table->currentRow()); });
 
 	hlo1->addStretch();
 
@@ -123,7 +110,7 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	table->setHorizontalHeaderLabels({"Наименование","","Начало","Отложено на..."});
 	hlo2->addWidget(table);
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
-		NoteEditor::MakeNoteEditor(*notes[r].get());
+		WidgetNoteEditor::MakeNoteEditor(*notes[r].get());
 	});
 
 	QDir().mkpath(Note::notesSavesPath);
@@ -136,17 +123,17 @@ MainWidget::MainWidget(QWidget *parent) : QWidget(parent)
 	QTimer::singleShot(200,this,[this]{ FitColWidth(); });
 
 	CreateTrayIcon();
-	CreateNotesChecker();
+	CreateNotesAlarmChecker();
 }
 
-MainWidget::~MainWidget()
+WidgetMain::~WidgetMain()
 {
 	/// не надо тут пытаться сохранять задачи
 	/// ибо при завершении работы программы инициированном ОС они не будут успевать сохраняться
 	/// сохранение задач должно надежно происходить при их изменении
 }
 
-void MainWidget::CreateTrayIcon()
+void WidgetMain::CreateTrayIcon()
 {
 	auto icon = new QSystemTrayIcon(this);
 	icon->setIcon(QApplication::style()->standardIcon(QStyle::SP_ArrowForward));
@@ -159,27 +146,30 @@ void MainWidget::CreateTrayIcon()
 	});
 }
 
-void MainWidget::CreateNotesChecker()
+void WidgetMain::CreateNotesAlarmChecker()
 {
 	QTimer *tChecher = new QTimer(this);
-	connect(tChecher, &QTimer::timeout, [this](){
-		if(0) CodeMarkers::to_do("Нужно адекватный алгоритм проверки чтобы не ломалось если будет много задач");
-		QDateTime currentDateTime = QDateTime::currentDateTime();
-		std::vector<Note*> alarmedNotes;
-		for(auto &note:notes)
-		{
-			if(note->CheckAlarm(currentDateTime))
-			{
-				alarmedNotes.emplace_back(note.get());
-			}
-		}
-
-		widgetAlarms.GiveNotes(alarmedNotes);
-	});
+	connect(tChecher, &QTimer::timeout, [this](){ CheckNotesForAlarm(); });
 	tChecher->start(1000);
 }
 
-void MainWidget::closeEvent(QCloseEvent * event)
+void WidgetMain::CheckNotesForAlarm()
+{
+	if(0) CodeMarkers::to_do("Нужно адекватный алгоритм проверки чтобы не ломалось если будет много задач");
+	QDateTime currentDateTime = QDateTime::currentDateTime();
+	std::vector<Note*> alarmedNotes;
+	for(auto &note:notes)
+	{
+		if(note->CheckAlarm(currentDateTime))
+		{
+			alarmedNotes.emplace_back(note.get());
+		}
+	}
+
+	widgetAlarms.GiveNotes(alarmedNotes);
+}
+
+void WidgetMain::closeEvent(QCloseEvent * event)
 {
 	auto answ = MyQDialogs::CustomDialog("Завершение работы приложения","Вы уверены, что хотите завершить работу приложения?"
 																		"\n\n(уведомления на задачи не будут поступать)"
@@ -201,7 +191,7 @@ void MainWidget::closeEvent(QCloseEvent * event)
 	QApplication::exit();
 }
 
-void MainWidget::SaveSettings()
+void WidgetMain::SaveSettings()
 {
 	MyQFileDir::WriteFile(settingsFile, "");
 	QSettings settings(settingsFile, QSettings::IniFormat);
@@ -213,7 +203,7 @@ void MainWidget::SaveSettings()
 	settings.setValue("geoMainWidget", this->saveGeometry());
 }
 
-void MainWidget::LoadSettings()
+void WidgetMain::LoadSettings()
 {
 	if(!QFile::exists(settingsFile)) return;
 
@@ -229,7 +219,7 @@ void MainWidget::LoadSettings()
 	restoreGeometry(settings.value("geoMainWidget").toByteArray());
 }
 
-void MainWidget::LoadNotes()
+void WidgetMain::LoadNotes()
 {
 	if(!QDir().mkpath(Note::notesBackupsPath)) QMbError("mkpath error " + Note::notesBackupsPath);
 	MyQFileDir::RemoveOldFiles(Note::notesBackupsPath, 1000);
@@ -255,7 +245,7 @@ void MainWidget::LoadNotes()
 	}
 }
 
-int MainWidget::RowOfNote(Note * note)
+int WidgetMain::RowOfNote(Note * note)
 {
 	for(uint i=0; i<notes.size(); i++)
 		if(note == notes[i].get()) return i;
@@ -264,7 +254,7 @@ int MainWidget::RowOfNote(Note * note)
 	return -1;
 }
 
-Note & MainWidget::MakeNewNote(QString name, bool activeNotify, QDateTime dtNotify, QDateTime dtPostpone, QString content)
+Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNotify, QDateTime dtPostpone, QString content)
 {
 	notes.emplace_back(std::make_unique<Note>());
 	Note* newNote = notes.back().get();
@@ -282,10 +272,15 @@ Note & MainWidget::MakeNewNote(QString name, bool activeNotify, QDateTime dtNoti
 
 	newNote->ConnectUpdated([newNote](){ newNote->SaveNote(); });
 
+	newNote->removeWorker = [this, newNote](){
+		RemoveNote(RowOfNote(newNote));
+		CheckNotesForAlarm();
+	};
+
 	return *newNote;
 }
 
-int MainWidget::MakeNewRowInMainTable(Note * newNote)
+int WidgetMain::MakeNewRowInMainTable(Note * newNote)
 {
 	newNote->ConnectUpdated([this, newNote](){ UpdateRowFromNote(newNote, RowOfNote(newNote)); });
 
@@ -337,7 +332,7 @@ int MainWidget::MakeNewRowInMainTable(Note * newNote)
 	return rowIndex;
 }
 
-void MainWidget::UpdateRowFromNote(Note * note, int row)
+void WidgetMain::UpdateRowFromNote(Note * note, int row)
 {
 	rowViews[row].item->setText("   " + note->name);
 	rowViews[row].chBox->setChecked(note->activeNotify);
@@ -345,7 +340,21 @@ void MainWidget::UpdateRowFromNote(Note * note, int row)
 	rowViews[row].dtePostpone->setDateTime(note->dtPostpone);
 }
 
-void MainWidget::FitColWidth()
+void WidgetMain::RemoveNote(int index)
+{
+	if(table->rowCount() == 0 ||  index < 0 || index >= table->rowCount()) return;
+	if(!notes[index]->file.isEmpty())
+	{
+		if(!QFile::remove(notes[index]->file)) QMbError("Error removing file " + notes[index]->file);
+	}
+	notes.erase(notes.begin() + index);
+	UpdateNotesIndexes();
+
+	rowViews.erase(rowViews.begin() + index);
+	table->removeRow(index);
+}
+
+void WidgetMain::FitColWidth()
 {
 	int columnCount = table->columnCount();
 
@@ -365,7 +374,7 @@ void MainWidget::FitColWidth()
 	table->setColumnWidth(ColIndexes::name, nameWidth);
 }
 
-void MainWidget::resizeEvent(QResizeEvent * event)
+void WidgetMain::resizeEvent(QResizeEvent * event)
 {
 	QWidget::resizeEvent(event);
 	FitColWidth();

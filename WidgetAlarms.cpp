@@ -1,4 +1,4 @@
-#include "WidgetNotifie.h"
+#include "WidgetAlarms.h"
 
 #include <QVBoxLayout>
 #include <QCloseEvent>
@@ -14,14 +14,13 @@
 #include "MyQDialogs.h"
 #include "declare_struct.h"
 
-#include "NoteEditor.h"
+#include "WidgetNoteEditor.h"
 
 WidgetAlarms::WidgetAlarms(QWidget * parent)
 	: QWidget(parent)
 {
 	settingsFile = MyQDifferent::PathToExe() + "/files/settings_widget_alarms.ini";
 
-	setWindowTitle("Notes notify");
 	setWindowFlag(Qt::WindowCloseButtonHint, false);
 
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
@@ -36,7 +35,7 @@ WidgetAlarms::WidgetAlarms(QWidget * parent)
 	table->horizontalHeader()->hide();
 	hlo1->addWidget(table);
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
-		NoteEditor::MakeNoteEditor(*notes[r]);
+		WidgetNoteEditor::MakeNoteEditor(*notes[r]);
 	});
 
 	hlo2->addStretch();
@@ -73,6 +72,8 @@ void WidgetAlarms::GiveNotes(const std::vector<Note *> & givingNotes)
 			AddNote(newNote);
 	}
 
+	setWindowTitle(QSn(notes.size()) + " notes alarms");
+
 	if(!notes.empty()) show();
 	else hide();
 }
@@ -92,15 +93,21 @@ void WidgetAlarms::AddNote(Note * note)
 	hlo->addStretch();
 	auto btnReschedule = new QPushButton(" Перенести на ... ");
 	auto btnPostpone = new QPushButton(" Отложить на ... ");
+	auto btnRemove = new QPushButton(" Удалить ");
 	hlo->addWidget(btnReschedule);
 	hlo->addWidget(btnPostpone);
-	hlo->addSpacing(5);
+	hlo->addWidget(btnRemove);
+	hlo->addSpacing(4);
 
 	connect(btnReschedule, &QPushButton::clicked, [this, btnReschedule, note](){
 		ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, note);
 	});
 	connect(btnPostpone, &QPushButton::clicked, [this, btnPostpone, note](){
 		ShowMenuPostpone(btnPostpone->mapToGlobal(QPoint(0, btnPostpone->height())), setPostpone, note);
+	});
+	connect(btnRemove, &QPushButton::clicked, [note](){
+		if(QMessageBox::question(0,"Remove note","Are you shure?") == QMessageBox::Yes)
+			note->Remove();
 	});
 }
 
@@ -152,14 +159,18 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 	const int handInput = -1;
 	if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
 		delays = 		{{"1 день", secondsInDay}, {"2 дня", secondsInDay*2}, {"3 дня", secondsInDay*3}, {"4 дня", secondsInDay*4},
-						 {"5 дней", secondsInDay*5}, {"6 дней", secondsInDay*6}, {"7 дней", secondsInDay*7},
+						 {"5 дней", secondsInDay*5}, {"6 дней", secondsInDay*6}, {"7 дней", secondsInDay*7}, {"8 дней", secondsInDay*8},
+						 {"9 дней", secondsInDay*9}, {"10 дней", secondsInDay*7}, {"10 дней", secondsInDay*10}, {"11 дней", secondsInDay*11},
+						 {"12 дней", secondsInDay*12}, {"13 дней", secondsInDay*13}, {"14 дней", secondsInDay*14},
+						 {"20 дней", secondsInDay*20}, {"25 дней", secondsInDay*25}, {"30 дней", secondsInDay*30},
 						 {"Ввести вручную", handInput}};
 	else if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
 		delays = 		{{"5 минут", 60*5}, {"10 минут", 60*10}, {"15 минут", 60*15}, {"20 минут", 60*20},
 						 {"25 минут", 60*25}, {"30 минут", 60*30}, {"35 минут", 60*35}, {"40 минут", 60*40},
 						 {"45 минут", 60*45}, {"50 минут", 60*50}, {"1 час", 60*60}, {"1,5 часа", 60*90},
 						 {"2 часа", 60*60*2}, {"3 часа", 60*60*3}, {"4 часа", 60*60*4}, {"5 часов", 60*60*5},
-						 {"6 часов", 60*60*6}, {"7 часов", 60*60*7}, {"8 часов", 60*60*8}, {"Ввести вручную", handInput}};
+						 {"6 часов", 60*60*6}, {"7 часов", 60*60*7}, {"8 часов", 60*60*8},
+						 {"Ввести вручную", handInput}};
 	else QMbError("wrong menuPostponeCaseValue");
 
 	std::vector<Note*> notesToTo { note };
@@ -208,7 +219,7 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 			int itogDelaySecs = delaySecs; // почему то не давал изменять значение delaySecs внутри лямбды
 			if(itogDelaySecs == handInput)
 			{
-				auto res = MyQDialogs::InputLineExt("Введите значение", "", "", {"Секунд","Минут","Часов","Дней","Отмена"}, 500);
+				auto res = MyQDialogs::InputLineExt("Введите значение", "Введите значение", "", {"Секунд","Минут","Часов","Дней","Отмена"}, 500);
 				if(res.line.isEmpty()) return;
 				if(!IsUInt(res.line)) { QMbError("Input is not number" + res.line); return; }
 				if(0) ;

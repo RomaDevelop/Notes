@@ -42,6 +42,12 @@ QString Note::MakeNameFileToSaveNote()
 	return fileName;
 }
 
+void Note::Remove()
+{
+	if(removeWorker) removeWorker();
+	else qdbg << "Note::Remove() execed, but removeWorker not valid";
+}
+
 bool Note::CheckAlarm(const QDateTime & dateToCompare)
 {
 	return dateToCompare >= dtPostpone;

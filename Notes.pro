@@ -10,19 +10,19 @@ CONFIG += c++17
 
 SOURCES += \
     ../include/PlatformDependent.cpp \
-    MainWidgetNotes.cpp \
     Note.cpp \
-    NoteEditor.cpp \
-    WidgetNotifie.cpp \
+    WidgetAlarms.cpp \
+    WidgetMain.cpp \
+    WidgetNoteEditor.cpp \
     main.cpp
 
 HEADERS += \
     ../include/MyQTextEdit.h \
     ../include/PlatformDependent.h \
-    MainWidgetNotes.h \
     Note.h \
-    NoteEditor.h \
-    WidgetNotifie.h
+    WidgetAlarms.h \
+    WidgetMain.h \
+    WidgetNoteEditor.h
 
 INCLUDEPATH += \
     ../include
