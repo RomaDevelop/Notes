@@ -53,14 +53,39 @@ bool Note::CheckAlarm(const QDateTime & dateToCompare)
 	return dateToCompare >= dtPostpone;
 }
 
-void Note::ConnectUpdated(std::function<void ()> aUpdated)
+void Note::ConnectUpdated(std::function<void ()> aUpdatedCb)
 {
-	updatedCbs.push_back(aUpdated);
+	if(aUpdatedCb)
+		updatedCbs.push_back(aUpdatedCb);
+	else qdbg << "ConnectUpdated invalid aUpdated";
 }
 
 void Note::EmitUpdated()
 {
-	for(auto &cb:updatedCbs) if(cb) cb();
+	for(auto &cb:updatedCbs) cb();
+	for(auto &cb:updatedCbs2) cb.cb(cb.handler);
+}
+
+void Note::ConnectUpdated(std::function<void (void* handler)> aUpdatedCb, void * handler)
+{
+	if(aUpdatedCb && handler)
+	{
+		updatedCbs2.emplace_back();
+		updatedCbs2.back().cb = aUpdatedCb;
+		updatedCbs2.back().handler = handler;
+	}
+	else qdbg << "ConnectUpdated invalid aUpdated or handler";
+}
+
+bool Note::RemoveCb(void * handler)
+{
+	for(uint i=0; i<updatedCbs2.size(); i++)
+		if(updatedCbs2[i].handler == handler)
+		{
+			updatedCbs2.erase(updatedCbs2.begin()+i);
+			return true;
+		}
+	return false;
 }
 
 

@@ -5,10 +5,19 @@
 #include <set>
 
 #include <QLabel>
+#include <QPushButton>
 #include <QTableWidget>
 #include <QWidget>
 
 #include "Note.h"
+
+struct NoteInAlarms
+{
+	Note* note;
+	QLabel* labelCaption1;
+	QLabel* labelCaption2;
+	void* dymmyHandlerToRemoveCb;
+};
 
 class WidgetAlarms : public QWidget
 {
@@ -24,9 +33,10 @@ public:
 	QString tableColWidths;
 
 private:
-	std::vector<Note*> notes;
+	std::vector<NoteInAlarms> notes;
+	NoteInAlarms* FindNote(Note *noteToFind);
 	void AddNote(Note* note);
-	QString GenLabelText(Note* note);
+	void SetLabelText(NoteInAlarms & note); // maxLen -1 = no max len
 	void RemoveNote(int index);
 	void RemoveNote(Note* aNote, bool showError);
 

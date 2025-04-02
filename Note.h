@@ -37,10 +37,15 @@ struct Note
 	bool CheckAlarm(const QDateTime &dateToCompare);
 
 	void ConnectUpdated(std::function<void()> aUpdatedCb);
+	void ConnectUpdated(std::function<void(void* handler)> aUpdatedCb, void *handler);
+	bool RemoveCb(void* handler);
 	void EmitUpdated();
 
 private:
 	std::vector<std::function<void()>> updatedCbs;
+
+	struct cbAndHandler { std::function<void(void* handler)> cb; void* handler; };
+	std::vector<cbAndHandler> updatedCbs2;
 };
 
 #endif // NOTE_H
