@@ -10,6 +10,7 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QPushButton>
+#include <QDateTimeEdit>
 
 #include "PlatformDependent.h"
 #include "MyQDifferent.h"
@@ -21,11 +22,28 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	setWindowTitle(note.name + " - NoteEditor");
 
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
+	QHBoxLayout *hloNameAndDates = new QHBoxLayout;
 	QHBoxLayout *hloButtons = new QHBoxLayout;
 	QHBoxLayout *hloTextEdit = new QHBoxLayout;
 
+	vlo_main->addLayout(hloNameAndDates);
+
 	leName = new QLineEdit(note.name);
-	vlo_main->addWidget(leName);
+
+	dtEditNotify = new QDateTimeEdit(note.dtNotify);
+	dtEditNotify->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
+	dtEditNotify->setCalendarPopup(true);
+
+	dtEditPostpone = new QDateTimeEdit(note.dtPostpone);
+	dtEditPostpone->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
+
+	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [this](const QDateTime &datetime){
+		dtEditPostpone->setDateTime(datetime);
+	});
+
+	hloNameAndDates->addWidget(leName);
+	hloNameAndDates->addWidget(dtEditNotify);
+	hloNameAndDates->addWidget(dtEditPostpone);
 
 	vlo_main->addLayout(hloButtons);
 	vlo_main->addLayout(hloTextEdit);
@@ -92,6 +110,8 @@ WidgetNoteEditor::~WidgetNoteEditor()
 {
 	note.content.code = textEdit->toHtml();
 	note.name = leName->text();
+	note.dtNotify = dtEditNotify->dateTime();
+	note.dtPostpone = dtEditPostpone->dateTime();
 	note.EmitUpdated();
 	if(auto thisEditor = existingEditors.find(&note); thisEditor != existingEditors.end())
 	{

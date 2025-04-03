@@ -16,10 +16,12 @@ class WidgetNoteEditor : public QWidget
 
 public:
 	static void MakeNoteEditor(Note &note);
-	~WidgetNoteEditor();
 
 private:
 	explicit WidgetNoteEditor(Note &note, QWidget *parent = nullptr);
+public:
+	~WidgetNoteEditor();
+private:
 	void closeEvent (QCloseEvent *event) override;
 	//void resizeEvent(QResizeEvent * event) override { }
 	//void moveEvent(QMoveEvent * event) override { }
@@ -29,6 +31,8 @@ private:
 
 	Note &note;
 	QLineEdit *leName;
+	QDateTimeEdit *dtEditNotify;
+	QDateTimeEdit *dtEditPostpone;
 	MyQTextEdit *textEdit;
 
 	inline static std::map<Note*,WidgetNoteEditor*> existingEditors;

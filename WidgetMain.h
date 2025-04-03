@@ -24,7 +24,7 @@ public:
 	std::vector<RowView> rowViews;
 	std::vector<std::unique_ptr<Note>> notes;
 	void UpdateNotesIndexes();
-	WidgetAlarms widgetAlarms;
+	std::unique_ptr<WidgetAlarms> widgetAlarms;
 
 	explicit WidgetMain(QWidget *parent = nullptr);
 	~WidgetMain();

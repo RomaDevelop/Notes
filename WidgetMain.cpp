@@ -55,6 +55,8 @@ void WidgetMain::UpdateNotesIndexes()
 
 WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 {
+	qdbg << "когда делаешь перенести, но открыто окно редактирования задачи даты там остаются старые, как быть?";
+
 	Note::notesSavesPath = filesPath + "/notes";
 	Note::notesBackupsPath = filesPath + "/notes_backups";
 
@@ -115,12 +117,18 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 
 	QDir().mkpath(Note::notesSavesPath);
 
-	QTimer::singleShot(0,this,[this]{
+	auto labelToGetFont = new QLabel("labelToGetFont");
+	vlo_main->addWidget(labelToGetFont);
+
+	QTimer::singleShot(0,[this, labelToGetFont]{
+		widgetAlarms = std::make_unique<WidgetAlarms>(labelToGetFont->font());
+		delete labelToGetFont;
+
 		LoadSettings();
 		LoadNotes();
 	});
 
-	QTimer::singleShot(200,this,[this]{ FitColWidth(); });
+	QTimer::singleShot(200,[this]{ FitColWidth(); });
 
 	CreateTrayIcon();
 	CreateNotesAlarmChecker();
@@ -166,7 +174,7 @@ void WidgetMain::CheckNotesForAlarm()
 		}
 	}
 
-	widgetAlarms.GiveNotes(alarmedNotes);
+	widgetAlarms->GiveNotes(alarmedNotes);
 }
 
 void WidgetMain::closeEvent(QCloseEvent * event)

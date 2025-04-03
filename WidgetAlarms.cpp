@@ -17,8 +17,10 @@
 
 #include "WidgetNoteEditor.h"
 
-WidgetAlarms::WidgetAlarms(QWidget * parent)
-	: QWidget(parent)
+WidgetAlarms::WidgetAlarms(QFont fontForLabels, QWidget * parent):
+	QWidget(parent),
+	fontForLabels{fontForLabels},
+	fontMetrixForLabels(fontForLabels)
 {
 	settingsFile = MyQDifferent::PathToExe() + "/files/settings_widget_alarms.ini";
 
@@ -96,8 +98,10 @@ void WidgetAlarms::AddNote(Note * note)
 	auto hlo = new QHBoxLayout(widget);
 	hlo->setContentsMargins(0,0,0,0);
 	auto labelCaption1 = new QLabel;
+	labelCaption1->setFont(fontForLabels);
 	labelCaption1->setMaximumWidth(table->width() - 480);
 	auto labelCaption2 = new QLabel;
+	labelCaption2->setFont(fontForLabels);
 	hlo->addWidget(labelCaption1);
 	hlo->addWidget(labelCaption2);
 	hlo->addStretch();
@@ -136,10 +140,19 @@ void WidgetAlarms::AddNote(Note * note)
 
 void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 {
-	int labelCaption1W = table->width() - 460;
+	int labelCaption1W = table->width() - 440;
 	if(labelCaption1W < 50) labelCaption1W = 50;
 	note.labelCaption1->setMaximumWidth(labelCaption1W);
-	note.labelCaption1->setText("   " + note.note->name);
+
+	QString text1 = "   " + note.note->name;
+	if(fontMetrixForLabels.boundingRect(text1).width() + 15 > labelCaption1W)
+	{
+		while(fontMetrixForLabels.boundingRect(text1).width() + 20 > labelCaption1W - fontMetrixForLabels.boundingRect("...").width())
+			text1.chop(1);
+		text1 += "...";
+	}
+
+	note.labelCaption1->setText(text1);
 	note.labelCaption2->setText("("+note.note->dtNotify.toString("dd MMM yyyy hh:mm:ss")+")");
 }
 

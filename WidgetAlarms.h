@@ -25,7 +25,7 @@ class WidgetAlarms : public QWidget
 public:
 	QTableWidget *table;
 
-	explicit WidgetAlarms(QWidget *parent = nullptr);
+	explicit WidgetAlarms(QFont fontForLabels, QWidget *parent = nullptr);
 	~WidgetAlarms();
 	void GiveNotes(const std::vector<Note*> &givingNotes);
 
@@ -48,6 +48,9 @@ private:
 	void showEvent(QShowEvent *event) override;
 	void closeEvent (QCloseEvent *event) override;
 	void SaveSettings();
+
+	QFont fontForLabels;
+	QFontMetrics fontMetrixForLabels;
 
 	void FitColWidth();
 
