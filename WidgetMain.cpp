@@ -55,7 +55,7 @@ void WidgetMain::UpdateNotesIndexes()
 
 WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 {
-	qdbg << "когда делаешь перенести, но открыто окно редактирования задачи даты там остаются старые, как быть?";
+	qdbg << "";
 
 	Note::notesSavesPath = filesPath + "/notes";
 	Note::notesBackupsPath = filesPath + "/notes_backups";
@@ -70,12 +70,14 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	btnPlus->setFixedWidth(25);
 	hlo1->addWidget(btnPlus);
 	connect(btnPlus,&QPushButton::clicked,[this](){
-		QString newName = MyQDialogs::InputText("Введите название заметки", "", 400, 150);
+		QString newName = MyQDialogs::InputLine("Создание заметки", "Введите название заметки", "");
 		if(newName.isEmpty()) return;
 
 		auto dt = QDateTime::currentDateTime();
-		MakeNewNote(newName, false, dt, dt, Note::StartText());
+		auto &newNote = MakeNewNote(newName, false, dt, dt.addSecs(3600), Note::StartText());
 		UpdateNotesIndexes();
+
+		WidgetNoteEditor::MakeOrShowNoteEditor(newNote, true);
 	});
 
 	QPushButton *btnRemove = new QPushButton("-");
@@ -112,7 +114,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	table->setHorizontalHeaderLabels({"Наименование","","Начало","Отложено на..."});
 	hlo2->addWidget(table);
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
-		WidgetNoteEditor::MakeNoteEditor(*notes[r].get());
+		WidgetNoteEditor::MakeOrShowNoteEditor(*notes[r].get());
 	});
 
 	QDir().mkpath(Note::notesSavesPath);

@@ -15,7 +15,7 @@ class WidgetNoteEditor : public QWidget
 	Q_OBJECT
 
 public:
-	static void MakeNoteEditor(Note &note);
+	static void MakeOrShowNoteEditor(Note &note, bool aNewNote = false);
 
 private:
 	explicit WidgetNoteEditor(Note &note, QWidget *parent = nullptr);
@@ -30,6 +30,8 @@ private:
 	void LoadSettings();
 
 	Note &note;
+	bool newNote = false;
+	bool dtChanged = false;
 	QLineEdit *leName;
 	QDateTimeEdit *dtEditNotify;
 	QDateTimeEdit *dtEditPostpone;

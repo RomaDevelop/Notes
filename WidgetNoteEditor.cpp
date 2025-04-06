@@ -14,12 +14,14 @@
 
 #include "PlatformDependent.h"
 #include "MyQDifferent.h"
+#include "MyQDialogs.h"
 
 WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	QWidget(parent),
 	note {note}
 {
 	setWindowTitle(note.name + " - NoteEditor");
+	setAttribute(Qt::WA_DeleteOnClose);
 
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
 	QHBoxLayout *hloNameAndDates = new QHBoxLayout;
@@ -29,16 +31,26 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	vlo_main->addLayout(hloNameAndDates);
 
 	leName = new QLineEdit(note.name);
+	MyQWidget::SetFontPointSize(leName, 12);
+	MyQWidget::SetFontBold(leName, true);
 
 	dtEditNotify = new QDateTimeEdit(note.dtNotify);
+	MyQWidget::SetFontPointSize(dtEditNotify, 12);
+	MyQWidget::SetFontBold(dtEditNotify, true);
 	dtEditNotify->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
 	dtEditNotify->setCalendarPopup(true);
 
 	dtEditPostpone = new QDateTimeEdit(note.dtPostpone);
+	MyQWidget::SetFontPointSize(dtEditPostpone, 12);
+	MyQWidget::SetFontBold(dtEditPostpone, true);
 	dtEditPostpone->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
 
 	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [this](const QDateTime &datetime){
 		dtEditPostpone->setDateTime(datetime);
+		dtChanged = true;
+	});
+	connect(dtEditPostpone, &QDateTimeEdit::dateTimeChanged, [this](const QDateTime &){
+		dtChanged = true;
 	});
 
 	hloNameAndDates->addWidget(leName);
@@ -108,6 +120,8 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 WidgetNoteEditor::~WidgetNoteEditor()
 {
+	qdbg << "~WidgetNoteEditor " + leName->text();
+
 	note.content.code = textEdit->toHtml();
 	note.name = leName->text();
 	note.dtNotify = dtEditNotify->dateTime();
@@ -120,13 +134,14 @@ WidgetNoteEditor::~WidgetNoteEditor()
 	else QMbc(0,"Error", "destructor called, but this editor not in the existingEditors");
 }
 
-void WidgetNoteEditor::MakeNoteEditor(Note & note)
+void WidgetNoteEditor::MakeOrShowNoteEditor(Note & note, bool aNewNote)
 {
 	if(auto existingEditor = existingEditors.find(&note); existingEditor == existingEditors.end())
 	{
 		auto editor = new WidgetNoteEditor(note);
 		editor->show();
 		existingEditors[&note] = editor;
+		editor->newNote = aNewNote;
 	}
 	else
 	{
@@ -145,15 +160,18 @@ void WidgetNoteEditor::MakeNoteEditor(Note & note)
 
 void WidgetNoteEditor::closeEvent(QCloseEvent * event)
 {
-	//	auto answ = QMessageBox::question(this,"Закрытие ...","...");
-	//	if(0){}
-	//	else if(answ == QMessageBox::Yes) {/*ничего не делаем*/}
-	//	else if(answ == QMessageBox::No) { event->ignore(); return; }
-	//	else { qCritical() << "not realesed button 0x" + QString::number(answ,16); return; }
+	if(newNote && !dtChanged)
+	{
+		auto answ = MyQDialogs::CustomDialog("Сохранение","Завершить редактирование и сохранить заметку с автоназначенным уведомлением на "
+											 + note.dtNotify.toString(DateTimeFormat) + " ?",
+											 {"Да, завершить и сохранить", "Нет, продолжить редактирование"});
+		if(answ == "Да, завершить и сохранить") {/*ничего не делаем*/}
+		else if(answ == "Нет, продолжить редактирование") { event->ignore(); return; }
+		else { QMbError("not realesed button " + answ); return; }
+	}
 
 	SaveSettings();
 	event->accept();
-	this->deleteLater();
 }
 
 void WidgetNoteEditor::SaveSettings()

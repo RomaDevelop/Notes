@@ -38,7 +38,7 @@ WidgetAlarms::WidgetAlarms(QFont fontForLabels, QWidget * parent):
 	table->horizontalHeader()->hide();
 	hlo1->addWidget(table);
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
-		WidgetNoteEditor::MakeNoteEditor(*notes[r].note);
+		WidgetNoteEditor::MakeOrShowNoteEditor(*notes[r].note);
 	});
 
 	hlo2->addStretch();
