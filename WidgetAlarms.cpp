@@ -124,7 +124,7 @@ void WidgetAlarms::AddNote(Note * note)
 	SetLabelText(notes.back());
 
 	auto cb = [this, index](void*){ SetLabelText(notes[index]); };
-	note->ConnectUpdated(cb, dummyHandler);
+	note->ConnectCommonUpdated(cb, dummyHandler);
 
 	connect(btnReschedule, &QPushButton::clicked, [this, btnReschedule, note](){
 		ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, note);
@@ -153,7 +153,7 @@ void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 	}
 
 	note.labelCaption1->setText(text1);
-	note.labelCaption2->setText("("+note.note->dtNotify.toString("dd MMM yyyy hh:mm:ss")+")");
+	note.labelCaption2->setText("("+note.note->DTNotify().toString("dd MMM yyyy hh:mm:ss")+")");
 }
 
 void WidgetAlarms::RemoveNote(int index)
@@ -235,11 +235,11 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 				}
 				else if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
 				{
-					delay.text = AddSecsFromToday(notesToDo[0]->dtNotify, delaySecs).toString("dd MMM yyyy hh:mm::ss (ddd)");
+					delay.text = AddSecsFromToday(notesToDo[0]->DTNotify(), delaySecs).toString("dd MMM yyyy hh:mm::ss (ddd)");
 					if(delaySecs == secondsInDay)
-						delay.text = AddSecsFromToday(notesToDo[0]->dtNotify, delaySecs).toString("завтра hh:mm::ss (ddd)");
+						delay.text = AddSecsFromToday(notesToDo[0]->DTNotify(), delaySecs).toString("завтра hh:mm::ss (ddd)");
 					if(delaySecs == secondsInDay*2)
-						delay.text = AddSecsFromToday(notesToDo[0]->dtNotify, delaySecs).toString("послезавтра hh:mm::ss (ddd)");
+						delay.text = AddSecsFromToday(notesToDo[0]->DTNotify(), delaySecs).toString("послезавтра hh:mm::ss (ddd)");
 				}
 			}
 			else // если обрабатываеся много зазач
@@ -277,16 +277,17 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 			for(uint i=0; i<notesToDo.size(); i++)
 			{
 				if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
-					notesToDo[i]->dtPostpone = AddSecsFromNow(itogDelaySecs);
+				{
+					notesToDo[i]->SetDT(notesToDo[i]->DTNotify(), AddSecsFromNow(itogDelaySecs));
+				}
 				else if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
 				{
-					notesToDo[i]->dtNotify = AddSecsFromToday(notesToDo[i]->dtNotify, itogDelaySecs);
-					notesToDo[i]->dtPostpone = notesToDo[i]->dtNotify;
+					notesToDo[i]->SetDT(AddSecsFromToday(notesToDo[i]->DTNotify(), itogDelaySecs), notesToDo[i]->DTNotify());
 				}
 				if(!notesToDo[i]->CheckAlarm(QDateTime::currentDateTime()))
 					RemoveNote(notesToDo[i], false);
 				if(notes.empty()) hide();
-				notesToDo[i]->EmitUpdated();
+				notesToDo[i]->EmitUpdatedCommon();
 			}
 		});
 	}

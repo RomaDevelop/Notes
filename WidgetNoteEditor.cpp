@@ -34,13 +34,13 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	MyQWidget::SetFontPointSize(leName, 12);
 	MyQWidget::SetFontBold(leName, true);
 
-	dtEditNotify = new QDateTimeEdit(note.dtNotify);
+	dtEditNotify = new QDateTimeEdit(note.DTNotify());
 	MyQWidget::SetFontPointSize(dtEditNotify, 12);
 	MyQWidget::SetFontBold(dtEditNotify, true);
 	dtEditNotify->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
 	dtEditNotify->setCalendarPopup(true);
 
-	dtEditPostpone = new QDateTimeEdit(note.dtPostpone);
+	dtEditPostpone = new QDateTimeEdit(note.DTPostpone());
 	MyQWidget::SetFontPointSize(dtEditPostpone, 12);
 	MyQWidget::SetFontBold(dtEditPostpone, true);
 	dtEditPostpone->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
@@ -109,6 +109,14 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	if(note.content.code == Note::StartText()) note.content.code = "<span style='font-size: 14pt;'>"+Note::StartText()+"</span>";
 	textEdit->setHtml(note.content.code);
 
+	note.ConnectDTUpdated([this](void *){
+		static int i =0;
+		qdbg << i++ << "ConnectDTUpdated" << this->note.DTNotify().toString() << this->note.DTPostpone().toString();
+		dtEditNotify->setDateTime(this->note.DTNotify());
+		dtEditPostpone->setDateTime(this->note.DTPostpone());
+	},
+	this);
+
 	settingsFile = MyQDifferent::PathToExe()+"/files/settings_note_editor.ini";
 	QTimer::singleShot(0,this,[this]
 	{
@@ -122,11 +130,12 @@ WidgetNoteEditor::~WidgetNoteEditor()
 {
 	qdbg << "~WidgetNoteEditor " + leName->text();
 
+	note.RemoveCb(this);
+
 	note.content.code = textEdit->toHtml();
 	note.name = leName->text();
-	note.dtNotify = dtEditNotify->dateTime();
-	note.dtPostpone = dtEditPostpone->dateTime();
-	note.EmitUpdated();
+	note.SetDT(dtEditNotify->dateTime(), dtEditPostpone->dateTime());
+	note.EmitUpdatedCommon();
 	if(auto thisEditor = existingEditors.find(&note); thisEditor != existingEditors.end())
 	{
 		existingEditors.erase(thisEditor);
@@ -163,7 +172,7 @@ void WidgetNoteEditor::closeEvent(QCloseEvent * event)
 	if(newNote && !dtChanged)
 	{
 		auto answ = MyQDialogs::CustomDialog("Сохранение","Завершить редактирование и сохранить заметку с автоназначенным уведомлением на "
-											 + note.dtNotify.toString(DateTimeFormat) + " ?",
+											 + note.DTNotify().toString(DateTimeFormat) + " ?",
 											 {"Да, завершить и сохранить", "Нет, продолжить редактирование"});
 		if(answ == "Да, завершить и сохранить") {/*ничего не делаем*/}
 		else if(answ == "Нет, продолжить редактирование") { event->ignore(); return; }

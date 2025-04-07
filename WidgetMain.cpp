@@ -259,7 +259,7 @@ int WidgetMain::RowOfNote(Note * note)
 {
 	for(uint i=0; i<notes.size(); i++)
 		if(note == notes[i].get()) return i;
-	if(note) QMbError("RowOfNote: ROW NOT FOUND for note " + note->name + " ("+note->dtNotify.toString()+")");
+	if(note) QMbError("RowOfNote: ROW NOT FOUND for note " + note->name + " ("+note->DTNotify().toString()+")");
 	else QMbError("RowOfNote: nullptr row");
 	return -1;
 }
@@ -270,8 +270,7 @@ Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNoti
 	Note* newNote = notes.back().get();
 	newNote->name = std::move(name);
 	newNote->activeNotify = activeNotify;
-	newNote->dtNotify = dtNotify;
-	newNote->dtPostpone = dtPostpone;
+	newNote->SetDT(dtNotify, dtPostpone);
 	newNote->content.code = content;
 
 	int newNoteIndex = MakeNewRowInMainTable(newNote);
@@ -280,7 +279,7 @@ Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNoti
 
 	newNote->SaveNote();
 
-	newNote->ConnectUpdated([newNote](){ newNote->SaveNote(); });
+	newNote->ConnectCommonUpdated([newNote](){ newNote->SaveNote(); });
 
 	newNote->removeWorker = [this, newNote](){
 		RemoveNote(RowOfNote(newNote));
@@ -292,7 +291,7 @@ Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNoti
 
 int WidgetMain::MakeNewRowInMainTable(Note * newNote)
 {
-	newNote->ConnectUpdated([this, newNote](){ UpdateRowFromNote(newNote, RowOfNote(newNote)); });
+	newNote->ConnectCommonUpdated([this, newNote](){ UpdateRowFromNote(newNote, RowOfNote(newNote)); });
 
 	table->setRowCount(table->rowCount()+1);
 
@@ -325,8 +324,7 @@ int WidgetMain::MakeNewRowInMainTable(Note * newNote)
 	UpdateRowFromNote(newNote, rowIndex);
 
 	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [newNote, dtEditPostpone](const QDateTime &datetime){
-		newNote->dtNotify = datetime;
-		newNote->dtPostpone = datetime;
+		newNote->SetDT(datetime, datetime);
 
 		dtEditPostpone->blockSignals(true);
 		dtEditPostpone->setDateTime(datetime);
@@ -335,7 +333,7 @@ int WidgetMain::MakeNewRowInMainTable(Note * newNote)
 		newNote->SaveNote();
 	});
 	connect(dtEditPostpone, &QDateTimeEdit::dateTimeChanged, [newNote](const QDateTime &datetime){
-		newNote->dtPostpone = datetime;
+		newNote->SetDT(newNote->DTNotify(), datetime);
 		newNote->SaveNote();
 	});
 
@@ -346,8 +344,8 @@ void WidgetMain::UpdateRowFromNote(Note * note, int row)
 {
 	rowViews[row].item->setText("   " + note->name);
 	rowViews[row].chBox->setChecked(note->activeNotify);
-	rowViews[row].dteNotify->setDateTime(note->dtNotify);
-	rowViews[row].dtePostpone->setDateTime(note->dtPostpone);
+	rowViews[row].dteNotify->setDateTime(note->DTNotify());
+	rowViews[row].dtePostpone->setDateTime(note->DTPostpone());
 }
 
 void WidgetMain::RemoveNote(int index)
