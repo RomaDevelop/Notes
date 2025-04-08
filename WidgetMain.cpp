@@ -377,8 +377,8 @@ void WidgetMain::FitColWidth()
 	table->setColumnWidth(ColIndexes::notifyDTedit, ColIndexes::notifyDTeditWidth);
 	table->setColumnWidth(ColIndexes::postponeDTedit, ColIndexes::postponeDTeditWidth);
 
-	int nameWidth = table->width() - (ColIndexes::chBoxWidth+ColIndexes::notifyDTeditWidth+ColIndexes::postponeDTeditWidth);
-	if(table->verticalScrollBar()->isVisible()) nameWidth -= table->verticalScrollBar()->width() + 5;
+	int nameWidth = table->width() - (ColIndexes::chBoxWidth+ColIndexes::notifyDTeditWidth+ColIndexes::postponeDTeditWidth + 5);
+	if(table->verticalScrollBar()->isVisible()) nameWidth -= table->verticalScrollBar()->width();
 	table->setColumnWidth(ColIndexes::name, nameWidth);
 }
 

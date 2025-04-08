@@ -136,6 +136,8 @@ void WidgetAlarms::AddNote(Note * note)
 		if(QMessageBox::question(0,"Remove note","Are you shure?") == QMessageBox::Yes)
 			note->Remove();
 	});
+
+	QTimer::singleShot(10,this,[this]{ FitColWidth(); });
 }
 
 void WidgetAlarms::SetLabelText(NoteInAlarms & note)
@@ -161,6 +163,8 @@ void WidgetAlarms::RemoveNote(int index)
 	notes[index].note->RemoveCb(notes[index].dymmyHandlerToRemoveCb);
 	table->removeRow(index);
 	notes.erase(notes.begin() + index);
+
+	QTimer::singleShot(10,this,[this]{ FitColWidth(); });
 }
 
 void WidgetAlarms::RemoveNote(Note * aNote, bool showError)
@@ -302,7 +306,7 @@ void WidgetAlarms::showEvent(QShowEvent * event)
 	QSettings settings(settingsFile, QSettings::IniFormat);
 	restoreGeometry(settings.value("geo").toByteArray());
 
-	QTimer::singleShot(200,this,[this]{ FitColWidth(); });
+	QTimer::singleShot(10,this,[this]{ FitColWidth(); });
 
 	event->accept();
 }
@@ -334,8 +338,8 @@ void WidgetAlarms::FitColWidth()
 		return;
 	}
 
-	int columnWidth = table->width();
-	if(table->verticalScrollBar()->isVisible()) columnWidth -= table->verticalScrollBar()->width() + 5;
+	int columnWidth = table->width() - 5;
+	if(table->verticalScrollBar()->isVisible()) columnWidth -= table->verticalScrollBar()->width();
 	table->setColumnWidth(0, columnWidth);
 
 	for(auto &note:notes) SetLabelText(note);
