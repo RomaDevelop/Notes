@@ -25,7 +25,10 @@ class WidgetAlarms : public QWidget
 public:
 	QTableWidget *table;
 
-	explicit WidgetAlarms(QFont fontForLabels, QWidget *parent = nullptr);
+	explicit WidgetAlarms(QFont fontForLabels,
+						  std::function<void()> crNewNoteFoo,
+						  std::function<void()> showMainWindow,
+						  QWidget *parent = nullptr);
 	~WidgetAlarms();
 	void GiveNotes(const std::vector<Note*> &givingNotes);
 

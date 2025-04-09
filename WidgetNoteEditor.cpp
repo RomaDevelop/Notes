@@ -61,43 +61,71 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	vlo_main->addLayout(hloTextEdit);
 
 	QPushButton *btnBold = new QPushButton("B");
+	btnBold->setStyleSheet("font-weight: bold;");
 	btnBold->setFixedWidth(25);
 	hloButtons->addWidget(btnBold);
 	connect(btnBold,&QPushButton::clicked,[this](){
 		auto cursor = textEdit->textCursor();
 		auto format = cursor.charFormat();
-		format.setFontWeight(QFont::Bold);
+		if(format.fontWeight() == QFont::Weight::Normal)
+			format.setFontWeight(QFont::Weight::Bold);
+		else format.setFontWeight(QFont::Weight::Normal);
 		cursor.setCharFormat(format);
 	});
 
 	QPushButton *btnUnderlined = new QPushButton("U");
+	btnUnderlined->setStyleSheet("text-decoration: underline;");
 	btnUnderlined->setFixedWidth(25);
 	hloButtons->addWidget(btnUnderlined);
 	connect(btnUnderlined,&QPushButton::clicked,[this](){
 		auto cursor = textEdit->textCursor();
 		auto format = cursor.charFormat();
-		format.setFontUnderline(true);
+		format.setFontUnderline(!format.fontUnderline());
 		cursor.setCharFormat(format);
 	});
 
-	QPushButton *btnAplus = new QPushButton("A+");
-	btnAplus->setFixedWidth(30);
-	hloButtons->addWidget(btnAplus);
-	connect(btnAplus,&QPushButton::clicked,[this](){
+	QPushButton *btnItalic = new QPushButton("I");
+	btnItalic->setStyleSheet("font-style: italic;");
+	btnItalic->setFixedWidth(25);
+	hloButtons->addWidget(btnItalic);
+	connect(btnItalic,&QPushButton::clicked,[this](){
+		auto cursor = textEdit->textCursor();
+		auto format = cursor.charFormat();
+		format.setFontItalic(!format.fontItalic());
+		cursor.setCharFormat(format);
+	});
+
+	QPushButton *btnAPlus = new QPushButton("A+");
+	btnAPlus->setFixedWidth(30);
+	hloButtons->addWidget(btnAPlus);
+	connect(btnAPlus,&QPushButton::clicked,[this](){
 		auto cursor = textEdit->textCursor();
 		auto format = cursor.charFormat();
 		format.setFontPointSize(format.fontPointSize()+1);
 		cursor.setCharFormat(format);
 	});
 
-	QPushButton *btnAminis = new QPushButton("A-");
-	btnAminis->setFixedWidth(30);
-	hloButtons->addWidget(btnAminis);
-	connect(btnAminis,&QPushButton::clicked,[this](){
+	QPushButton *btnAMinus = new QPushButton("A-");
+	btnAMinus->setFixedWidth(30);
+	hloButtons->addWidget(btnAMinus);
+	connect(btnAMinus,&QPushButton::clicked,[this](){
 		auto cursor = textEdit->textCursor();
 		auto format = cursor.charFormat();
 		format.setFontPointSize(format.fontPointSize()-1);
 		cursor.setCharFormat(format);
+	});
+
+
+	QPushButton *btnAddAction = new QPushButton("Add action");
+	btnAddAction->setFixedWidth(30);
+	hloButtons->addWidget(btnAddAction);
+	connect(btnAddAction,&QPushButton::clicked,[btnAddAction](){
+		MyQDialogs::MenuUnderWidget(btnAddAction,
+									{
+										{"1",[](){qdbg << "1"; }},
+										{"2",[](){qdbg << "2"; }},
+										{"3",[](){qdbg << "3"; }}
+									});
 	});
 
 	hloButtons->addStretch();
@@ -111,7 +139,7 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 	note.ConnectDTUpdated([this](void *){
 		static int i =0;
-		qdbg << i++ << "ConnectDTUpdated" << this->note.DTNotify().toString() << this->note.DTPostpone().toString();
+		qdbg << i++ << "ConnectDTUpdated in WidgetNoteEditor" << this->note.DTNotify().toString() << this->note.DTPostpone().toString();
 		dtEditNotify->setDateTime(this->note.DTNotify());
 		dtEditPostpone->setDateTime(this->note.DTPostpone());
 	},

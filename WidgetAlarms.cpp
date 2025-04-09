@@ -17,7 +17,10 @@
 
 #include "WidgetNoteEditor.h"
 
-WidgetAlarms::WidgetAlarms(QFont fontForLabels, QWidget * parent):
+WidgetAlarms::WidgetAlarms(QFont fontForLabels,
+						   std::function<void()> crNewNoteFoo,
+						   std::function<void()> showMainWindow,
+						   QWidget * parent):
 	QWidget(parent),
 	fontForLabels{fontForLabels},
 	fontMetrixForLabels(fontForLabels)
@@ -40,6 +43,17 @@ WidgetAlarms::WidgetAlarms(QFont fontForLabels, QWidget * parent):
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
 		WidgetNoteEditor::MakeOrShowNoteEditor(*notes[r].note);
 	});
+
+	auto btnShowMainWindow = new QPushButton();
+	btnShowMainWindow->setFixedWidth(26);
+	btnShowMainWindow->setIcon(QApplication::style()->standardIcon(QStyle::StandardPixmap::SP_FileDialogDetailedView));
+	hlo2->addWidget(btnShowMainWindow);
+	connect(btnShowMainWindow, &QPushButton::clicked, showMainWindow);
+
+	auto btnAdd = new QPushButton("+");
+	btnAdd->setFixedWidth(25);
+	hlo2->addWidget(btnAdd);
+	connect(btnAdd, &QPushButton::clicked, crNewNoteFoo);
 
 	hlo2->addStretch();
 	auto btnReschedule = new QPushButton(" Перенести все на ... ");

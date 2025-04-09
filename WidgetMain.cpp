@@ -55,8 +55,6 @@ void WidgetMain::UpdateNotesIndexes()
 
 WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 {
-	qdbg << "";
-
 	Note::notesSavesPath = filesPath + "/notes";
 	Note::notesBackupsPath = filesPath + "/notes_backups";
 
@@ -68,8 +66,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 
 	QPushButton *btnPlus = new QPushButton("+");
 	btnPlus->setFixedWidth(25);
-	hlo1->addWidget(btnPlus);
-	connect(btnPlus,&QPushButton::clicked,[this](){
+	auto crNewNoteFoo = [this](){
 		QString newName = MyQDialogs::InputLine("Создание заметки", "Введите название заметки", "");
 		if(newName.isEmpty()) return;
 
@@ -78,7 +75,9 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 		UpdateNotesIndexes();
 
 		WidgetNoteEditor::MakeOrShowNoteEditor(newNote, true);
-	});
+	};
+	hlo1->addWidget(btnPlus);
+	connect(btnPlus,&QPushButton::clicked, crNewNoteFoo);
 
 	QPushButton *btnRemove = new QPushButton("-");
 	btnRemove->setFixedWidth(25);
@@ -122,8 +121,14 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	auto labelToGetFont = new QLabel("labelToGetFont");
 	vlo_main->addWidget(labelToGetFont);
 
-	QTimer::singleShot(0,[this, labelToGetFont]{
-		widgetAlarms = std::make_unique<WidgetAlarms>(labelToGetFont->font());
+	QTimer::singleShot(0,[this, labelToGetFont, crNewNoteFoo]{
+
+		auto showMainWindow = [this](){
+			this->showNormal();
+			PlatformDependent::SetTopMostFlash(this);
+		};
+
+		widgetAlarms = std::make_unique<WidgetAlarms>(labelToGetFont->font(), crNewNoteFoo, showMainWindow);
 		delete labelToGetFont;
 
 		LoadSettings();
