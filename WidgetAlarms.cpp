@@ -245,13 +245,14 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 
 		if(delay.seconds != handInput)
 		{
-			if(notesToDo.size() == 1) // если обрабатываеся одна зазача
+
+			if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
 			{
-				if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
-				{
-					delay.text += AddSecsFromNow(delaySecs).toString(" (hh:mm::ss)");
-				}
-				else if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
+				delay.text += AddSecsFromNow(delaySecs).toString(" (hh:mm::ss)");
+			}
+			else if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
+			{
+				if(notesToDo.size() == 1) // если обрабатываеся одна зазача
 				{
 					delay.text = AddSecsFromToday(notesToDo[0]->DTNotify(), delaySecs).toString("dd MMM yyyy hh:mm::ss (ddd)");
 					if(delaySecs == secondsInDay)
@@ -259,16 +260,13 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 					if(delaySecs == secondsInDay*2)
 						delay.text = AddSecsFromToday(notesToDo[0]->DTNotify(), delaySecs).toString("послезавтра hh:mm::ss (ddd)");
 				}
-			}
-			else // если обрабатываеся много зазач
-			{
-				if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
-				{
-					delay.text += AddSecsFromNow(delaySecs).toString(" (hh:mm::ss)");
-				}
-				else if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
+				else // если обрабатываеся много зазач
 				{
 					delay.text = QDateTime::currentDateTime().addSecs(delaySecs).toString("dd MMM yyyy (ddd)");
+					if(delaySecs == secondsInDay)
+						delay.text = "завтра";
+					if(delaySecs == secondsInDay*2)
+						delay.text = "послезавтра";
 				}
 			}
 		}
