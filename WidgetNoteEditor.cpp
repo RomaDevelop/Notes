@@ -116,8 +116,7 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	});
 
 
-	QPushButton *btnAddAction = new QPushButton("Add action");
-	btnAddAction->setFixedWidth(30);
+	QPushButton *btnAddAction = new QPushButton(" Add action ");
 	hloButtons->addWidget(btnAddAction);
 	connect(btnAddAction,&QPushButton::clicked,[btnAddAction](){
 		MyQDialogs::MenuUnderWidget(btnAddAction,
@@ -132,6 +131,7 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 	textEdit = new MyQTextEdit;
 	textEdit->richTextPaste = false;
+	textEdit->setTabStopDistance(40);
 	hloTextEdit->addWidget(textEdit);
 
 	if(note.content.code == Note::StartText()) note.content.code = "<span style='font-size: 14pt;'>"+Note::StartText()+"</span>";
