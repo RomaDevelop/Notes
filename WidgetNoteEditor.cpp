@@ -202,7 +202,7 @@ void WidgetNoteEditor::closeEvent(QCloseEvent * event)
 		auto answ = MyQDialogs::CustomDialog("Сохранение","Завершить редактирование и сохранить заметку с автоназначенным уведомлением на "
 											 + note.DTNotify().toString(DateTimeFormat) + " ?",
 											 {"Да, завершить и сохранить", "Нет, продолжить редактирование"});
-		if(answ == "Да, завершить и сохранить") {/*ничего не делаем*/}
+		if(answ == "Да, завершить и сохранить") { dtEditPostpone->setDateTime(note.DTNotify()); } // ставим отложить на одну дату с уведомлением
 		else if(answ == "Нет, продолжить редактирование") { event->ignore(); return; }
 		else { QMbError("not realesed button " + answ); return; }
 	}
