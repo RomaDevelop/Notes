@@ -67,7 +67,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	QPushButton *btnPlus = new QPushButton("+");
 	btnPlus->setFixedWidth(25);
 	auto crNewNoteFoo = [this](){
-		QString newName = MyQDialogs::InputLine("Создание заметки", "Введите название заметки", "");
+		QString newName = MyQDialogs::InputLine("Создание заметки", "Введите название заметки", "").text;
 		if(newName.isEmpty()) return;
 
 		auto dt = QDateTime::currentDateTime();

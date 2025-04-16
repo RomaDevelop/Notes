@@ -277,14 +277,15 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 			int itogDelaySecs = delaySecs; // почему то не давал изменять значение delaySecs внутри лямбды
 			if(itogDelaySecs == handInput)
 			{
-				auto res = MyQDialogs::InputLineExt("Введите значение", "Введите значение", "", {"Секунд","Минут","Часов","Дней","Отмена"}, 500);
-				if(res.line.isEmpty()) return;
-				if(!IsUInt(res.line)) { QMbError("Input is not number" + res.line); return; }
+				auto res = MyQDialogs::InputLineExt("Введите значение", "Введите значение", "",
+													{"Секунд","Минут","Часов","Дней","Отмена"}, 500);
+				if(res.text.isEmpty()) return;
+				if(!IsUInt(res.text)) { QMbError("Input is not number" + res.text); return; }
 				if(0) ;
-				else if(res.button == "Секунд") itogDelaySecs = res.line.toUInt();
-				else if(res.button == "Минут") itogDelaySecs = res.line.toUInt()*60;
-				else if(res.button == "Часов") itogDelaySecs = res.line.toUInt()*60*60;
-				else if(res.button == "Дней") itogDelaySecs = res.line.toUInt()*60*60*24;
+				else if(res.button == "Секунд") itogDelaySecs = res.text.toUInt();
+				else if(res.button == "Минут") itogDelaySecs = res.text.toUInt()*60;
+				else if(res.button == "Часов") itogDelaySecs = res.text.toUInt()*60*60;
+				else if(res.button == "Дней") itogDelaySecs = res.text.toUInt()*60*60*24;
 				else if(res.button == "Отмена") return;
 				else if(res.button.isEmpty()) return;
 				else QMbError("Error button name " + res.button);

@@ -11,6 +11,7 @@
 #include <QVBoxLayout>
 #include <QPushButton>
 #include <QDateTimeEdit>
+#include <QShortcut>
 
 #include "PlatformDependent.h"
 #include "MyQDifferent.h"
@@ -60,47 +61,74 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	vlo_main->addLayout(hloButtons);
 	vlo_main->addLayout(hloTextEdit);
 
+	auto SlotSetBold = [this](){
+		auto cursor = textEdit->textCursor();
+		if(!cursor.hasSelection()) return;
+
+		int start = cursor.selectionStart();
+		QTextCharFormat format = MyQTextEdit::LetterFormat(textEdit, start);
+
+		if(format.fontWeight() == QFont::Weight::Normal)
+			format.setFontWeight(QFont::Weight::Bold);
+		else format.setFontWeight(QFont::Weight::Normal);
+
+		cursor.setCharFormat(format);
+	};
+	auto SlotSetUndL = [this](){
+		auto cursor = textEdit->textCursor();
+		if(!cursor.hasSelection()) return;
+
+		int start = cursor.selectionStart();
+		QTextCharFormat format = MyQTextEdit::LetterFormat(textEdit, start);
+
+		format.setFontUnderline(!format.fontUnderline());
+		cursor.setCharFormat(format);
+	};
+	auto SlotSetItal = [this](){
+		auto cursor = textEdit->textCursor();
+		if(!cursor.hasSelection()) return;
+
+		int start = cursor.selectionStart();
+		QTextCharFormat format = MyQTextEdit::LetterFormat(textEdit, start);
+
+		format.setFontItalic(!format.fontItalic());
+		cursor.setCharFormat(format);
+	};
+
 	QPushButton *btnBold = new QPushButton("B");
 	btnBold->setStyleSheet("font-weight: bold;");
 	btnBold->setFixedWidth(25);
 	hloButtons->addWidget(btnBold);
-	connect(btnBold,&QPushButton::clicked,[this](){
-		auto cursor = textEdit->textCursor();
-		auto format = cursor.charFormat();
-		if(format.fontWeight() == QFont::Weight::Normal)
-			format.setFontWeight(QFont::Weight::Bold);
-		else format.setFontWeight(QFont::Weight::Normal);
-		cursor.setCharFormat(format);
-	});
+	connect(btnBold,&QPushButton::clicked, SlotSetBold);
+	QShortcut *shortcutCtrlB = new QShortcut(QKeySequence("Ctrl+B"), this);
+	connect(shortcutCtrlB, &QShortcut::activated, SlotSetBold);
 
 	QPushButton *btnUnderlined = new QPushButton("U");
 	btnUnderlined->setStyleSheet("text-decoration: underline;");
 	btnUnderlined->setFixedWidth(25);
 	hloButtons->addWidget(btnUnderlined);
-	connect(btnUnderlined,&QPushButton::clicked,[this](){
-		auto cursor = textEdit->textCursor();
-		auto format = cursor.charFormat();
-		format.setFontUnderline(!format.fontUnderline());
-		cursor.setCharFormat(format);
-	});
+	connect(btnUnderlined,&QPushButton::clicked,SlotSetUndL);
+	QShortcut *shortcutCtrlU = new QShortcut(QKeySequence("Ctrl+U"), this);
+	connect(shortcutCtrlU, &QShortcut::activated, SlotSetUndL);
 
 	QPushButton *btnItalic = new QPushButton("I");
 	btnItalic->setStyleSheet("font-style: italic;");
 	btnItalic->setFixedWidth(25);
 	hloButtons->addWidget(btnItalic);
-	connect(btnItalic,&QPushButton::clicked,[this](){
-		auto cursor = textEdit->textCursor();
-		auto format = cursor.charFormat();
-		format.setFontItalic(!format.fontItalic());
-		cursor.setCharFormat(format);
-	});
+	connect(btnItalic,&QPushButton::clicked,SlotSetItal);
+	QShortcut *shortcutCtrlI = new QShortcut(QKeySequence("Ctrl+I"), this);
+	connect(shortcutCtrlI, &QShortcut::activated, SlotSetItal);
 
 	QPushButton *btnAPlus = new QPushButton("A+");
 	btnAPlus->setFixedWidth(30);
 	hloButtons->addWidget(btnAPlus);
 	connect(btnAPlus,&QPushButton::clicked,[this](){
 		auto cursor = textEdit->textCursor();
-		auto format = cursor.charFormat();
+		if(!cursor.hasSelection()) return;
+
+		int start = cursor.selectionStart();
+		QTextCharFormat format = MyQTextEdit::LetterFormat(textEdit, start);
+
 		format.setFontPointSize(format.fontPointSize()+1);
 		cursor.setCharFormat(format);
 	});
@@ -110,7 +138,11 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	hloButtons->addWidget(btnAMinus);
 	connect(btnAMinus,&QPushButton::clicked,[this](){
 		auto cursor = textEdit->textCursor();
-		auto format = cursor.charFormat();
+		if(!cursor.hasSelection()) return;
+
+		int start = cursor.selectionStart();
+		QTextCharFormat format = MyQTextEdit::LetterFormat(textEdit, start);
+
 		format.setFontPointSize(format.fontPointSize()-1);
 		cursor.setCharFormat(format);
 	});

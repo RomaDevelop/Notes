@@ -39,7 +39,7 @@ private:
 	std::vector<NoteInAlarms> notes;
 	NoteInAlarms* FindNote(Note *noteToFind);
 	void AddNote(Note* note);
-	void SetLabelText(NoteInAlarms & note); // maxLen -1 = no max len
+	void SetLabelText(NoteInAlarms & note);
 	void RemoveNote(int index);
 	void RemoveNote(Note* aNote, bool showError);
 
