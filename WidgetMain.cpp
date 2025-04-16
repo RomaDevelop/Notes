@@ -45,10 +45,10 @@ void WidgetMain::UpdateNotesIndexes()
 	if(0) CodeMarkers::to_do("do not resave all note file for change index");
 	for(int i=0; i<(int)notes.size(); i++)
 	{
-		if(notes[i]->index != i)
+		if(notes[i].note->index != i)
 		{
-			notes[i]->index = i;
-			notes[i]->SaveNote();
+			notes[i].note->index = i;
+			notes[i].note->SaveNote();
 		}
 	}
 }
@@ -82,7 +82,14 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	QPushButton *btnRemove = new QPushButton("-");
 	btnRemove->setFixedWidth(25);
 	hlo1->addWidget(btnRemove);
-	connect(btnRemove,&QPushButton::clicked,[this](){ RemoveNote(table->currentRow()); });
+	connect(btnRemove,&QPushButton::clicked,[this](){
+		if(QMessageBox::question(0,"Remove note","Are you shure?") == QMessageBox::Yes)
+		{
+			if(auto note = NoteOfRow(table->currentRow()); note)
+				note->Remove();
+			else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
+		}
+	});
 
 	hlo1->addStretch();
 
@@ -113,7 +120,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	table->setHorizontalHeaderLabels({"Наименование","","Начало","Отложено на..."});
 	hlo2->addWidget(table);
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
-		WidgetNoteEditor::MakeOrShowNoteEditor(*notes[r].get());
+		WidgetNoteEditor::MakeOrShowNoteEditor(*notes[r].note.get());
 	});
 
 	QDir().mkpath(Note::notesSavesPath);
@@ -175,9 +182,9 @@ void WidgetMain::CheckNotesForAlarm()
 	std::vector<Note*> alarmedNotes;
 	for(auto &note:notes)
 	{
-		if(note->CheckAlarm(currentDateTime))
+		if(note.note->CheckAlarm(currentDateTime))
 		{
-			alarmedNotes.emplace_back(note.get());
+			alarmedNotes.emplace_back(note.note.get());
 		}
 	}
 
@@ -263,22 +270,43 @@ void WidgetMain::LoadNotes()
 int WidgetMain::RowOfNote(Note * note)
 {
 	for(uint i=0; i<notes.size(); i++)
-		if(note == notes[i].get()) return i;
+	{
+		if(note == notes[i].note.get())
+		{
+			int row = table->row(notes[i].rowView.item);
+			if(row == -1) QMbError("RowOfNote: -1");
+			return row;
+		}
+	}
 	if(note) QMbError("RowOfNote: ROW NOT FOUND for note " + note->name + " ("+note->DTNotify().toString()+")");
 	else QMbError("RowOfNote: nullptr row");
 	return -1;
 }
 
+Note *WidgetMain::NoteOfRow(int row)
+{
+	auto item = table->item(row, ColIndexes::name);
+	if(!item) { QMbError("NoteOfRow: !item for row " + QSn(row)); return nullptr; }
+
+	for(uint i=0; i<notes.size(); i++)
+	{
+		if(notes[i].rowView.item == item) return notes[i].note.get();
+	}
+	QMbError("NoteOfRow: NOTE NOT FOUND for row("+QSn(row)+") and existing item " + item->text());
+	return nullptr;
+}
+
 Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNotify, QDateTime dtPostpone, QString content)
 {
-	notes.emplace_back(std::make_unique<Note>());
-	Note* newNote = notes.back().get();
+	NoteInMain &newNoteInMainRef = notes.emplace_back();
+	newNoteInMainRef.note = std::make_unique<Note>();
+	Note* newNote = newNoteInMainRef.note.get();
 	newNote->name = std::move(name);
 	newNote->activeNotify = activeNotify;
 	newNote->SetDT(dtNotify, dtPostpone);
 	newNote->content.code = content;
 
-	int newNoteIndex = MakeNewRowInMainTable(newNote);
+	int newNoteIndex = MakeNewRowInMainTable(newNoteInMainRef);
 
 	newNote->index = newNoteIndex;
 
@@ -287,16 +315,16 @@ Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNoti
 	newNote->ConnectCommonUpdated([newNote](){ newNote->SaveNote(); });
 
 	newNote->removeWorker = [this, newNote](){
-		RemoveNote(RowOfNote(newNote));
+		RemoveNote(newNote);
 		CheckNotesForAlarm();
 	};
 
 	return *newNote;
 }
 
-int WidgetMain::MakeNewRowInMainTable(Note * newNote)
+int WidgetMain::MakeNewRowInMainTable(NoteInMain &newNote)
 {
-	newNote->ConnectCommonUpdated([this, newNote](){ UpdateRowFromNote(newNote, RowOfNote(newNote)); });
+	newNote.note->ConnectCommonUpdated([this, &newNote](){ UpdateRowFromNote(newNote); });
 
 	table->setRowCount(table->rowCount()+1);
 
@@ -305,8 +333,8 @@ int WidgetMain::MakeNewRowInMainTable(Note * newNote)
 	table->setItem(rowIndex, ColIndexes::name, new QTableWidgetItem);
 
 	auto chActive = new QCheckBox;
-	connect(chActive, &QCheckBox::stateChanged, [newNote, chActive](int){
-		newNote->activeNotify = chActive->isChecked();
+	connect(chActive, &QCheckBox::stateChanged, [&newNote, chActive](int){
+		newNote.note->activeNotify = chActive->isChecked();
 	});
 	auto wCh = new QWidget;
 	auto loWCH = new QHBoxLayout(wCh);
@@ -324,47 +352,61 @@ int WidgetMain::MakeNewRowInMainTable(Note * newNote)
 	dtEditPostpone->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
 	table->setCellWidget(rowIndex, ColIndexes::postponeDTedit, dtEditPostpone);
 
-	rowViews.emplace_back(table->item(rowIndex, ColIndexes::name), chActive, dtEditNotify, dtEditPostpone);
+	newNote.rowView = RowView(table->item(rowIndex, ColIndexes::name), chActive, dtEditNotify, dtEditPostpone);
 
-	UpdateRowFromNote(newNote, rowIndex);
+	UpdateRowFromNote(newNote);
 
-	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [newNote, dtEditPostpone](const QDateTime &datetime){
-		newNote->SetDT(datetime, datetime);
+	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [&newNote, dtEditPostpone](const QDateTime &datetime){
+		newNote.note->SetDT(datetime, datetime);
 
 		dtEditPostpone->blockSignals(true);
 		dtEditPostpone->setDateTime(datetime);
 		dtEditPostpone->blockSignals(false);
 
-		newNote->SaveNote();
+		newNote.note->SaveNote();
 	});
-	connect(dtEditPostpone, &QDateTimeEdit::dateTimeChanged, [newNote](const QDateTime &datetime){
-		newNote->SetDT(newNote->DTNotify(), datetime);
-		newNote->SaveNote();
+	connect(dtEditPostpone, &QDateTimeEdit::dateTimeChanged, [&newNote](const QDateTime &datetime){
+		newNote.note->SetDT(newNote.note->DTNotify(), datetime);
+		newNote.note->SaveNote();
 	});
 
 	return rowIndex;
 }
 
-void WidgetMain::UpdateRowFromNote(Note * note, int row)
+void WidgetMain::UpdateRowFromNote(NoteInMain &note)
 {
-	rowViews[row].item->setText("   " + note->name);
-	rowViews[row].chBox->setChecked(note->activeNotify);
-	rowViews[row].dteNotify->setDateTime(note->DTNotify());
-	rowViews[row].dtePostpone->setDateTime(note->DTPostpone());
+	note.rowView.item->setText("   " + note.note->name);
+	note.rowView.chBox->setChecked(note.note->activeNotify);
+	note.rowView.dteNotify->setDateTime(note.note->DTNotify());
+	note.rowView.dtePostpone->setDateTime(note.note->DTPostpone());
 }
 
-void WidgetMain::RemoveNote(int index)
+void WidgetMain::RemoveNote(Note* note)
 {
-	if(table->rowCount() == 0 ||  index < 0 || index >= table->rowCount()) return;
-	if(!notes[index]->file.isEmpty())
+	for(uint index=0; index<notes.size(); index++)
 	{
-		if(!QFile::remove(notes[index]->file)) QMbError("Error removing file " + notes[index]->file);
-	}
-	notes.erase(notes.begin() + index);
-	UpdateNotesIndexes();
+		auto &notePl = notes[index];
+		if(notePl.note.get() == note)
+		{
+			if(!note->file.isEmpty())
+			{
+				if(!QFile::remove(note->file)) QMbError("Error removing file " + note->file);
+			}
+			else QMbError("note("+note->name+")->file is empty");
 
-	rowViews.erase(rowViews.begin() + index);
-	table->removeRow(index);
+			if(int row = RowOfNote(note); row != -1)
+			{
+				table->removeRow(row);
+			}
+
+			notes.erase(notes.begin() + index);
+
+			UpdateNotesIndexes();
+			return;
+		}
+	}
+	if(!note) QMbError("RemoveNote nullptr note get");
+	else QMbError("note("+note->name+") not found");
 }
 
 void WidgetMain::FitColWidth()

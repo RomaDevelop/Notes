@@ -15,14 +15,17 @@
 #include "Note.h"
 #include "WidgetAlarms.h"
 
+declare_struct_4_fields_no_move(RowView, QTableWidgetItem*, item, QCheckBox*, chBox, QDateTimeEdit*, dteNotify, QDateTimeEdit*, dtePostpone);
+declare_struct_2_fields_move(NoteInMain, RowView, rowView, std::unique_ptr<Note>, note);
+
 class WidgetMain : public QWidget
 {
 	Q_OBJECT
 public:
 	QTableWidget *table;
-	declare_struct_4_fields_no_move(RowView, QTableWidgetItem*, item, QCheckBox*, chBox, QDateTimeEdit*, dteNotify, QDateTimeEdit*, dtePostpone);
-	std::vector<RowView> rowViews;
-	std::vector<std::unique_ptr<Note>> notes;
+
+	std::vector<NoteInMain> notes;
+
 	void UpdateNotesIndexes();
 	std::unique_ptr<WidgetAlarms> widgetAlarms;
 
@@ -45,12 +48,13 @@ private:
 	void LoadNotes();
 
 	int RowOfNote(Note* note);
+	Note* NoteOfRow(int row);
 
 	Note& MakeNewNote(QString name, bool activeNotify, QDateTime dtNotify, QDateTime dtPostpone, QString content);
-	int MakeNewRowInMainTable(Note* newNote); // returns index
-	void UpdateRowFromNote(Note * note, int row);
+	int MakeNewRowInMainTable(NoteInMain &newNote); // returns index
+	void UpdateRowFromNote(NoteInMain &note);
 
-	void RemoveNote(int index);
+	void RemoveNote(Note* note);
 
 	void FitColWidth();
 
