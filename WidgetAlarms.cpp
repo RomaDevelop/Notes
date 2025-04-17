@@ -317,7 +317,19 @@ void WidgetAlarms::showEvent(QShowEvent * event)
 	if(!QFile::exists(settingsFile)) return;
 
 	QSettings settings(settingsFile, QSettings::IniFormat);
-	restoreGeometry(settings.value("geo").toByteArray());
+	auto geo = settings.value("geo").toByteArray();
+	if(settings.contains("geo") && !geo.isNull() && !geo.isEmpty())
+	{
+		restoreGeometry(geo);
+		qdbg << "loaded correct geo" << pos() << size();
+	}
+	else
+	{
+		setGeometry(30,30, 640,300);
+		if(!settings.contains("geo")) QMbError("!settings.contains(\"geo\")");
+		if(geo.isNull()) QMbError("geo.isNull()");
+		if(geo.isEmpty()) QMbError("geo.isEmpty()");
+	}
 
 	QTimer::singleShot(10,this,[this]{ FitColWidth(); });
 

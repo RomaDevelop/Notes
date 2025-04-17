@@ -24,7 +24,7 @@ class WidgetMain : public QWidget
 public:
 	QTableWidget *table;
 
-	std::vector<NoteInMain> notes;
+	std::vector<std::unique_ptr<NoteInMain>> notes;
 
 	void UpdateNotesIndexes();
 	std::unique_ptr<WidgetAlarms> widgetAlarms;

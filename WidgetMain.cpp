@@ -45,10 +45,10 @@ void WidgetMain::UpdateNotesIndexes()
 	if(0) CodeMarkers::to_do("do not resave all note file for change index");
 	for(int i=0; i<(int)notes.size(); i++)
 	{
-		if(notes[i].note->index != i)
+		if(notes[i]->note->index != i)
 		{
-			notes[i].note->index = i;
-			notes[i].note->SaveNote();
+			notes[i]->note->index = i;
+			notes[i]->note->SaveNote();
 		}
 	}
 }
@@ -120,7 +120,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	table->setHorizontalHeaderLabels({"Наименование","","Начало","Отложено на..."});
 	hlo2->addWidget(table);
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
-		WidgetNoteEditor::MakeOrShowNoteEditor(*notes[r].note.get());
+		WidgetNoteEditor::MakeOrShowNoteEditor(*notes[r]->note.get());
 	});
 
 	QDir().mkpath(Note::notesSavesPath);
@@ -182,9 +182,9 @@ void WidgetMain::CheckNotesForAlarm()
 	std::vector<Note*> alarmedNotes;
 	for(auto &note:notes)
 	{
-		if(note.note->CheckAlarm(currentDateTime))
+		if(note->note->CheckAlarm(currentDateTime))
 		{
-			alarmedNotes.emplace_back(note.note.get());
+			alarmedNotes.emplace_back(note->note.get());
 		}
 	}
 
@@ -271,9 +271,9 @@ int WidgetMain::RowOfNote(Note * note)
 {
 	for(uint i=0; i<notes.size(); i++)
 	{
-		if(note == notes[i].note.get())
+		if(note == notes[i]->note.get())
 		{
-			int row = table->row(notes[i].rowView.item);
+			int row = table->row(notes[i]->rowView.item);
 			if(row == -1) QMbError("RowOfNote: -1");
 			return row;
 		}
@@ -290,7 +290,7 @@ Note *WidgetMain::NoteOfRow(int row)
 
 	for(uint i=0; i<notes.size(); i++)
 	{
-		if(notes[i].rowView.item == item) return notes[i].note.get();
+		if(notes[i]->rowView.item == item) return notes[i]->note.get();
 	}
 	QMbError("NoteOfRow: NOTE NOT FOUND for row("+QSn(row)+") and existing item " + item->text());
 	return nullptr;
@@ -298,7 +298,8 @@ Note *WidgetMain::NoteOfRow(int row)
 
 Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNotify, QDateTime dtPostpone, QString content)
 {
-	NoteInMain &newNoteInMainRef = notes.emplace_back();
+	notes.emplace_back(std::unique_ptr<NoteInMain>(new NoteInMain));
+	NoteInMain &newNoteInMainRef = *notes.back().get();
 	newNoteInMainRef.note = std::make_unique<Note>();
 	Note* newNote = newNoteInMainRef.note.get();
 	newNote->name = std::move(name);
@@ -386,7 +387,7 @@ void WidgetMain::RemoveNote(Note* note)
 	for(uint index=0; index<notes.size(); index++)
 	{
 		auto &notePl = notes[index];
-		if(notePl.note.get() == note)
+		if(notePl->note.get() == note)
 		{
 			if(!note->file.isEmpty())
 			{
