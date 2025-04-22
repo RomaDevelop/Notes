@@ -17,11 +17,13 @@
 #include "MyQDifferent.h"
 #include "MyQDialogs.h"
 
+#include "FastActions.h"
+
 WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	QWidget(parent),
 	note {note}
 {
-	setWindowTitle(note.name + " - NoteEditor");
+	setWindowTitle(note.Name() + " - NoteEditor");
 	setAttribute(Qt::WA_DeleteOnClose);
 
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
@@ -31,7 +33,7 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 	vlo_main->addLayout(hloNameAndDates);
 
-	leName = new QLineEdit(note.name);
+	leName = new QLineEdit(note.Name());
 	MyQWidget::SetFontPointSize(leName, 12);
 	MyQWidget::SetFontBold(leName, true);
 
@@ -150,32 +152,45 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 	QPushButton *btnAddAction = new QPushButton(" Add action ");
 	hloButtons->addWidget(btnAddAction);
-	connect(btnAddAction,&QPushButton::clicked,[btnAddAction](){
+	connect(btnAddAction,&QPushButton::clicked,[this, btnAddAction](){
+		auto executeFoo = [this](){ this->textEdit->textCursor().insertText(FastActions_ns::execute); };
 		MyQDialogs::MenuUnderWidget(btnAddAction,
 									{
-										{"1",[](){qdbg << "1"; }},
-										{"2",[](){qdbg << "2"; }},
-										{"3",[](){qdbg << "3"; }}
+										{ FastActions_ns::execute, executeFoo },
 									});
 	});
 
+	QPushButton *btnDoActions = new QPushButton(" Do actions ");
+	hloButtons->addWidget(btnDoActions);
+	connect(btnDoActions,&QPushButton::clicked,[this, btnDoActions](){
+		auto actions = FastActions::Scan(textEdit->toPlainText());
+
+		MyQDialogs::MenuUnderWidget(btnDoActions, actions.actionsVals, actions.GetVectFunctions());
+	});
+
 	hloButtons->addStretch();
+
+	QPushButton *btnSave = new QPushButton(" Save ");
+	hloButtons->addWidget(btnSave);
+	connect(btnSave,&QPushButton::clicked, this, &WidgetNoteEditor::SaveNoteFromWidgets);
 
 	textEdit = new MyQTextEdit;
 	textEdit->richTextPaste = false;
 	textEdit->setTabStopDistance(40);
 	hloTextEdit->addWidget(textEdit);
+	connect(textEdit, &QTextEdit::textChanged, [this](){ textEditChanged=true; });
 
-	if(note.content.code == Note::StartText()) note.content.code = "<span style='font-size: 14pt;'>"+Note::StartText()+"</span>";
-	textEdit->setHtml(note.content.code);
+	if(note.Content() == Note::StartText()) note.SetContent("<span style='font-size: 14pt;'>"+Note::StartText()+"</span>");
+	textEdit->setHtml(note.Content());
 
-	note.ConnectDTUpdated([this](void *){
+	auto dtUpdateFoo = [this](void *){
 		static int i =0;
 		qdbg << i++ << "ConnectDTUpdated in WidgetNoteEditor" << this->note.DTNotify().toString() << this->note.DTPostpone().toString();
 		dtEditNotify->setDateTime(this->note.DTNotify());
 		dtEditPostpone->setDateTime(this->note.DTPostpone());
-	},
-	this);
+	};
+
+	note.SetCBDTUpdated(dtUpdateFoo, this, cbCounter);
 
 	settingsFile = MyQDifferent::PathToExe()+"/files/settings_note_editor.ini";
 	QTimer::singleShot(0,this,[this]
@@ -190,12 +205,10 @@ WidgetNoteEditor::~WidgetNoteEditor()
 {
 	qdbg << "~WidgetNoteEditor " + leName->text();
 
-	note.RemoveCb(this);
+	note.RemoveCbs(this, cbCounter);
 
-	note.content.code = textEdit->toHtml();
-	note.name = leName->text();
-	note.SetDT(dtEditNotify->dateTime(), dtEditPostpone->dateTime());
-	note.EmitUpdatedCommon();
+	SaveNoteFromWidgets();
+
 	if(auto thisEditor = existingEditors.find(&note); thisEditor != existingEditors.end())
 	{
 		existingEditors.erase(thisEditor);
@@ -259,6 +272,17 @@ void WidgetNoteEditor::LoadSettings()
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
 	this->restoreGeometry(settings.value("geoNoteEditor").toByteArray());
+}
+
+void WidgetNoteEditor::SaveNoteFromWidgets()
+{
+	if(textEditChanged) note.SetContent(textEdit->toHtml());
+
+	QString newName = leName->text();
+	if(note.Name() != newName) note.SetName(newName);
+
+	auto dtN = dtEditNotify->dateTime(), dtP = dtEditPostpone->dateTime();
+	if(!note.CmpDTs(dtN, dtP))note.SetDT(dtN, dtP);
 }
 
 

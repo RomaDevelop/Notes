@@ -10,6 +10,7 @@ CONFIG += c++17
 
 SOURCES += \
     ../include/PlatformDependent.cpp \
+    FastActions.cpp \
     Note.cpp \
     WidgetAlarms.cpp \
     WidgetMain.cpp \
@@ -19,7 +20,9 @@ SOURCES += \
 HEADERS += \
     ../include/MyQTextEdit.h \
     ../include/PlatformDependent.h \
+    FastActions.h \
     Note.h \
+    Resources.h \
     WidgetAlarms.h \
     WidgetMain.h \
     WidgetNoteEditor.h

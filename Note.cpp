@@ -6,12 +6,28 @@
 #include "MyQFileDir.h"
 #include "MyQDialogs.h"
 
+void Note::SetName(QString newName)
+{
+	name = std::move(newName);
+	for(auto &cb:cbsNameUpdated) cb.cb(cb.handler);
+}
+
+void Note::SetContent(QString content)
+{
+	this->content.code = std::move(content);
+	for(auto &cb:cbsContentUpdated) cb.cb(cb.handler);
+}
+
+bool Note::CmpDTs(const QDateTime &dtNotify, const QDateTime &dtPostpone)
+{
+	return this->dtNotify == dtNotify && this->dtPostpone == dtPostpone;
+}
+
 void Note::SetDT(QDateTime dtNotify, QDateTime dtPostpone)
 {
-	this->dtNotify = dtNotify;
-	this->dtPostpone = dtPostpone;
-	for(auto &cb:dtUpdatedCbs) cb.cb(cb.handler);
-	EmitUpdatedCommon();
+	this->dtNotify = std::move(dtNotify);
+	this->dtPostpone = std::move(dtPostpone);
+	for(auto &cb:cbsDTUpdated) cb.cb(cb.handler);
 }
 
 void Note::SaveNote()
@@ -50,9 +66,9 @@ QString Note::MakeNameFileToSaveNote()
 	return fileName;
 }
 
-void Note::Remove()
+void Note::RemoveNoteFromBase()
 {
-	if(removeWorker) removeWorker();
+	if(removeNoteFromBaseWorker) removeNoteFromBaseWorker();
 	else qdbg << "Note::Remove() execed, but removeWorker not valid";
 }
 
@@ -61,56 +77,65 @@ bool Note::CheckAlarm(const QDateTime & dateToCompare)
 	return dateToCompare >= dtPostpone;
 }
 
-void Note::ConnectCommonUpdated(std::function<void ()> aUpdatedCb)
-{
-	if(aUpdatedCb)
-		updatedCbs.push_back(aUpdatedCb);
-	else qdbg << "ConnectUpdated invalid aUpdated";
-}
-
-void Note::EmitUpdatedCommon()
-{
-	for(auto &cb:updatedCbs) cb();
-	for(auto &cb:updatedCbs2) cb.cb(cb.handler);
-}
-
-void Note::ConnectCommonUpdated(std::function<void (void *handler)> aUpdatedCb, void * handler)
+void Note::SetCBNameUpdated(std::function<void (void *)> aUpdatedCb, void *handler, int &localCbCounter)
 {
 	if(aUpdatedCb && handler)
 	{
-		auto &cbRef = updatedCbs2.emplace_back();
+		auto &cbRef = cbsNameUpdated.emplace_back();
 		cbRef.cb = aUpdatedCb;
 		cbRef.handler = handler;
+		localCbCounter++;
 	}
-	else qdbg << "ConnectCommonUpdated invalid aUpdated or handler";
+	else qdbg << "ConnectNameUpdated invalid aUpdated or handler";
 }
 
-void Note::ConnectDTUpdated(std::function<void (void *handler)> aUpdatedCb, void *handler)
+void Note::SetCBContentUpdated(std::function<void (void *)> aUpdatedCb, void *handler, int &localCbCounter)
 {
 	if(aUpdatedCb && handler)
 	{
-		auto &cbRef = dtUpdatedCbs.emplace_back();
+		auto &cbRef = cbsContentUpdated.emplace_back();
 		cbRef.cb = aUpdatedCb;
 		cbRef.handler = handler;
+		localCbCounter++;
+	}
+	else qdbg << "ConnectContentUpdated invalid aUpdated or handler";
+}
+
+void Note::SetCBDTUpdated(std::function<void (void *handler)> aUpdatedCb, void *handler, int &localCbCounter)
+{
+	if(aUpdatedCb && handler)
+	{
+		auto &cbRef = cbsDTUpdated.emplace_back();
+		cbRef.cb = aUpdatedCb;
+		cbRef.handler = handler;
+		localCbCounter++;
 	}
 	else qdbg << "ConnectDTUpdated invalid aUpdated or handler";
 }
 
-bool Note::RemoveCb(void * handler)
+void Note::RemoveCbs(void * handler, int removedCountShouldBe)
 {
-	for(uint i=0; i<updatedCbs2.size(); i++)
-		if(updatedCbs2[i].handler == handler)
+	int countRemoved = 0;
+	for(uint i=0; i<cbsNameUpdated.size(); i++)
+		if(cbsNameUpdated[i].handler == handler)
 		{
-			updatedCbs2.erase(updatedCbs2.begin()+i);
-			return true;
+			cbsNameUpdated.erase(cbsNameUpdated.begin()+i);
+			countRemoved++;
 		}
-	for(uint i=0; i<dtUpdatedCbs.size(); i++)
-		if(dtUpdatedCbs[i].handler == handler)
+	for(uint i=0; i<cbsContentUpdated.size(); i++)
+		if(cbsContentUpdated[i].handler == handler)
 		{
-			dtUpdatedCbs.erase(dtUpdatedCbs.begin()+i);
-			return true;
+			cbsContentUpdated.erase(cbsContentUpdated.begin()+i);
+			countRemoved++;
 		}
-	return false;
+	for(uint i=0; i<cbsDTUpdated.size(); i++)
+		if(cbsDTUpdated[i].handler == handler)
+		{
+			cbsDTUpdated.erase(cbsDTUpdated.begin()+i);
+			countRemoved++;
+		}
+	if(removedCountShouldBe != countRemoved)
+		QMbError("removedCountShouldBe != countRemoved for note " + name);
 }
 
 

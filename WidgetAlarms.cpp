@@ -5,7 +5,9 @@
 #include <QSettings>
 #include <QLabel>
 #include <QPushButton>
+#include <QToolButton>
 #include <QScrollBar>
+#include <QWindow>
 
 #include "MyQShortings.h"
 #include "MyQTableWidget.h"
@@ -15,7 +17,9 @@
 #include "MyQString.h"
 #include "declare_struct.h"
 
+#include "FastActions.h"
 #include "WidgetNoteEditor.h"
+#include "Resources.h"
 
 WidgetAlarms::WidgetAlarms(QFont fontForLabels,
 						   std::function<void()> crNewNoteFoo,
@@ -41,19 +45,33 @@ WidgetAlarms::WidgetAlarms(QFont fontForLabels,
 	table->horizontalHeader()->hide();
 	hlo1->addWidget(table);
 	connect(table, &QTableWidget::cellDoubleClicked, [this](int r, int){
-		WidgetNoteEditor::MakeOrShowNoteEditor(*notes[r].note);
+		WidgetNoteEditor::MakeOrShowNoteEditor(*notes[r]->note);
 	});
 
-	auto btnShowMainWindow = new QPushButton();
-	btnShowMainWindow->setFixedWidth(26);
-	btnShowMainWindow->setIcon(QApplication::style()->standardIcon(QStyle::StandardPixmap::SP_FileDialogDetailedView));
+	auto btnShowMainWindow = new QToolButton();
+	btnShowMainWindow->setIcon(QIcon(Resources::list().GetPathName()));
 	hlo2->addWidget(btnShowMainWindow);
 	connect(btnShowMainWindow, &QPushButton::clicked, showMainWindow);
 
-	auto btnAdd = new QPushButton("+");
-	btnAdd->setFixedWidth(25);
+	auto btnAdd = new QToolButton();
+	btnAdd->setIcon(QIcon(Resources::add().GetPathName()));
 	hlo2->addWidget(btnAdd);
 	connect(btnAdd, &QPushButton::clicked, crNewNoteFoo);
+
+	auto btnAction = new QToolButton();
+	btnAction->setIcon(QIcon(Resources::action().GetPathName()));
+	hlo2->addWidget(btnAction);
+	connect(btnAction, &QPushButton::clicked, [this, btnAction](){
+		int index = table->currentRow();
+
+		if(0) CodeMarkers::to_do("сделать нормально извлечение текста, а не через костыль QTextEdit");
+		QTextEdit te;
+		te.setHtml(notes[index]->note->Content());
+
+		auto actions = FastActions::Scan(te.toPlainText());
+
+		MyQDialogs::MenuUnderWidget(btnAction, actions.actionsVals, actions.GetVectFunctions());
+	});
 
 	hlo2->addStretch();
 	auto btnReschedule = new QPushButton(" Перенести все на ... ");
@@ -76,29 +94,38 @@ WidgetAlarms::~WidgetAlarms()
 
 void WidgetAlarms::GiveNotes(const std::vector<Note *> & givingNotes)
 {
+	bool added = false;
 	for(uint i=0; i<notes.size();)
 	{
-		if(std::find(givingNotes.begin(), givingNotes.end(), notes[i].note) == givingNotes.end())
-			RemoveNote(i);
+		if(std::find(givingNotes.begin(), givingNotes.end(), notes[i]->note) == givingNotes.end())
+			RemoveNoteFromWidgetAlarms(i);
 		else ++i;
 	}
 
 	for(auto &newNote:givingNotes)
 	{
 		if(NoteInAlarms *findedNote = FindNote(newNote); findedNote == nullptr)
+		{
 			AddNote(newNote);
+			added = true;
+		}
 	}
 
 	setWindowTitle(QSn(notes.size()) + " alarms for notes");
 
-	if(!notes.empty()) show();
+	if(!notes.empty())
+	{
+		show();
+		if(added)
+			this->windowHandle()->alert(5000);
+	}
 	else hide();
 }
 
 NoteInAlarms * WidgetAlarms::FindNote(Note * noteToFind)
 {
 	for(auto &note:notes)
-		if(note.note == noteToFind) return &note;
+		if(note->note == noteToFind) return note.get();
 	return nullptr;
 }
 
@@ -127,18 +154,17 @@ void WidgetAlarms::AddNote(Note * note)
 	hlo->addWidget(btnRemove);
 	hlo->addSpacing(4);
 
-	notes.emplace_back();
-	notes.back().note = note;
-	notes.back().labelCaption1 = labelCaption1;
-	notes.back().labelCaption2 = labelCaption2;
-	notes.back().dymmyHandlerToRemoveCb = labelCaption1;
-	void *dummyHandler = notes.back().dymmyHandlerToRemoveCb;
-	int index = notes.size()-1;
+	NoteInAlarms *newNoteInAlarmsPtr = notes.emplace_back(new NoteInAlarms).get();
+	NoteInAlarms &newNoteInAlarms = *newNoteInAlarmsPtr;
+	newNoteInAlarms.note = note;
+	newNoteInAlarms.labelCaption1 = labelCaption1;
+	newNoteInAlarms.labelCaption2 = labelCaption2;
 
-	SetLabelText(notes.back());
+	SetLabelText(newNoteInAlarms);
 
-	auto cb = [this, index](void*){ SetLabelText(notes[index]); };
-	note->ConnectCommonUpdated(cb, dummyHandler);
+	auto cb = [this, newNoteInAlarmsPtr](void*){ SetLabelText(*newNoteInAlarmsPtr); };
+	note->SetCBNameUpdated(cb, newNoteInAlarmsPtr, newNoteInAlarmsPtr->cbCounter);
+	note->SetCBDTUpdated(cb, newNoteInAlarmsPtr, newNoteInAlarmsPtr->cbCounter);
 
 	connect(btnReschedule, &QPushButton::clicked, [this, btnReschedule, note](){
 		ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, note);
@@ -148,7 +174,7 @@ void WidgetAlarms::AddNote(Note * note)
 	});
 	connect(btnRemove, &QPushButton::clicked, [note](){
 		if(QMessageBox::question(0,"Remove note","Are you shure?") == QMessageBox::Yes)
-			note->Remove();
+			note->RemoveNoteFromBase();
 	});
 
 	QTimer::singleShot(10,this,[this]{ FitColWidth(); });
@@ -160,7 +186,7 @@ void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 	if(labelCaption1W < 50) labelCaption1W = 50;
 	note.labelCaption1->setMaximumWidth(labelCaption1W);
 
-	QString text1 = "   " + note.note->name;
+	QString text1 = "   " + note.note->Name();
 	if(fontMetrixForLabels.boundingRect(text1).width() + 15 > labelCaption1W)
 	{
 		while(fontMetrixForLabels.boundingRect(text1).width() + 20 > labelCaption1W - fontMetrixForLabels.boundingRect("...").width())
@@ -172,24 +198,24 @@ void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 	note.labelCaption2->setText("("+note.note->DTNotify().toString("dd MMM yyyy hh:mm:ss")+")");
 }
 
-void WidgetAlarms::RemoveNote(int index)
+void WidgetAlarms::RemoveNoteFromWidgetAlarms(int index)
 {
-	notes[index].note->RemoveCb(notes[index].dymmyHandlerToRemoveCb);
+	notes[index]->note->RemoveCbs(notes[index].get(), notes[index]->cbCounter);
 	table->removeRow(index);
 	notes.erase(notes.begin() + index);
 
 	QTimer::singleShot(10,this,[this]{ FitColWidth(); });
 }
 
-void WidgetAlarms::RemoveNote(Note * aNote, bool showError)
+void WidgetAlarms::RemoveNoteFromWidgetAlarms(Note * aNote, bool showError)
 {
 	for(uint i=0; i<notes.size(); i++)
-		if(notes[i].note == aNote)
+		if(notes[i]->note == aNote)
 		{
-			RemoveNote(i);
+			RemoveNoteFromWidgetAlarms(i);
 			return;
 		}
-	if(showError) QMbError("RemoveNote: note " + aNote->name + " not found");
+	if(showError) QMbError("RemoveNote: note " + aNote->Name() + " not found");
 }
 
 QDateTime AddSecsFromToday(const QDateTime &dt, qint64 secs)
@@ -205,6 +231,10 @@ QDateTime AddSecsFromNow(qint64 secs)
 	return QDateTime::currentDateTime().addSecs(secs);
 }
 
+namespace ForPostpone_ns {
+	const int handInput = -1;
+}
+
 void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCaseValue, Note* note)
 {
 	static QMenu *menu = nullptr;
@@ -215,37 +245,36 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 	declare_struct_2_fields_move(Delay, QString, text, int, seconds);
 	std::vector<Delay> delays;
 	const int secondsInDay = 60*60*24;
-	const int handInput = -1;
+
 	if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
 		delays = 		{{"1 день", secondsInDay}, {"2 дня", secondsInDay*2}, {"3 дня", secondsInDay*3}, {"4 дня", secondsInDay*4},
 						 {"5 дней", secondsInDay*5}, {"6 дней", secondsInDay*6}, {"7 дней", secondsInDay*7}, {"8 дней", secondsInDay*8},
 						 {"9 дней", secondsInDay*9}, {"10 дней", secondsInDay*7}, {"10 дней", secondsInDay*10}, {"11 дней", secondsInDay*11},
 						 {"12 дней", secondsInDay*12}, {"13 дней", secondsInDay*13}, {"14 дней", secondsInDay*14},
 						 {"20 дней", secondsInDay*20}, {"25 дней", secondsInDay*25}, {"30 дней", secondsInDay*30},
-						 {"Ввести вручную", handInput}};
+						 {"Ввести вручную", ForPostpone_ns::handInput}};
 	else if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
 		delays = 		{{"5 минут", 60*5}, {"10 минут", 60*10}, {"15 минут", 60*15}, {"20 минут", 60*20},
 						 {"25 минут", 60*25}, {"30 минут", 60*30}, {"35 минут", 60*35}, {"40 минут", 60*40},
 						 {"45 минут", 60*45}, {"50 минут", 60*50}, {"1 час", 60*60}, {"1,5 часа", 60*90},
 						 {"2 часа", 60*60*2}, {"3 часа", 60*60*3}, {"4 часа", 60*60*4}, {"5 часов", 60*60*5},
 						 {"6 часов", 60*60*6}, {"7 часов", 60*60*7}, {"8 часов", 60*60*8},
-						 {"Ввести вручную", handInput}};
+						 {"Ввести вручную", ForPostpone_ns::handInput}};
 	else QMbError("wrong menuPostponeCaseValue");
 
 	std::vector<Note*> notesToDo { note };
 	if(note == NoteForPostponeAll())
 	{
 		notesToDo.clear();
-		for(auto &note:notes) notesToDo.emplace_back(note.note);
+		for(auto &note:notes) notesToDo.emplace_back(note->note);
 	}
 
 	for(auto &delay:delays)
 	{
 		int delaySecs = delay.seconds;
 
-		if(delay.seconds != handInput)
+		if(delay.seconds != ForPostpone_ns::handInput)
 		{
-
 			if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
 			{
 				delay.text += AddSecsFromNow(delaySecs).toString(" (hh:mm::ss)");
@@ -273,43 +302,49 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 
 		menu->addAction(new QAction(delay.text, menu));
 
-		connect(menu->actions().back(), &QAction::triggered, [this, notesToDo, delaySecs](){
-			int itogDelaySecs = delaySecs; // почему то не давал изменять значение delaySecs внутри лямбды
-			if(itogDelaySecs == handInput)
-			{
-				auto res = MyQDialogs::InputLineExt("Введите значение", "Введите значение", "",
-													{"Секунд","Минут","Часов","Дней","Отмена"}, 500);
-				if(res.text.isEmpty()) return;
-				if(!IsUInt(res.text)) { QMbError("Input is not number" + res.text); return; }
-				if(0) ;
-				else if(res.button == "Секунд") itogDelaySecs = res.text.toUInt();
-				else if(res.button == "Минут") itogDelaySecs = res.text.toUInt()*60;
-				else if(res.button == "Часов") itogDelaySecs = res.text.toUInt()*60*60;
-				else if(res.button == "Дней") itogDelaySecs = res.text.toUInt()*60*60*24;
-				else if(res.button == "Отмена") return;
-				else if(res.button.isEmpty()) return;
-				else QMbError("Error button name " + res.button);
-			}
-
-			for(uint i=0; i<notesToDo.size(); i++)
-			{
-				if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
-				{
-					notesToDo[i]->SetDT(notesToDo[i]->DTNotify(), AddSecsFromNow(itogDelaySecs));
-				}
-				else if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
-				{
-					notesToDo[i]->SetDT(AddSecsFromToday(notesToDo[i]->DTNotify(), itogDelaySecs), notesToDo[i]->DTNotify());
-				}
-				if(!notesToDo[i]->CheckAlarm(QDateTime::currentDateTime()))
-					RemoveNote(notesToDo[i], false);
-				if(notes.empty()) hide();
-				notesToDo[i]->EmitUpdatedCommon();
-			}
+		connect(menu->actions().back(), &QAction::triggered, [this, delaySecs, notesToDo](){
+			SlotPostpone(notesToDo, delaySecs, menuPostponeCaseCurrent);
 		});
 	}
 
 	menu->exec(pos);
+}
+
+void WidgetAlarms::SlotPostpone(std::vector<Note*> notesToPostpone, int delaySecs, menuPostponeCase caseCurrent)
+{
+	int itogDelaySecs = delaySecs; // почему то не давал изменять значение delaySecs внутри лямбды
+	if(itogDelaySecs == ForPostpone_ns::handInput)
+	{
+		auto res = MyQDialogs::InputLineExt("Введите значение", "Введите значение", "",
+											{"Секунд","Минут","Часов","Дней","Отмена"}, 500);
+		if(res.text.isEmpty()) return;
+		if(!IsUInt(res.text)) { QMbError("Input is not number" + res.text); return; }
+		if(0) ;
+		else if(res.button == "Секунд") itogDelaySecs = res.text.toUInt();
+		else if(res.button == "Минут") itogDelaySecs = res.text.toUInt()*60;
+		else if(res.button == "Часов") itogDelaySecs = res.text.toUInt()*60*60;
+		else if(res.button == "Дней") itogDelaySecs = res.text.toUInt()*60*60*24;
+		else if(res.button == "Отмена") return;
+		else if(res.button.isEmpty()) return;
+		else QMbError("Error button name " + res.button);
+	}
+
+	for(uint i=0; i<notesToPostpone.size(); i++)
+	{
+		if(caseCurrent == menuPostponeCase::setPostpone)
+		{
+			notesToPostpone[i]->SetDT(notesToPostpone[i]->DTNotify(), AddSecsFromNow(itogDelaySecs));
+		}
+		else if(caseCurrent == menuPostponeCase::changeDtNotify)
+		{
+			notesToPostpone[i]->SetDT(AddSecsFromToday(notesToPostpone[i]->DTNotify(), itogDelaySecs), notesToPostpone[i]->DTNotify());
+		}
+
+		if(!notesToPostpone[i]->CheckAlarm(QDateTime::currentDateTime()))
+			RemoveNoteFromWidgetAlarms(notesToPostpone[i], false);
+
+		if(notes.empty()) hide();
+	}
 }
 
 void WidgetAlarms::showEvent(QShowEvent * event)
@@ -367,7 +402,7 @@ void WidgetAlarms::FitColWidth()
 	if(table->verticalScrollBar()->isVisible()) columnWidth -= table->verticalScrollBar()->width();
 	table->setColumnWidth(0, columnWidth);
 
-	for(auto &note:notes) SetLabelText(note);
+	for(auto &note:notes) SetLabelText(*note.get());
 }
 
 void WidgetAlarms::resizeEvent(QResizeEvent * event)

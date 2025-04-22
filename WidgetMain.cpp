@@ -10,6 +10,7 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QPushButton>
+#include <QToolButton>
 #include <QTextEdit>
 #include <QDateTimeEdit>
 #include <QSystemTrayIcon>
@@ -23,6 +24,7 @@
 #include "PlatformDependent.h"
 #include "MyQTableWidget.h"
 #include "CodeMarkers.h"
+#include "Resources.h"
 
 #include "WidgetNoteEditor.h"
 
@@ -64,29 +66,19 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	vlo_main->addLayout(hlo1);
 	vlo_main->addLayout(hlo2);
 
-	QPushButton *btnPlus = new QPushButton("+");
-	btnPlus->setFixedWidth(25);
-	auto crNewNoteFoo = [this](){
-		QString newName = MyQDialogs::InputLine("Создание заметки", "Введите название заметки", "").text;
-		if(newName.isEmpty()) return;
-
-		auto dt = QDateTime::currentDateTime();
-		auto &newNote = MakeNewNote(newName, false, dt, dt.addSecs(3600), Note::StartText());
-		UpdateNotesIndexes();
-
-		WidgetNoteEditor::MakeOrShowNoteEditor(newNote, true);
-	};
+	QToolButton *btnPlus = new QToolButton();
+	btnPlus->setIcon(QIcon(Resources::add().GetPathName()));
 	hlo1->addWidget(btnPlus);
-	connect(btnPlus,&QPushButton::clicked, crNewNoteFoo);
+	connect(btnPlus,&QPushButton::clicked, this, &WidgetMain::SlotCreationNewNote);
 
-	QPushButton *btnRemove = new QPushButton("-");
-	btnRemove->setFixedWidth(25);
+	QToolButton *btnRemove = new QToolButton();
+	btnRemove->setIcon(QIcon(Resources::remove().GetPathName()));
 	hlo1->addWidget(btnRemove);
 	connect(btnRemove,&QPushButton::clicked,[this](){
 		if(QMessageBox::question(0,"Remove note","Are you shure?") == QMessageBox::Yes)
 		{
 			if(auto note = NoteOfRow(table->currentRow()); note)
-				note->Remove();
+				note->RemoveNoteFromBase();
 			else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
 		}
 	});
@@ -128,14 +120,14 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	auto labelToGetFont = new QLabel("labelToGetFont");
 	vlo_main->addWidget(labelToGetFont);
 
-	QTimer::singleShot(0,[this, labelToGetFont, crNewNoteFoo]{
+	QTimer::singleShot(0,[this, labelToGetFont]{
 
 		auto showMainWindow = [this](){
 			this->showNormal();
 			PlatformDependent::SetTopMostFlash(this);
 		};
 
-		widgetAlarms = std::make_unique<WidgetAlarms>(labelToGetFont->font(), crNewNoteFoo, showMainWindow);
+		widgetAlarms = std::make_unique<WidgetAlarms>(labelToGetFont->font(), [this](){ SlotCreationNewNote(); }, showMainWindow);
 		delete labelToGetFont;
 
 		LoadSettings();
@@ -159,13 +151,34 @@ void WidgetMain::CreateTrayIcon()
 {
 	auto icon = new QSystemTrayIcon(this);
 	icon->setIcon(QApplication::style()->standardIcon(QStyle::SP_ArrowForward));
-	icon->setToolTip("Notes");
 	icon->show();
-	connect(icon, &QSystemTrayIcon::activated, [this](){
+
+	QString toolTip = "Notes";
+	#ifdef QT_DEBUG
+	toolTip += " debug";
+	#endif
+	icon->setToolTip(toolTip);
+
+	QMenu *menu = new QMenu(this);
+	icon->setContextMenu(menu);
+
+	auto showFoo = [this](){
 		showNormal();
 		PlatformDependent::SetTopMost(this,true);
 		PlatformDependent::SetTopMost(this,false);
+	};
+
+	connect(icon, &QSystemTrayIcon::activated, [icon, showFoo](QSystemTrayIcon::ActivationReason reason){
+		if(reason == QSystemTrayIcon::Trigger) showFoo();
+		if(reason == QSystemTrayIcon::Context) icon->contextMenu()->exec();
 	});
+
+	menu->addAction("Show Notes");
+	connect(menu->actions().back(), &QAction::triggered, showFoo);
+
+	menu->addAction("Create new note");
+	connect(menu->actions().back(), &QAction::triggered, [this](){ SlotCreationNewNote(); });
+
 }
 
 void WidgetMain::CreateNotesAlarmChecker()
@@ -278,7 +291,7 @@ int WidgetMain::RowOfNote(Note * note)
 			return row;
 		}
 	}
-	if(note) QMbError("RowOfNote: ROW NOT FOUND for note " + note->name + " ("+note->DTNotify().toString()+")");
+	if(note) QMbError("RowOfNote: ROW NOT FOUND for note " + note->Name() + " ("+note->DTNotify().toString()+")");
 	else QMbError("RowOfNote: nullptr row");
 	return -1;
 }
@@ -296,16 +309,28 @@ Note *WidgetMain::NoteOfRow(int row)
 	return nullptr;
 }
 
+void WidgetMain::SlotCreationNewNote()
+{
+	QString newName = MyQDialogs::InputLine("Создание заметки", "Введите название новой заметки", "").text;
+	if(newName.isEmpty()) return;
+
+	auto dt = QDateTime::currentDateTime();
+	auto &newNote = MakeNewNote(newName, false, dt, dt.addSecs(3600), Note::StartText());
+	UpdateNotesIndexes();
+
+	WidgetNoteEditor::MakeOrShowNoteEditor(newNote, true);
+}
+
 Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNotify, QDateTime dtPostpone, QString content)
 {
 	notes.emplace_back(std::unique_ptr<NoteInMain>(new NoteInMain));
 	NoteInMain &newNoteInMainRef = *notes.back().get();
 	newNoteInMainRef.note = std::make_unique<Note>();
 	Note* newNote = newNoteInMainRef.note.get();
-	newNote->name = std::move(name);
+	newNote->SetName(std::move(name));
 	newNote->activeNotify = activeNotify;
 	newNote->SetDT(dtNotify, dtPostpone);
-	newNote->content.code = content;
+	newNote->SetContent(std::move(content));
 
 	int newNoteIndex = MakeNewRowInMainTable(newNoteInMainRef);
 
@@ -313,9 +338,13 @@ Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNoti
 
 	newNote->SaveNote();
 
-	newNote->ConnectCommonUpdated([newNote](){ newNote->SaveNote(); });
+	auto saveNoteFoo = [newNote](void*){ newNote->SaveNote(); };
 
-	newNote->removeWorker = [this, newNote](){
+	newNote->SetCBNameUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
+	newNote->SetCBContentUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
+	newNote->SetCBDTUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
+
+	newNote->removeNoteFromBaseWorker = [this, newNote](){
 		RemoveNote(newNote);
 		CheckNotesForAlarm();
 	};
@@ -325,7 +354,11 @@ Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNoti
 
 int WidgetMain::MakeNewRowInMainTable(NoteInMain &newNote)
 {
-	newNote.note->ConnectCommonUpdated([this, &newNote](){ UpdateRowFromNote(newNote); });
+	NoteInMain *newNotePtr = &newNote;
+	auto updateRowFoo = [this, newNotePtr](void*){ UpdateRowFromNote(*newNotePtr); };
+
+	newNote.note->SetCBNameUpdated(updateRowFoo, &newNote, newNote.cbCounter);
+	newNote.note->SetCBDTUpdated(updateRowFoo, &newNote, newNote.cbCounter);
 
 	table->setRowCount(table->rowCount()+1);
 
@@ -376,7 +409,7 @@ int WidgetMain::MakeNewRowInMainTable(NoteInMain &newNote)
 
 void WidgetMain::UpdateRowFromNote(NoteInMain &note)
 {
-	note.rowView.item->setText("   " + note.note->name);
+	note.rowView.item->setText("   " + note.note->Name());
 	note.rowView.chBox->setChecked(note.note->activeNotify);
 	note.rowView.dteNotify->setDateTime(note.note->DTNotify());
 	note.rowView.dtePostpone->setDateTime(note.note->DTPostpone());
@@ -393,7 +426,7 @@ void WidgetMain::RemoveNote(Note* note)
 			{
 				if(!QFile::remove(note->file)) QMbError("Error removing file " + note->file);
 			}
-			else QMbError("note("+note->name+")->file is empty");
+			else QMbError("note("+note->Name()+")->file is empty");
 
 			if(int row = RowOfNote(note); row != -1)
 			{
@@ -407,7 +440,7 @@ void WidgetMain::RemoveNote(Note* note)
 		}
 	}
 	if(!note) QMbError("RemoveNote nullptr note get");
-	else QMbError("note("+note->name+") not found");
+	else QMbError("note("+note->Name()+") not found");
 }
 
 void WidgetMain::FitColWidth()

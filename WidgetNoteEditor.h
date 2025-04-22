@@ -30,12 +30,16 @@ private:
 	void LoadSettings();
 
 	Note &note;
+	int cbCounter = 0;
 	bool newNote = false;
 	bool dtChanged = false;
 	QLineEdit *leName;
 	QDateTimeEdit *dtEditNotify;
 	QDateTimeEdit *dtEditPostpone;
 	MyQTextEdit *textEdit;
+	bool textEditChanged = false;
+
+	void SaveNoteFromWidgets();
 
 	inline static std::map<Note*,WidgetNoteEditor*> existingEditors;
 };

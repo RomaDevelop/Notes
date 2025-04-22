@@ -16,7 +16,7 @@ struct NoteInAlarms
 	Note* note;
 	QLabel* labelCaption1;
 	QLabel* labelCaption2;
-	void* dymmyHandlerToRemoveCb;
+	int cbCounter = 0;
 };
 
 class WidgetAlarms : public QWidget
@@ -36,16 +36,17 @@ public:
 	QString tableColWidths;
 
 private:
-	std::vector<NoteInAlarms> notes;
+	std::vector<std::unique_ptr<NoteInAlarms>> notes;
 	NoteInAlarms* FindNote(Note *noteToFind);
 	void AddNote(Note* note);
 	void SetLabelText(NoteInAlarms & note);
-	void RemoveNote(int index);
-	void RemoveNote(Note* aNote, bool showError);
+	void RemoveNoteFromWidgetAlarms(int index);
+	void RemoveNoteFromWidgetAlarms(Note* aNote, bool showError);
 
 	enum menuPostponeCase {changeDtNotify, setPostpone};
 	static Note* NoteForPostponeAll() { return nullptr; }
 	void ShowMenuPostpone(QPoint pos, menuPostponeCase, Note* note);
+	void SlotPostpone(std::vector<Note*> notesToPostpone, int delaySecs, menuPostponeCase caseCurrent);
 
 	QString settingsFile;
 	void showEvent(QShowEvent *event) override;

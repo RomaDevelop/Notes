@@ -16,7 +16,7 @@
 #include "WidgetAlarms.h"
 
 declare_struct_4_fields_no_move(RowView, QTableWidgetItem*, item, QCheckBox*, chBox, QDateTimeEdit*, dteNotify, QDateTimeEdit*, dtePostpone);
-declare_struct_2_fields_move(NoteInMain, RowView, rowView, std::unique_ptr<Note>, note);
+declare_struct_3_fields_move(NoteInMain, RowView, rowView, std::unique_ptr<Note>, note, int, cbCounter);
 
 class WidgetMain : public QWidget
 {
@@ -50,6 +50,7 @@ private:
 	int RowOfNote(Note* note);
 	Note* NoteOfRow(int row);
 
+	void SlotCreationNewNote();
 	Note& MakeNewNote(QString name, bool activeNotify, QDateTime dtNotify, QDateTime dtPostpone, QString content);
 	int MakeNewRowInMainTable(NoteInMain &newNote); // returns index
 	void UpdateRowFromNote(NoteInMain &note);
