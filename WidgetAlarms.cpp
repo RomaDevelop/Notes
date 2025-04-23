@@ -58,19 +58,12 @@ WidgetAlarms::WidgetAlarms(QFont fontForLabels,
 	hlo2->addWidget(btnAdd);
 	connect(btnAdd, &QPushButton::clicked, crNewNoteFoo);
 
-	auto btnAction = new QToolButton();
-	btnAction->setIcon(QIcon(Resources::action().GetPathName()));
-	hlo2->addWidget(btnAction);
-	connect(btnAction, &QPushButton::clicked, [this, btnAction](){
+	auto btnFastActions = new QToolButton();
+	btnFastActions->setIcon(QIcon(Resources::action().GetPathName()));
+	hlo2->addWidget(btnFastActions);
+	connect(btnFastActions, &QPushButton::clicked, [this, btnFastActions](){
 		int index = table->currentRow();
-
-		if(0) CodeMarkers::to_do("сделать нормально извлечение текста, а не через костыль QTextEdit");
-		QTextEdit te;
-		te.setHtml(notes[index]->note->Content());
-
-		auto actions = FastActions::Scan(te.toPlainText());
-
-		MyQDialogs::MenuUnderWidget(btnAction, actions.actionsVals, actions.GetVectFunctions());
+		notes[index]->note->ShowDialogFastActions(btnFastActions);
 	});
 
 	hlo2->addStretch();

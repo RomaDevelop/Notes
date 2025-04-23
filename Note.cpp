@@ -77,6 +77,17 @@ bool Note::CheckAlarm(const QDateTime & dateToCompare)
 	return dateToCompare >= dtPostpone;
 }
 
+void Note::ShowDialogFastActions(QWidget *widgetToShowUnder)
+{
+	if(0) CodeMarkers::to_do("сделать нормально извлечение текста, а не через костыль QTextEdit");
+	QTextEdit te;
+	te.setHtml(this->Content());
+
+	auto actions = FastActions::Scan(te.toPlainText());
+
+	MyQDialogs::MenuUnderWidget(widgetToShowUnder, actions.actionsVals, actions.GetVectFunctions());
+}
+
 void Note::SetCBNameUpdated(std::function<void (void *)> aUpdatedCb, void *handler, int &localCbCounter)
 {
 	if(aUpdatedCb && handler)

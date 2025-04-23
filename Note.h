@@ -9,6 +9,8 @@
 #include <QString>
 #include <QTimer>
 
+#include "FastActions.h"
+
 struct HTML
 {
 	QString code;
@@ -51,18 +53,19 @@ public:
 
 	bool CheckAlarm(const QDateTime &dateToCompare);
 
+	void ShowDialogFastActions(QWidget *widgetToShowUnder);
+
+// cbs
 	void SetCBNameUpdated(std::function<void(void *handler)> aUpdatedCb, void *handler, int &localCbCounter);
 	void SetCBContentUpdated(std::function<void(void *handler)> aUpdatedCb, void *handler, int &localCbCounter);
 	void SetCBDTUpdated(std::function<void(void *handler)> aUpdatedCb, void *handler, int &localCbCounter);
 	void RemoveCbs(void* handler, int removedCountShouldBe);
-
 private:
-
 	struct cbAndHandler { std::function<void(void* handler)> cb; void* handler; };
-
 	std::vector<cbAndHandler> cbsNameUpdated;
 	std::vector<cbAndHandler> cbsContentUpdated;
 	std::vector<cbAndHandler> cbsDTUpdated;
+// cbs end
 };
 
 #endif // NOTE_H

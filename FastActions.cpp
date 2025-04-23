@@ -13,10 +13,18 @@ QString FastAction::DoAction() const
 	{
 		QString subj(command);
 		subj.remove(0, curKeyWordCommand.size());
-		while(subj.startsWith(' ')) subj.remove(' ');
+		while(subj.startsWith(' ')) subj.remove(0,1);
 		if(!QFile::exists(subj))
-			return "for command " + curKeyWordCommand + " subj ["+subj+"] doesn't exists";
-		MyQExecute::Execute(subj);
+		{
+			QFileInfo fiSubg(subj);
+			qdbg << fiSubg.path();
+			if(!QFileInfo(fiSubg.path()).isDir())
+				return "for command " + curKeyWordCommand + " path ["+fiSubg.path()+"] doesn't exists";
+			else return "for command " + curKeyWordCommand + " bad file name ["+subj+"]";
+		}
+		qdbg << "MyQExecute::Execute(subj)" << subj;
+		if(!MyQExecute::Execute(subj))
+			return "MyQExecute::Execute("+subj+") result false";
 	}
 	else res += "unknown command " + command;
 

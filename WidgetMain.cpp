@@ -83,6 +83,16 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 		}
 	});
 
+	auto btnFastActions = new QToolButton();
+	btnFastActions->setIcon(QIcon(Resources::action().GetPathName()));
+	hlo1->addWidget(btnFastActions);
+	connect(btnFastActions, &QPushButton::clicked, [this, btnFastActions](){
+		if(table->currentRow() == -1) return;
+		if(auto note = NoteOfRow(table->currentRow()); note)
+			note->ShowDialogFastActions(btnFastActions);
+		else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
+	});
+
 	hlo1->addStretch();
 
 	QPushButton *btnSavePath = new QPushButton("Save path");
