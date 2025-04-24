@@ -293,11 +293,14 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 			}
 		}
 
-		menu->addAction(new QAction(delay.text, menu));
-
+		menu->addAction(delay.text);
 		connect(menu->actions().back(), &QAction::triggered, [this, delaySecs, notesToDo](){
 			SlotPostpone(notesToDo, delaySecs, menuPostponeCaseCurrent);
 		});
+
+		// добавление разделителей
+		if(menu->actions().back()->text().contains("(Вс)"))
+			menu->addSeparator();
 	}
 
 	menu->exec(pos);

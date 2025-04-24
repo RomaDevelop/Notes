@@ -18,6 +18,7 @@
 #include <QScrollBar>
 
 #include "MyQDifferent.h"
+#include "MyQString.h"
 #include "MyQDialogs.h"
 #include "MyQFileDir.h"
 #include "MyQExecute.h"
@@ -66,55 +67,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	vlo_main->addLayout(hlo1);
 	vlo_main->addLayout(hlo2);
 
-	QToolButton *btnPlus = new QToolButton();
-	btnPlus->setIcon(QIcon(Resources::add().GetPathName()));
-	hlo1->addWidget(btnPlus);
-	connect(btnPlus,&QPushButton::clicked, this, &WidgetMain::SlotCreationNewNote);
-
-	QToolButton *btnRemove = new QToolButton();
-	btnRemove->setIcon(QIcon(Resources::remove().GetPathName()));
-	hlo1->addWidget(btnRemove);
-	connect(btnRemove,&QPushButton::clicked,[this](){
-		if(QMessageBox::question(0,"Remove note","Are you shure?") == QMessageBox::Yes)
-		{
-			if(auto note = NoteOfRow(table->currentRow()); note)
-				note->RemoveNoteFromBase();
-			else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
-		}
-	});
-
-	auto btnFastActions = new QToolButton();
-	btnFastActions->setIcon(QIcon(Resources::action().GetPathName()));
-	hlo1->addWidget(btnFastActions);
-	connect(btnFastActions, &QPushButton::clicked, [this, btnFastActions](){
-		if(table->currentRow() == -1) return;
-		if(auto note = NoteOfRow(table->currentRow()); note)
-			note->ShowDialogFastActions(btnFastActions);
-		else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
-	});
-
-	hlo1->addStretch();
-
-	QPushButton *btnSavePath = new QPushButton("Save path");
-	btnSavePath->setFixedWidth(QFontMetrics(btnSavePath->font()).horizontalAdvance(btnSavePath->text()) + 20);
-	hlo1->addWidget(btnSavePath);
-	connect(btnSavePath,&QPushButton::clicked,[](){
-		MyQExecute::OpenDir(Note::notesSavesPath);
-	});
-
-	QPushButton *btnSettings = new QPushButton("Settings.ini");
-	btnSettings->setFixedWidth(QFontMetrics(btnSettings->font()).horizontalAdvance(btnSettings->text()) + 20);
-	hlo1->addWidget(btnSettings);
-	connect(btnSettings,&QPushButton::clicked,[this](){
-		MyQExecute::Execute(settingsFile);
-	});
-
-	QPushButton *btnToTray = new QPushButton("To tray");
-	btnToTray->setFixedWidth(QFontMetrics(btnToTray->font()).horizontalAdvance(btnToTray->text()) + 20);
-	hlo1->addWidget(btnToTray);
-	connect(btnToTray,&QPushButton::clicked,[this](){
-		hide();
-	});
+	CreateHeaderPanel(hlo1);
 
 	table = new QTableWidget;
 	table->verticalHeader()->hide();
@@ -157,6 +110,65 @@ WidgetMain::~WidgetMain()
 	/// сохранение задач должно надежно происходить при их изменении
 }
 
+void WidgetMain::CreateHeaderPanel(QHBoxLayout *hlo1)
+{
+	QToolButton *btnPlus = new QToolButton();
+	btnPlus->setIcon(QIcon(Resources::add().GetPathName()));
+	hlo1->addWidget(btnPlus);
+	connect(btnPlus,&QPushButton::clicked, this, &WidgetMain::SlotCreationNewNote);
+
+	QToolButton *btnRemove = new QToolButton();
+	btnRemove->setIcon(QIcon(Resources::remove().GetPathName()));
+	hlo1->addWidget(btnRemove);
+	connect(btnRemove,&QPushButton::clicked,[this](){
+		if(QMessageBox::question(0,"Remove note","Are you shure?") == QMessageBox::Yes)
+		{
+			if(auto note = NoteOfRow(table->currentRow()); note)
+				note->RemoveNoteFromBase();
+			else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
+		}
+	});
+
+	auto btnFastActions = new QToolButton();
+	btnFastActions->setIcon(QIcon(Resources::action().GetPathName()));
+	hlo1->addWidget(btnFastActions);
+	connect(btnFastActions, &QPushButton::clicked, [this, btnFastActions](){
+		if(table->currentRow() == -1) return;
+		if(auto note = NoteOfRow(table->currentRow()); note)
+			note->ShowDialogFastActions(btnFastActions);
+		else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
+	});
+
+
+	hlo1->addSpacing(20);
+	auto leSrc = new QLineEdit;
+	hlo1->addWidget(leSrc);
+	connect(leSrc, &QLineEdit::textChanged, [this](const QString &text){ FilterNotes(text); });
+
+	hlo1->addSpacing(20);
+
+	QPushButton *btnSavePath = new QPushButton("Save path");
+	btnSavePath->setFixedWidth(QFontMetrics(btnSavePath->font()).horizontalAdvance(btnSavePath->text()) + 20);
+	hlo1->addWidget(btnSavePath);
+	connect(btnSavePath,&QPushButton::clicked,[](){
+		MyQExecute::OpenDir(Note::notesSavesPath);
+	});
+
+	QPushButton *btnSettings = new QPushButton("Settings.ini");
+	btnSettings->setFixedWidth(QFontMetrics(btnSettings->font()).horizontalAdvance(btnSettings->text()) + 20);
+	hlo1->addWidget(btnSettings);
+	connect(btnSettings,&QPushButton::clicked,[this](){
+		MyQExecute::Execute(settingsFile);
+	});
+
+	QPushButton *btnToTray = new QPushButton("To tray");
+	btnToTray->setFixedWidth(QFontMetrics(btnToTray->font()).horizontalAdvance(btnToTray->text()) + 20);
+	hlo1->addWidget(btnToTray);
+	connect(btnToTray,&QPushButton::clicked,[this](){
+		hide();
+	});
+}
+
 void WidgetMain::CreateTrayIcon()
 {
 	auto icon = new QSystemTrayIcon(this);
@@ -164,9 +176,9 @@ void WidgetMain::CreateTrayIcon()
 	icon->show();
 
 	QString toolTip = "Notes";
-	#ifdef QT_DEBUG
+#ifdef QT_DEBUG
 	toolTip += " debug";
-	#endif
+#endif
 	icon->setToolTip(toolTip);
 
 	QMenu *menu = new QMenu(this);
@@ -186,9 +198,11 @@ void WidgetMain::CreateTrayIcon()
 	menu->addAction("Show Notes");
 	connect(menu->actions().back(), &QAction::triggered, showFoo);
 
+	menu->addAction("Hide Notes");
+	connect(menu->actions().back(), &QAction::triggered, this, &WidgetMain::hide);
+
 	menu->addAction("Create new note");
 	connect(menu->actions().back(), &QAction::triggered, [this](){ SlotCreationNewNote(); });
-
 }
 
 void WidgetMain::CreateNotesAlarmChecker()
@@ -290,6 +304,8 @@ void WidgetMain::LoadNotes()
 	}
 }
 
+
+
 int WidgetMain::RowOfNote(Note * note)
 {
 	for(uint i=0; i<notes.size(); i++)
@@ -342,7 +358,7 @@ Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNoti
 	newNote->SetDT(dtNotify, dtPostpone);
 	newNote->SetContent(std::move(content));
 
-	int newNoteIndex = MakeNewRowInMainTable(newNoteInMainRef);
+	int newNoteIndex = MakeWidgetsForMainTable(newNoteInMainRef);
 
 	newNote->index = newNoteIndex;
 
@@ -362,43 +378,40 @@ Note & WidgetMain::MakeNewNote(QString name, bool activeNotify, QDateTime dtNoti
 	return *newNote;
 }
 
-int WidgetMain::MakeNewRowInMainTable(NoteInMain &newNote)
+int WidgetMain::MakeWidgetsForMainTable(NoteInMain &newNote)
 {
 	NoteInMain *newNotePtr = &newNote;
-	auto updateRowFoo = [this, newNotePtr](void*){ UpdateRowFromNote(*newNotePtr); };
+	auto updateRowFoo = [this, newNotePtr](void*){ UpdateWidgetsFromNote(*newNotePtr); };
 
 	newNote.note->SetCBNameUpdated(updateRowFoo, &newNote, newNote.cbCounter);
 	newNote.note->SetCBDTUpdated(updateRowFoo, &newNote, newNote.cbCounter);
 
-	table->setRowCount(table->rowCount()+1);
-
-	int rowIndex = table->rowCount()-1;
-
-	table->setItem(rowIndex, ColIndexes::name, new QTableWidgetItem);
+	auto item = new QTableWidgetItem;
 
 	auto chActive = new QCheckBox;
 	connect(chActive, &QCheckBox::stateChanged, [&newNote, chActive](int){
 		newNote.note->activeNotify = chActive->isChecked();
 	});
-	auto wCh = new QWidget;
-	auto loWCH = new QHBoxLayout(wCh);
+
+	// сигнал удаления виджетов
+	//connect(chActive, &QObject::destroyed, [&newNote](){ qdbg << "widgets of " + newNote.note->Name() + " destroyed"; });
+
+	auto widgetForChBox = new QWidget;
+	auto loWCH = new QHBoxLayout(widgetForChBox);
 	loWCH->setAlignment(Qt::AlignCenter);
 	loWCH->setContentsMargins(0,0,0,0);
 	loWCH->addWidget(chActive);
-	table->setCellWidget(rowIndex, ColIndexes::chBox, wCh);
 
 	auto dtEditNotify = new QDateTimeEdit;
 	dtEditNotify->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
 	dtEditNotify->setCalendarPopup(true);
-	table->setCellWidget(rowIndex, ColIndexes::notifyDTedit, dtEditNotify);
 
 	auto dtEditPostpone = new QDateTimeEdit;
 	dtEditPostpone->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
-	table->setCellWidget(rowIndex, ColIndexes::postponeDTedit, dtEditPostpone);
 
-	newNote.rowView = RowView(table->item(rowIndex, ColIndexes::name), chActive, dtEditNotify, dtEditPostpone);
+	newNote.rowView = RowView(item, chActive, dtEditNotify, dtEditPostpone);
 
-	UpdateRowFromNote(newNote);
+	UpdateWidgetsFromNote(newNote);
 
 	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [&newNote, dtEditPostpone](const QDateTime &datetime){
 		newNote.note->SetDT(datetime, datetime);
@@ -414,15 +427,38 @@ int WidgetMain::MakeNewRowInMainTable(NoteInMain &newNote)
 		newNote.note->SaveNote();
 	});
 
+	table->setRowCount(table->rowCount()+1);
+	int rowIndex = table->rowCount()-1;
+	table->setItem(			rowIndex, ColIndexes::name, item);
+	table->setCellWidget(	rowIndex, ColIndexes::chBox, widgetForChBox);
+	table->setCellWidget(	rowIndex, ColIndexes::notifyDTedit, dtEditNotify);
+	table->setCellWidget(	rowIndex, ColIndexes::postponeDTedit, dtEditPostpone);
 	return rowIndex;
 }
 
-void WidgetMain::UpdateRowFromNote(NoteInMain &note)
+void WidgetMain::UpdateWidgetsFromNote(NoteInMain &note)
 {
 	note.rowView.item->setText("   " + note.note->Name());
 	note.rowView.chBox->setChecked(note.note->activeNotify);
 	note.rowView.dteNotify->setDateTime(note.note->DTNotify());
 	note.rowView.dtePostpone->setDateTime(note.note->DTPostpone());
+}
+
+void WidgetMain::FilterNotes(const QString &nameFilter)
+{
+	for(int row=0; row<table->rowCount(); row++)
+	{
+		if(nameFilter.isEmpty()
+				|| table->item(row, ColIndexes::name)->text().contains(nameFilter, Qt::CaseInsensitive)
+				|| table->item(row, ColIndexes::name)->text().contains(MyQString::Translited(nameFilter), Qt::CaseInsensitive))
+		{
+			table->setRowHidden(row, false);
+		}
+		else
+		{
+			table->setRowHidden(row, true);
+		}
+	}
 }
 
 void WidgetMain::RemoveNote(Note* note)
