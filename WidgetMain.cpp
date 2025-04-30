@@ -22,6 +22,7 @@
 #include "MyQDialogs.h"
 #include "MyQFileDir.h"
 #include "MyQExecute.h"
+#include "MyQWidget.h"
 #include "PlatformDependent.h"
 #include "MyQTableWidget.h"
 #include "CodeMarkers.h"
@@ -196,10 +197,13 @@ void WidgetMain::CreateTrayIcon()
 	});
 
 	menu->addAction("Show Notes");
+	MyQWidget::SetFontBold(menu->actions().back(), true);
 	connect(menu->actions().back(), &QAction::triggered, showFoo);
 
 	menu->addAction("Hide Notes");
 	connect(menu->actions().back(), &QAction::triggered, this, &WidgetMain::hide);
+
+	menu->addSeparator();
 
 	menu->addAction("Create new note");
 	connect(menu->actions().back(), &QAction::triggered, [this](){ SlotCreationNewNote(); });
