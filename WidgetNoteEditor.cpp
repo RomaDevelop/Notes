@@ -181,6 +181,7 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	connect(textEdit, &QTextEdit::textChanged, [this](){ textEditChanged=true; });
 
 	if(note.Content() == Note::StartText()) note.SetContent("<span style='font-size: 14pt;'>"+Note::StartText()+"</span>");
+	textEdit->document()->setDefaultStyleSheet("p { font-size: 14pt; }");
 	textEdit->setHtml(note.Content());
 
 	auto dtUpdateFoo = [this](void *){

@@ -68,8 +68,10 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	vlo_main->addLayout(hlo1);
 	vlo_main->addLayout(hlo2);
 
+// HeaderPanel
 	CreateHeaderPanel(hlo1);
 
+// Table
 	table = new QTableWidget;
 	table->verticalHeader()->hide();
 	table->setColumnCount(4);
@@ -141,13 +143,24 @@ void WidgetMain::CreateHeaderPanel(QHBoxLayout *hlo1)
 	});
 
 
+// Search
 	hlo1->addSpacing(20);
-	auto leSrc = new QLineEdit;
-	hlo1->addWidget(leSrc);
-	connect(leSrc, &QLineEdit::textChanged, [this](const QString &text){ FilterNotes(text); });
+	auto hloSearch = new QHBoxLayout;
+	hloSearch->setContentsMargins(0,0,0,0);
+	hloSearch->setSpacing(0);
+	hlo1->addLayout(hloSearch);
+
+	auto leSearch = new QLineEdit;
+	hloSearch->addWidget(leSearch);
+	connect(leSearch, &QLineEdit::textChanged, [this](const QString &text){ FilterNotes(text); });
+	auto btnClearSearch = new QToolButton;
+	btnClearSearch->setIcon(QApplication::style()->standardIcon(QStyle::StandardPixmap::SP_TitleBarCloseButton));
+	hloSearch->addWidget(btnClearSearch);
+	connect(btnClearSearch, &QToolButton::clicked, [leSearch](){ leSearch->clear(); });
 
 	hlo1->addSpacing(20);
 
+// Save path
 	QPushButton *btnSavePath = new QPushButton("Save path");
 	btnSavePath->setFixedWidth(QFontMetrics(btnSavePath->font()).horizontalAdvance(btnSavePath->text()) + 20);
 	hlo1->addWidget(btnSavePath);
