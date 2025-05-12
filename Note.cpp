@@ -85,7 +85,9 @@ void Note::ShowDialogFastActions(QWidget *widgetToShowUnder)
 
 	auto actions = FastActions::Scan(te.toPlainText());
 
-	MyQDialogs::MenuUnderWidget(widgetToShowUnder, actions.actionsVals, actions.GetVectFunctions());
+	if(!actions.actionsVals.isEmpty())
+		MyQDialogs::MenuUnderWidget(widgetToShowUnder, actions.actionsVals, actions.GetVectFunctions());
+	else MyQDialogs::MenuUnderWidget(widgetToShowUnder, { MyQDialogs::DisabledItem("Actions not found") });
 }
 
 void Note::SetCBNameUpdated(std::function<void (void *)> aUpdatedCb, void *handler, int &localCbCounter)

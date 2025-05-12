@@ -5,6 +5,7 @@
 #include "Resources.h"
 
 #include "MyQDifferent.h"
+#include "LaunchParams.h"
 
 int main(int argc, char *argv[])
 {
@@ -16,9 +17,14 @@ int main(int argc, char *argv[])
 	QApplication a(argc, argv);
 	a.setQuitOnLastWindowClosed(false);
 
-	//Resources::Init("C:\\Work\\C++\\Notes\\resources", MyQDifferent::PathToExe()+"\\files\\resources", true);
-	Resources::Init("D:\\Documents\\C++ QT\\Notes\\resources", MyQDifferent::PathToExe()+"\\files\\resources", true);
-	#error
+	LaunchParams::Init({
+						   LaunchParams::DeveloperData("RomaWork", "TKO3-206", "C:/Work/C++/Notes",
+						   "D:/Documents/C++ QT/"),
+						   LaunchParams::DeveloperData("RomaHome", "don't remember", "D:/Documents/C++ QT/Notes",
+						   "C:/Work/C++/")
+					   });
+
+	Resources::Init(LaunchParams::CurrentDeveloper()->sourcesPath + "/resources", MyQDifferent::PathToExe()+"/files/resources", true);
 
 	WidgetMain w;
 	w.show();

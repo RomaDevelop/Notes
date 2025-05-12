@@ -75,6 +75,8 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 		else format.setFontWeight(QFont::Weight::Normal);
 
 		cursor.setCharFormat(format);
+
+		textEdit->setFocus();
 	};
 	auto SlotSetUndL = [this](){
 		auto cursor = textEdit->textCursor();
@@ -85,6 +87,8 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 		format.setFontUnderline(!format.fontUnderline());
 		cursor.setCharFormat(format);
+
+		textEdit->setFocus();
 	};
 	auto SlotSetItal = [this](){
 		auto cursor = textEdit->textCursor();
@@ -95,6 +99,8 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 		format.setFontItalic(!format.fontItalic());
 		cursor.setCharFormat(format);
+
+		textEdit->setFocus();
 	};
 
 	QPushButton *btnBold = new QPushButton("B");
@@ -133,6 +139,7 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 		format.setFontPointSize(format.fontPointSize()+1);
 		cursor.setCharFormat(format);
+		textEdit->setFocus();
 	});
 
 	QPushButton *btnAMinus = new QPushButton("A-");
@@ -147,13 +154,19 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 		format.setFontPointSize(format.fontPointSize()-1);
 		cursor.setCharFormat(format);
+		textEdit->setFocus();
 	});
 
 
 	QPushButton *btnAddAction = new QPushButton(" Add action ");
 	hloButtons->addWidget(btnAddAction);
 	connect(btnAddAction,&QPushButton::clicked,[this, btnAddAction](){
-		auto executeFoo = [this](){ this->textEdit->textCursor().insertText(FastActions_ns::execute); };
+
+		auto executeFoo = [this](){
+			this->textEdit->textCursor().insertText(FastActions_ns::execute);
+			textEdit->setFocus();
+		};
+
 		MyQDialogs::MenuUnderWidget(btnAddAction,
 									{
 										{ FastActions_ns::execute, executeFoo },
@@ -165,7 +178,9 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	connect(btnDoActions,&QPushButton::clicked,[this, btnDoActions](){
 		auto actions = FastActions::Scan(textEdit->toPlainText());
 
-		MyQDialogs::MenuUnderWidget(btnDoActions, actions.actionsVals, actions.GetVectFunctions());
+		if(!actions.actionsVals.isEmpty())
+			MyQDialogs::MenuUnderWidget(btnDoActions, actions.actionsVals, actions.GetVectFunctions());
+		else MyQDialogs::MenuUnderWidget(btnDoActions, { MyQDialogs::DisabledItem("Actions not found") });
 	});
 
 	hloButtons->addStretch();
