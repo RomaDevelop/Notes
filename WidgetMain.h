@@ -61,10 +61,7 @@ private:
 
 	void RemoveNote(Note* note);
 
-	void FitColWidth();
-
-protected:
-	void resizeEvent(QResizeEvent *event) override;
+	void DefaultColsWidths();
 };
 
 

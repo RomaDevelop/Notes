@@ -166,7 +166,7 @@ void WidgetAlarms::AddNote(Note * note)
 		ShowMenuPostpone(btnPostpone->mapToGlobal(QPoint(0, btnPostpone->height())), setPostpone, note);
 	});
 	connect(btnRemove, &QPushButton::clicked, [note](){
-		if(QMessageBox::question(0,"Remove note","Are you shure?") == QMessageBox::Yes)
+		if(QMessageBox::question(0,"Remove note","Removing note "+note->Name()+"\n\nAre you shure?") == QMessageBox::Yes)
 			note->RemoveNoteFromBase();
 	});
 
@@ -352,7 +352,13 @@ void WidgetAlarms::showEvent(QShowEvent * event)
 	if(settings.contains("geo") && !geo.isNull() && !geo.isEmpty())
 	{
 		restoreGeometry(geo);
-		qdbg << "loaded correct geo" << pos() << size();
+
+		auto geoRect = geometry();
+		QString geoStr = "X:" + QSn(geoRect.x()) + " Y: " + QSn(geoRect.y())
+				 + " Width: " + QSn(geoRect.width()) + " Height: " + QSn(geoRect.height()) + "\n";
+		QString log = QDateTime::currentDateTime().toString(DateTimeFormat) +
+							" WidgetAlarms::SaveSettings saved geo: " + geoStr + "\n";
+		MyQFileDir::AppendFile(QFileInfo(settingsFile).path() + "/save geo log.txt", log);
 	}
 	else
 	{
@@ -379,7 +385,23 @@ void WidgetAlarms::SaveSettings()
 	MyQFileDir::WriteFile(settingsFile, "");
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
-	settings.setValue("geo", saveGeometry());
+	auto geo = saveGeometry();
+	settings.setValue("geo", geo);
+
+	if (geo.size() < 16) {
+		qDebug() << "Недостаточно данных для извлечения геометрии.";
+		return;
+	}
+
+	QWidget newWidget;
+	newWidget.restoreGeometry(geo);
+
+	auto geoRect = geometry();
+	QString geoStr = "X:" + QSn(geoRect.x()) + " Y: " + QSn(geoRect.y())
+			 + " Width: " + QSn(geoRect.width()) + " Height: " + QSn(geoRect.height()) + "\n";
+	QString log = QDateTime::currentDateTime().toString(DateTimeFormat) +
+						" WidgetAlarms::SaveSettings saved geo: " + geoStr + "\n";
+	MyQFileDir::AppendFile(QFileInfo(settingsFile).path() + "/save geo log.txt", log);
 }
 
 void WidgetAlarms::FitColWidth()

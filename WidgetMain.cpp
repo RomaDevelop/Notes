@@ -100,8 +100,6 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 		LoadNotes();
 	});
 
-	QTimer::singleShot(200,[this]{ FitColWidth(); });
-
 	CreateTrayIcon();
 	CreateNotesAlarmChecker();
 }
@@ -124,12 +122,11 @@ void WidgetMain::CreateHeaderPanel(QHBoxLayout *hlo1)
 	btnRemove->setIcon(QIcon(Resources::remove().GetPathName()));
 	hlo1->addWidget(btnRemove);
 	connect(btnRemove,&QPushButton::clicked,[this](){
-		if(QMessageBox::question(0,"Remove note","Are you shure?") == QMessageBox::Yes)
-		{
-			if(auto note = NoteOfRow(table->currentRow()); note)
+		auto note = NoteOfRow(table->currentRow());
+		if(!note) { QMbError("NoteOfRow(table->currentRow()) returned nullptr"); return; }
+
+		if(QMessageBox::question(0,"Remove note","Removing note "+note->Name()+"\n\nAre you shure?") == QMessageBox::Yes)
 				note->RemoveNoteFromBase();
-			else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
-		}
 	});
 
 	auto btnFastActions = new QToolButton();
@@ -141,7 +138,6 @@ void WidgetMain::CreateHeaderPanel(QHBoxLayout *hlo1)
 			note->ShowDialogFastActions(btnFastActions);
 		else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
 	});
-
 
 // Search
 	hlo1->addSpacing(20);
@@ -209,17 +205,23 @@ void WidgetMain::CreateTrayIcon()
 		if(reason == QSystemTrayIcon::Context) icon->contextMenu()->exec();
 	});
 
-	menu->addAction("Show Notes");
+	menu->addAction("Show main window");
 	MyQWidget::SetFontBold(menu->actions().back(), true);
 	connect(menu->actions().back(), &QAction::triggered, showFoo);
 
-	menu->addAction("Hide Notes");
+	menu->addAction("Hide main window");
 	connect(menu->actions().back(), &QAction::triggered, this, &WidgetMain::hide);
 
 	menu->addSeparator();
 
 	menu->addAction("Create new note");
 	connect(menu->actions().back(), &QAction::triggered, [this](){ SlotCreationNewNote(); });
+
+	menu->addSeparator();
+
+	menu->addAction("Close app");
+	MyQWidget::SetFontBold(menu->actions().back(), true);
+	connect(menu->actions().back(), &QAction::triggered, this, &QWidget::close);
 }
 
 void WidgetMain::CreateNotesAlarmChecker()
@@ -277,6 +279,7 @@ void WidgetMain::SaveSettings()
 	/// сохранение задач должно надежно происходить при их изменении
 
 	settings.setValue("geoMainWidget", this->saveGeometry());
+	settings.setValue("tableHeaderState", this->table->horizontalHeader()->saveState());
 }
 
 void WidgetMain::LoadSettings()
@@ -292,7 +295,16 @@ void WidgetMain::LoadSettings()
 
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
-	restoreGeometry(settings.value("geoMainWidget").toByteArray());
+	if(settings.contains("geoMainWidget")) restoreGeometry(settings.value("geoMainWidget").toByteArray());
+	bool tableHeaderRestored = false;
+	if(settings.contains("tableHeaderState"))
+	{
+		this->table->horizontalHeader()->restoreState(settings.value("tableHeaderState").toByteArray());
+		tableHeaderRestored = true;
+	}
+
+	if(!tableHeaderRestored)
+		QTimer::singleShot(200,[this]{ DefaultColsWidths(); });
 }
 
 void WidgetMain::LoadNotes()
@@ -506,14 +518,14 @@ void WidgetMain::RemoveNote(Note* note)
 	else QMbError("note("+note->Name()+") not found");
 }
 
-void WidgetMain::FitColWidth()
+void WidgetMain::DefaultColsWidths()
 {
 	int columnCount = table->columnCount();
 
 	if (columnCount != ColIndexes::colsCount)
 	{
 		static bool preinted = false;
-		if(!preinted) { preinted = true; QMbError("resizeEvent wrong columnCount"); }
+		if(!preinted) { preinted = true; QMbError("FitColWidth wrong columnCount"); }
 		return;
 	}
 
@@ -524,10 +536,4 @@ void WidgetMain::FitColWidth()
 	int nameWidth = table->width() - (ColIndexes::chBoxWidth+ColIndexes::notifyDTeditWidth+ColIndexes::postponeDTeditWidth + 5);
 	if(table->verticalScrollBar()->isVisible()) nameWidth -= table->verticalScrollBar()->width();
 	table->setColumnWidth(ColIndexes::name, nameWidth);
-}
-
-void WidgetMain::resizeEvent(QResizeEvent * event)
-{
-	QWidget::resizeEvent(event);
-	FitColWidth();
 }

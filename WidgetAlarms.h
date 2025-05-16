@@ -32,7 +32,6 @@ public:
 	~WidgetAlarms();
 	void GiveNotes(const std::vector<Note*> &givingNotes);
 
-	QByteArray geometry;
 	QString tableColWidths;
 
 private:
