@@ -133,10 +133,9 @@ void WidgetAlarms::AddNote(Note * note)
 	hlo->setContentsMargins(0,0,0,0);
 	auto labelCaption1 = new QLabel;
 	labelCaption1->setFont(fontForLabels);
-	labelCaption1->setMaximumWidth(table->width() - 480);
 	auto labelCaption2 = new QLabel;
 	labelCaption2->setFont(fontForLabels);
-	hlo->addWidget(labelCaption1);
+	hlo->addWidget(labelCaption1, 1);
 	hlo->addWidget(labelCaption2);
 	hlo->addStretch();
 	auto btnReschedule = new QPushButton(" Перенести на ... ");
@@ -150,6 +149,7 @@ void WidgetAlarms::AddNote(Note * note)
 	NoteInAlarms *newNoteInAlarmsPtr = notes.emplace_back(new NoteInAlarms).get();
 	NoteInAlarms &newNoteInAlarms = *newNoteInAlarmsPtr;
 	newNoteInAlarms.note = note;
+	newNoteInAlarms.widgetContainer = widget;
 	newNoteInAlarms.labelCaption1 = labelCaption1;
 	newNoteInAlarms.labelCaption2 = labelCaption2;
 
@@ -175,6 +175,18 @@ void WidgetAlarms::AddNote(Note * note)
 
 void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 {
+	static QString text;
+
+	text = "   " + note.note->Name();
+	text = fontMetrixForLabels.elidedText(text, Qt::ElideRight,
+										  note.labelCaption1->width() - fontMetrixForLabels.horizontalAdvance("..."));
+	note.labelCaption1->setText(text);
+
+	text = "("+note.note->DTNotify().toString("dd MMM yyyy hh:mm:ss")+")";
+	note.labelCaption2->setText(text);
+
+	return;
+
 	int labelCaption1W = table->width() - 440;
 	if(labelCaption1W < 50) labelCaption1W = 50;
 	note.labelCaption1->setMaximumWidth(labelCaption1W);
@@ -420,7 +432,11 @@ void WidgetAlarms::FitColWidth()
 	if(table->verticalScrollBar()->isVisible()) columnWidth -= table->verticalScrollBar()->width();
 	table->setColumnWidth(0, columnWidth);
 
-	for(auto &note:notes) SetLabelText(*note.get());
+	for(auto &note:notes)
+	{
+		note->widgetContainer->setMaximumWidth(columnWidth-2);
+		SetLabelText(*note.get());
+	}
 }
 
 void WidgetAlarms::resizeEvent(QResizeEvent * event)

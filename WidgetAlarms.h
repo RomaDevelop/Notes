@@ -13,9 +13,10 @@
 
 struct NoteInAlarms
 {
-	Note* note;
-	QLabel* labelCaption1;
-	QLabel* labelCaption2;
+	Note *note;
+	QWidget *widgetContainer;
+	QLabel *labelCaption1;
+	QLabel *labelCaption2;
 	int cbCounter = 0;
 };
 

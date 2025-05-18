@@ -9,8 +9,6 @@
 
 int main(int argc, char *argv[])
 {
-
-	qdbg << "сохранять ширину колонок";
 	qdbg << "дома из-за увеличенных шрифтов есть некоторые уродства";
 	qdbg << "экзешнику картинку";
 
@@ -20,7 +18,7 @@ int main(int argc, char *argv[])
 	LaunchParams::Init({
 						   LaunchParams::DeveloperData("RomaWork", "TKO3-206", "C:/Work/C++/Notes",
 						   "D:/Documents/C++ QT/"),
-						   LaunchParams::DeveloperData("RomaHome", "don't remember", "D:/Documents/C++ QT/Notes",
+						   LaunchParams::DeveloperData("RomaHome", "ELBRUS-HOME-10", "D:/Documents/C++ QT/Notes",
 						   "C:/Work/C++/")
 					   });
 
