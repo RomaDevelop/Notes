@@ -133,9 +133,10 @@ void WidgetAlarms::AddNote(Note * note)
 	hlo->setContentsMargins(0,0,0,0);
 	auto labelCaption1 = new QLabel;
 	labelCaption1->setFont(fontForLabels);
+	labelCaption1->setMaximumWidth(table->width() - 480);
 	auto labelCaption2 = new QLabel;
 	labelCaption2->setFont(fontForLabels);
-	hlo->addWidget(labelCaption1, 1);
+	hlo->addWidget(labelCaption1);
 	hlo->addWidget(labelCaption2);
 	hlo->addStretch();
 	auto btnReschedule = new QPushButton(" Перенести на ... ");
@@ -149,7 +150,6 @@ void WidgetAlarms::AddNote(Note * note)
 	NoteInAlarms *newNoteInAlarmsPtr = notes.emplace_back(new NoteInAlarms).get();
 	NoteInAlarms &newNoteInAlarms = *newNoteInAlarmsPtr;
 	newNoteInAlarms.note = note;
-	newNoteInAlarms.widgetContainer = widget;
 	newNoteInAlarms.labelCaption1 = labelCaption1;
 	newNoteInAlarms.labelCaption2 = labelCaption2;
 
@@ -175,18 +175,6 @@ void WidgetAlarms::AddNote(Note * note)
 
 void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 {
-	static QString text;
-
-	text = "   " + note.note->Name();
-	text = fontMetrixForLabels.elidedText(text, Qt::ElideRight,
-										  note.labelCaption1->width() - fontMetrixForLabels.horizontalAdvance("..."));
-	note.labelCaption1->setText(text);
-
-	text = "("+note.note->DTNotify().toString("dd MMM yyyy hh:mm:ss")+")";
-	note.labelCaption2->setText(text);
-
-	return;
-
 	int labelCaption1W = table->width() - 440;
 	if(labelCaption1W < 50) labelCaption1W = 50;
 	note.labelCaption1->setMaximumWidth(labelCaption1W);
@@ -257,13 +245,15 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 						 {"9 дней", secondsInDay*9}, {"10 дней", secondsInDay*7}, {"10 дней", secondsInDay*10}, {"11 дней", secondsInDay*11},
 						 {"12 дней", secondsInDay*12}, {"13 дней", secondsInDay*13}, {"14 дней", secondsInDay*14},
 						 {"20 дней", secondsInDay*20}, {"25 дней", secondsInDay*25}, {"30 дней", secondsInDay*30},
+						 {"40 дней", secondsInDay*40}, {"50 дней", secondsInDay*50}, {"60 дней", secondsInDay*60},
 						 {"Ввести вручную", ForPostpone_ns::handInput}};
 	else if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
 		delays = 		{{"5 минут", 60*5}, {"10 минут", 60*10}, {"15 минут", 60*15}, {"20 минут", 60*20},
 						 {"25 минут", 60*25}, {"30 минут", 60*30}, {"35 минут", 60*35}, {"40 минут", 60*40},
 						 {"45 минут", 60*45}, {"50 минут", 60*50}, {"1 час", 60*60}, {"1,5 часа", 60*90},
 						 {"2 часа", 60*60*2}, {"3 часа", 60*60*3}, {"4 часа", 60*60*4}, {"5 часов", 60*60*5},
-						 {"6 часов", 60*60*6}, {"7 часов", 60*60*7}, {"8 часов", 60*60*8},
+						 {"6 часов", 60*60*6}, {"7 часов", 60*60*7}, {"8 часов", 60*60*8},  {"10 часов", 60*60*10},
+						  {"12 часов", 60*60*12},  {"14 часов", 60*60*14},  {"16 часов", 60*60*16},
 						 {"Ввести вручную", ForPostpone_ns::handInput}};
 	else QMbError("wrong menuPostponeCaseValue");
 
@@ -432,11 +422,7 @@ void WidgetAlarms::FitColWidth()
 	if(table->verticalScrollBar()->isVisible()) columnWidth -= table->verticalScrollBar()->width();
 	table->setColumnWidth(0, columnWidth);
 
-	for(auto &note:notes)
-	{
-		note->widgetContainer->setMaximumWidth(columnWidth-2);
-		SetLabelText(*note.get());
-	}
+	for(auto &note:notes) SetLabelText(*note.get());
 }
 
 void WidgetAlarms::resizeEvent(QResizeEvent * event)
