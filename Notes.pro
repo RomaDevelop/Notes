@@ -9,8 +9,10 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    ../include/AdditionalTray.cpp \
     ../include/PlatformDependent.cpp \
     FastActions.cpp \
+    NetClient.cpp \
     Note.cpp \
     WidgetAlarms.cpp \
     WidgetMain.cpp \
@@ -18,9 +20,12 @@ SOURCES += \
     main.cpp
 
 HEADERS += \
+    ../include/AdditionalTray.h \
+    ../include/ClickableQWidget.h \
     ../include/MyQTextEdit.h \
     ../include/PlatformDependent.h \
     FastActions.h \
+    NetClient.h \
     Note.h \
     Resources.h \
     WidgetAlarms.h \
@@ -28,7 +33,8 @@ HEADERS += \
     WidgetNoteEditor.h
 
 INCLUDEPATH += \
-    ../include
+    ../include \
+	../NotesServer
 
 DEPENDPATH += \
     ../include

@@ -3,8 +3,6 @@
 #include "MyQFileDir.h"
 #include "MyQExecute.h"
 
-
-
 QString FastAction::DoAction() const
 {
 	QString res;

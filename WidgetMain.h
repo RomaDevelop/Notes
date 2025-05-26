@@ -5,18 +5,21 @@
 
 #include <QWidget>
 #include <QLayout>
+#include <QTextEdit>
 #include <QTableWidget>
 #include <QDateTime>
 #include <QCheckBox>
 #include <QDateTimeEdit>
+#include <QTcpSocket>
 
 #include "MyQDifferent.h"
 #include "declare_struct.h"
 
+#include "NetClient.h"
 #include "Note.h"
 #include "WidgetAlarms.h"
 
-declare_struct_4_fields_no_move(RowView, QTableWidgetItem*, item, QCheckBox*, chBox,
+declare_struct_5_fields_no_move(RowView, QTableWidgetItem*, itemName, QTableWidgetItem*, itemGroup, QCheckBox*, chBox,
 											QDateTimeEdit*, dteNotify, QDateTimeEdit*, dtePostpone);
 declare_struct_3_fields_move(NoteInMain, RowView, rowView, std::unique_ptr<Note>, note, int, cbCounter);
 
@@ -31,18 +34,21 @@ public:
 	void UpdateNotesIndexes();
 	std::unique_ptr<WidgetAlarms> widgetAlarms;
 
+	NetClient *netClient;
+
 	explicit WidgetMain(QWidget *parent = nullptr);
 	~WidgetMain();
+	void closeEvent (QCloseEvent *event) override;
 
 private:
 	void CreateHeaderPanel(QHBoxLayout *hlo1);
+	void CreateTableContextMenu();
 	void CreateTrayIcon();
 	void CreateNotesAlarmChecker();
 	void CheckNotesForAlarm();
 
-	void closeEvent (QCloseEvent *event) override;
-	//void resizeEvent(QResizeEvent * event) override { }
-	//void moveEvent(QMoveEvent * event) override { }
+	void SlotTest();
+
 	QString filesPath = MyQDifferent::PathToExe()+"/files";
 	QString settingsFile = filesPath + "/settings.ini";
 
@@ -51,9 +57,10 @@ private:
 	void LoadNotes();
 	int RowOfNote(Note* note);
 	Note* NoteOfRow(int row);
+	Note* NoteOfCurrentRow();
 
 	void SlotCreationNewNote();
-	Note& MakeNewNote(QString name, bool activeNotify, QDateTime dtNotify, QDateTime dtPostpone, QString content);
+	Note& MakeNewNote(Note noteSrc, bool doSave);
 	int MakeWidgetsForMainTable(NoteInMain &newNote); // returns index
 	void UpdateWidgetsFromNote(NoteInMain &note);
 

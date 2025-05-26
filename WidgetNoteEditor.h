@@ -29,6 +29,8 @@ private:
 	void SaveSettings();
 	void LoadSettings();
 
+	std::vector<std::function<void()>> postShowFunctions;
+
 	Note &note;
 	int cbCounter = 0;
 	bool newNote = false;

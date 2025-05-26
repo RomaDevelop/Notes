@@ -43,6 +43,29 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	dtEditNotify->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
 	dtEditNotify->setCalendarPopup(true);
 
+	auto btnDtEditNotifyAdd = new QPushButton("...");
+	btnDtEditNotifyAdd->setFixedWidth(28);
+	connect(btnDtEditNotifyAdd,&QPushButton::clicked, [this, btnDtEditNotifyAdd](){
+		MyQDialogs::MenuUnderWidget(btnDtEditNotifyAdd, {
+			{"09:00:00", [this](){ dtEditNotify->setTime(QTime(9,0,0)); }},
+			{"09:30:00", [this](){ dtEditNotify->setTime(QTime(9,30,0)); }},
+			{"10:00:00", [this](){ dtEditNotify->setTime(QTime(10,0,0)); }},
+			{"10:30:00", [this](){ dtEditNotify->setTime(QTime(10,30,0)); }},
+			{"11:00:00", [this](){ dtEditNotify->setTime(QTime(11,0,0)); }},
+			{"11:30:00", [this](){ dtEditNotify->setTime(QTime(11,30,0)); }},
+			{"12:00:00", [this](){ dtEditNotify->setTime(QTime(12,0,0)); }},
+			{"13:00:00", [this](){ dtEditNotify->setTime(QTime(13,0,0)); }},
+			{"14:00:00", [this](){ dtEditNotify->setTime(QTime(14,0,0)); }},
+			{"15:00:00", [this](){ dtEditNotify->setTime(QTime(15,0,0)); }},
+			{"16:00:00", [this](){ dtEditNotify->setTime(QTime(16,0,0)); }},
+			{"17:00:00", [this](){ dtEditNotify->setTime(QTime(17,0,0)); }},
+			{"18:00:00", [this](){ dtEditNotify->setTime(QTime(18,0,0)); }},
+			{"19:00:00", [this](){ dtEditNotify->setTime(QTime(19,0,0)); }},
+			{"20:00:00", [this](){ dtEditNotify->setTime(QTime(20,0,0)); }},
+			{"21:00:00", [this](){ dtEditNotify->setTime(QTime(21,0,0)); }},
+		});
+	});
+
 	dtEditPostpone = new QDateTimeEdit(note.DTPostpone());
 	MyQWidget::SetFontPointSize(dtEditPostpone, 12);
 	MyQWidget::SetFontBold(dtEditPostpone, true);
@@ -58,6 +81,7 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 	hloNameAndDates->addWidget(leName);
 	hloNameAndDates->addWidget(dtEditNotify);
+	hloNameAndDates->addWidget(btnDtEditNotifyAdd);
 	hloNameAndDates->addWidget(dtEditPostpone);
 
 	vlo_main->addLayout(hloButtons);
@@ -185,6 +209,12 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 	hloButtons->addStretch();
 
+	QPushButton *btnTest = new QPushButton(" Test ");
+	hloButtons->addWidget(btnTest);
+	connect(btnTest,&QPushButton::clicked, [this, btnDtEditNotifyAdd](){
+		qdbg << btnDtEditNotifyAdd->height() << dtEditNotify->height();
+	});
+
 	QPushButton *btnSave = new QPushButton(" Save ");
 	hloButtons->addWidget(btnSave);
 	connect(btnSave,&QPushButton::clicked, this, &WidgetNoteEditor::SaveNoteFromWidgets);
@@ -206,13 +236,14 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 		dtEditPostpone->setDateTime(this->note.DTPostpone());
 	};
 
-	note.SetCBDTUpdated(dtUpdateFoo, this, cbCounter);
+	note.AddCBDTUpdated(dtUpdateFoo, this, cbCounter);
 
 	settingsFile = MyQDifferent::PathToExe()+"/files/settings_note_editor.ini";
 	QTimer::singleShot(0,this,[this]
 	{
-		//move(10,10);
-		//resize(1870,675);
+		for(auto &foo:postShowFunctions)
+			foo();
+		postShowFunctions.clear();
 		LoadSettings();
 	});
 }
@@ -263,7 +294,10 @@ void WidgetNoteEditor::closeEvent(QCloseEvent * event)
 		auto answ = MyQDialogs::CustomDialog("Сохранение","Завершить редактирование и сохранить заметку с автоназначенным уведомлением на "
 											 + note.DTNotify().toString(DateTimeFormat) + " ?",
 											 {"Да, завершить и сохранить", "Нет, продолжить редактирование"});
-		if(answ == "Да, завершить и сохранить") { dtEditPostpone->setDateTime(note.DTNotify()); } // ставим отложить на одну дату с уведомлением
+		if(answ == "Да, завершить и сохранить")
+		{
+			dtEditPostpone->setDateTime(note.DTNotify());   // ставим отложить на одну дату с уведомлением
+		}
 		else if(answ == "Нет, продолжить редактирование") { event->ignore(); return; }
 		else { QMbError("not realesed button " + answ); return; }
 	}

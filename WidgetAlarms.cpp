@@ -156,8 +156,8 @@ void WidgetAlarms::AddNote(Note * note)
 	SetLabelText(newNoteInAlarms);
 
 	auto cb = [this, newNoteInAlarmsPtr](void*){ SetLabelText(*newNoteInAlarmsPtr); };
-	note->SetCBNameUpdated(cb, newNoteInAlarmsPtr, newNoteInAlarmsPtr->cbCounter);
-	note->SetCBDTUpdated(cb, newNoteInAlarmsPtr, newNoteInAlarmsPtr->cbCounter);
+	note->AddCBNameUpdated(cb, newNoteInAlarmsPtr, newNoteInAlarmsPtr->cbCounter);
+	note->AddCBDTUpdated(cb, newNoteInAlarmsPtr, newNoteInAlarmsPtr->cbCounter);
 
 	connect(btnReschedule, &QPushButton::clicked, [this, btnReschedule, note](){
 		ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, note);
