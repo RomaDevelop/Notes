@@ -45,6 +45,7 @@ public:
 	}
 
 	int index = -1;
+	int id = -1;
 	QString file;
 
 	QString ToStrForLog();
@@ -64,6 +65,7 @@ public:
 	void ChangeGroup(NotesGroup *newGroup);
 
 	void InitFromTmpNote(Note &note);
+	void InitFromRecord(QStringList &record);
 
 	QString Name() { return name; }
 	void SetName(QString newName);
@@ -83,10 +85,10 @@ public:
 	static Note LoadNote_v1(const QString &text);
 	static std::vector<Note> LoadNotes();
 
-	inline static std::map<int, std::function<Note(const QString &text)>> loadsFooMap;
+	inline static std::map<int, std::function<Note(const QString &text)>> loadsFunctionsMap;
 	static void InitLoadsFooMap()
 	{
-		loadsFooMap[1] = [](const QString &text){ return LoadNote_v1(text); };
+		loadsFunctionsMap[1] = [](const QString &text){ return LoadNote_v1(text); };
 	}
 	static int GetVersion(const QString &text);
 	QString MakeNameFileToSaveNote();

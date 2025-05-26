@@ -39,9 +39,10 @@
 
 void ToDo(){
 	qdbg << "ToDo in WidgetMain.cpp line " + QSn(__LINE__);
+
 			///
 			/// нужно создавать id заметок, ибо как их еще идентифицировать на сервере
-			/// для дефолт груп они будут вестись локально
+			/// для дефолт групп они будут вестись локально
 			/// для остальных нужно получать айди от сервера
 			///		можно конечно еще ввести переменную в которой будет порядковый номер,
 			///		чтобы если айди не будет получет сразу, то все равно сохранялся порядок заметок
@@ -62,6 +63,8 @@ void ToDo(){
 			/// запуск таймера из иконки в трее
 			///
 			/// очистка старых файлов и каталогов
+			///
+			/// нужна возможность хранить ссылки в заметках. Как?
 }
 
 namespace ColIndexes {
@@ -341,12 +344,12 @@ void WidgetMain::CheckNotesForAlarm()
 
 void WidgetMain::SlotTest()
 {
-	QString text;
-	for(auto &note:notes)
-	{
-		text += "[" + note->note->group->name + "]:[" + note->note->group->describtion + "]\n";
-	}
-	MyQDialogs::ShowText(text);
+//	QString text;
+//	for(auto &note:notes)
+//	{
+//		text += "[" + note->note->group->name + "]:[" + note->note->group->describtion + "]\n";
+//	}
+//	MyQDialogs::ShowText(text);
 }
 
 void WidgetMain::closeEvent(QCloseEvent * event)
@@ -482,7 +485,6 @@ Note & WidgetMain::MakeNewNote(Note noteSrc, bool doSave)
 	MakeWidgetsForMainTable(newNoteInMainRef);
 
 	if(doSave) newNote->SaveNote("MakeNewNote-doSave");
-	else if(newNote->file != newNote->MakeNameFileToSaveNote()) newNote->SaveNote("MakeNewNote-new file name");
 
 	auto saveNoteFoo = [newNote](void*){ newNote->SaveNote("saveNoteFoo"); };
 

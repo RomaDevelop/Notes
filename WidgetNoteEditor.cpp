@@ -209,11 +209,11 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 	hloButtons->addStretch();
 
-	QPushButton *btnTest = new QPushButton(" Test ");
-	hloButtons->addWidget(btnTest);
-	connect(btnTest,&QPushButton::clicked, [this, btnDtEditNotifyAdd](){
-		qdbg << btnDtEditNotifyAdd->height() << dtEditNotify->height();
-	});
+//	QPushButton *btnTest = new QPushButton(" Test ");
+//	hloButtons->addWidget(btnTest);
+//	connect(btnTest,&QPushButton::clicked, [this, btnDtEditNotifyAdd](){
+//		qdbg << btnDtEditNotifyAdd->height() << dtEditNotify->height();
+//	});
 
 	QPushButton *btnSave = new QPushButton(" Save ");
 	hloButtons->addWidget(btnSave);

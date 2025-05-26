@@ -6,6 +6,20 @@
 #include "MyCppDifferent.h"
 #include "MyQFileDir.h"
 #include "MyQDialogs.h"
+#include "MyQSqlDatabase.h"
+
+const BaseData clientBaseRegular {"Client base",
+								  "D:\\Documents\\C++ QT\\Notes\\Client base.mdb",
+								  "D:\\Documents\\C++ QT\\Notes\\storage"};
+const BaseData clientBaseDebug {"Client base debug",
+								"D:\\Documents\\C++ QT\\Notes\\Client base debug.mdb",
+								"D:\\Documents\\C++ QT\\Notes\\storage_debug"};
+
+#ifdef QT_DEBUG
+const BaseData clientBase {clientBaseDebug};
+#else
+const BaseData clientBase {clientBaseRegular};
+#endif
 
 namespace SaveKeyWods {
 
@@ -20,6 +34,98 @@ namespace SaveKeyWods {
 	inline const QString& group() { static QString str = "group: "; return str; }
 	inline const QString& content() { static QString str = "content: "; return str; }
 }
+
+namespace Fields {
+	inline static const QString& Notes() { static QString str = "Notes"; return str; }
+	inline static const QString& Groups() { static QString str = "Groups"; return str; }
+
+	inline static const QString& nameGroup() { static QString str = "nameGroup"; return str; }
+
+	inline static const QString& idNote			() { static QString str = "idNote"; return str; }
+	//inline static const QString& idNoteOnServer	() { static QString str = "idNoteOnServer"; return str; }
+	inline static const QString& idGroup		() { static QString str = "idGroup"; return str; }
+	inline static const QString& nameNote		() { static QString str = "nameNote"; return str; }
+	inline static const QString& activeNotify	() { static QString str = "activeNotify"; return str; }
+	inline static const QString& dtNotify		() { static QString str = "dtNotify"; return str; }
+	inline static const QString& dtPostpone		() { static QString str = "dtPostpone"; return str; }
+	inline static const QString& content		() { static QString str = "content"; return str; }
+
+	const int idNoteInd			= 0;
+	const int idNoteOnServerInd	= idNoteInd+1;
+	const int idGroupInd		= idNoteOnServerInd+1;
+	const int nameNoteInd		= idGroupInd+1;
+	const int activeNotifyInd	= nameNoteInd+1;
+	const int dtNotifyInd		= activeNotifyInd+1;
+	const int dtPostponeInd		= dtNotifyInd+1;
+	const int contentInd		= dtPostponeInd+1;
+
+	inline const QString& dtFormat() { static QString str = SaveKeyWods::dtFormat(); return str; }
+}
+
+class DataBase: public MyQSqlDatabase
+{
+public:
+	static QString GroupId(const QString &groupName)
+	{
+		return DoSqlQueryGetFirstCell("select " + Fields::idGroup() + " from " + Fields::Groups() + "\n"
+									  "where " + Fields::nameGroup() + " = :nameGroup",
+									  {{":nameGroup",groupName}});
+	}
+	static const QString& DefaultGroupId()
+	{
+		static QString str = GroupId(Note::defaultGroupMarker());
+		return str;
+	}
+	static int InsertNoteInDefaultGroup(Note *note)
+	{
+		auto res = DoSqlQueryExt("insert into " + Fields::Notes() + " ("+Fields::idGroup() + ", " + Fields::nameNote() + ", "
+				   + Fields::activeNotify() + ", " + Fields::dtNotify() + ", " + Fields::dtPostpone() + ", " + Fields::content() + ")\n"
+				   + "values (:groupId, :name, :actNotif, :dtNotif, :dtPosp, :content)",
+				   {{":groupId", DefaultGroupId()}, {":name", note->Name()}, {":actNotif", QSn(note->activeNotify)},
+					{":dtNotif", note->DTNotify().toString(Fields::dtFormat())},
+					{":dtPosp", note->DTPostpone().toString(Fields::dtFormat())},
+					{":content", note->Content()}});
+
+		note->id = -1;
+
+		if(res.errors.isEmpty())
+		{
+			auto id = DoSqlQueryGetFirstCell("select max("+Fields::idNote()+") from " + Fields::Notes());
+			bool ok;
+			note->id = id.toUInt(&ok);
+			if(!ok)
+			{
+				note->id = -1;
+				QMbError("bad id " + id);
+			}
+
+		}
+		else QMbError("note was not inserted");
+
+		return note->id;
+	}
+	static std::vector<Note> NotesFromDefaultGroup()
+	{
+		std::vector<Note> notes;
+		auto table = DoSqlQueryGetTable("select * from "+Fields::Notes()+" where "+Fields::idGroup()+" = " + DefaultGroupId());
+		for(auto &row:table)
+		{
+			notes.emplace_back();
+			notes.back().InitFromRecord(row);
+		}
+		return notes;
+	}
+	static void SaveNote(Note *note)
+	{
+		auto res = DoSqlQueryExt("update "+Fields::Notes()+" set "+Fields::nameNote() + " = :name, " + Fields::activeNotify() + " = :actNotif, "
+									+Fields::dtNotify()+" = :dtNotif, "+Fields::dtPostpone() + " = :dtPosp, " + Fields::content() + " = :content\n"
+								 "where "+Fields::idNote()+" = :idNote",
+				   {{":idNote", QSn(note->id)}, {":name", note->Name()}, {":actNotif", QSn(note->activeNotify)},
+					{":dtNotif", note->DTNotify().toString(Fields::dtFormat())},
+					{":dtPosp", note->DTPostpone().toString(Fields::dtFormat())},
+					{":content", note->Content()}});
+	}
+};
 
 QString Note::ToStrForLog()
 {
@@ -134,7 +240,19 @@ void Note::InitFromTmpNote(Note &note)
 	group = note.group;
 	file = std::move(note.file);
 	index = note.index;
+	id = note.id;
 	content = std::move(note.content);
+}
+
+void Note::InitFromRecord(QStringList &row)
+{
+	name = std::move(row[Fields::nameNoteInd]);
+	activeNotify = row[Fields::activeNotifyInd].toInt();
+	dtNotify = QDateTime::fromString(row[Fields::dtNotifyInd], Fields::dtFormat());
+	dtPostpone = QDateTime::fromString(row[Fields::dtPostponeInd], Fields::dtFormat());
+	//group = note.group;
+	id = row[Fields::idNoteInd].toInt();
+	content = std::move(row[Fields::contentInd]);
 }
 
 void Note::SetName(QString newName)
@@ -164,6 +282,9 @@ void Note::SetDT(QDateTime dtNotify, QDateTime dtPostpone)
 void Note::SaveNote(const QString &reason)
 {
 	qdbg << "SaveNote for "+reason+" i:" + QSn(index) + " name:" + name;
+	DataBase::SaveNote(this);
+	return;
+
 	QString noteText;
 	noteText.append(SaveKeyWods::version()).append("1").append(SaveKeyWods::endValue());
 	noteText.append(this->name).append(SaveKeyWods::endValue());
@@ -172,33 +293,6 @@ void Note::SaveNote(const QString &reason)
 	noteText.append(this->dtPostpone.toString(SaveKeyWods::dtFormat())).append(SaveKeyWods::endValue());
 	noteText.append(SaveKeyWods::group()).append(group->name).append(SaveKeyWods::endValue());
 	noteText.append(this->content).append(SaveKeyWods::endValue());
-
-	if(!this->file.isEmpty())
-	{
-		for(int i=0; i<5; i++)
-		{
-			QFileInfo fi(this->file);
-			QString currentDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName_ms);
-			QString backFile = notesBackupsPath + "/" + currentDt + " rewrited " + fi.fileName();
-			if(QFile::rename(this->file, backFile)) break;
-
-			if(i==4)
-			{
-				QMbError("Error moving file \n\n" + this->file + "\n\nto\n\n" + backFile +"\n\ntry remove");
-				if(!QFile::remove(this->file))
-					QMbError("Error removing file \n\n" + this->file);
-			}
-			MyCppDifferent::sleep_ms(1);
-		}
-	}
-	this->file = MakeNameFileToSaveNote();
-
-	if(!MyQFileDir::WriteFile(this->file, noteText))
-	{
-		QMbError("Во время сохранения произошла ошибка, "
-				 "сейчас будет показан файл который не сохранился, сохраните содержимое самостоятельно");
-		MyQDialogs::ShowText(noteText);
-	}
 
 	NetNoteSaved(noteText);
 }
@@ -223,14 +317,15 @@ std::unique_ptr<Note> Note::LoadNote(const QString &text, const QString &fileFro
 	else // содержит версию
 	{
 		int v = GetVersion(text);
-		if(loadsFooMap.empty()) InitLoadsFooMap();
-		if(auto it = loadsFooMap.find(v); it != loadsFooMap.end())
+		if(loadsFunctionsMap.empty()) InitLoadsFooMap();
+		if(auto it = loadsFunctionsMap.find(v); it != loadsFunctionsMap.end())
 		{
-			auto noteUptr = std::make_unique<Note>(it->second(text));
+			auto &loadFunctoin = it->second;
+			auto noteUptr = std::make_unique<Note>(loadFunctoin(text));
 			noteUptr->file = fileFrom;
 			return noteUptr;
 		}
-		else { QMbError("Unknown version in file " + Note::notesSavesPath + "/" + fileFrom); return {}; }
+		else { QMbError("Not found load function for version "+QSn(v)+" in file " + Note::notesSavesPath + "/" + fileFrom); return {}; }
 	}
 
 	return {};
@@ -256,6 +351,8 @@ Note Note::LoadNote_v1(const QString &text)
 
 std::vector<Note> Note::LoadNotes()
 {
+	MyQSqlDatabase::Init(clientBase, {});
+
 	std::vector<Note> notes;
 	QString currentDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName_ms);
 	auto files = QDir(Note::notesSavesPath).entryList(QDir::Files,QDir::Name);
@@ -273,8 +370,16 @@ std::vector<Note> Note::LoadNotes()
 			Note &noteRef = *note_uptr.get();
 			notes.emplace_back(std::move(noteRef));
 			notes.back().index = i;
+
+			DataBase::InsertNoteInDefaultGroup(&notes.back());
+			qdbg << notes.back().name + " readed from file and inserted in base, and file removed";
+			QFile::remove(filePathName);
 		}
 	}
+	notes.clear();
+
+	notes = DataBase::NotesFromDefaultGroup();
+
 	return notes;
 }
 

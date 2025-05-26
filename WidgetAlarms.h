@@ -51,6 +51,7 @@ private:
 	void showEvent(QShowEvent *event) override;
 	void closeEvent (QCloseEvent *event) override;
 	void SaveSettings();
+	bool hasValidGeo = false;
 
 	QFont fontForLabels;
 	QFontMetrics fontMetrixForLabels;
