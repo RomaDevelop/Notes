@@ -46,6 +46,7 @@ public:
 
 	int index = -1;
 	int id = -1;
+	inline static const int idMarkerCreateNewNote = -2;
 	QString file;
 
 	QString ToStrForLog();
@@ -95,8 +96,9 @@ public:
 	inline static QString notesSavesPath;
 	inline static QString notesBackupsPath;
 
-	void RemoveNoteFromBase();
-	std::function<void()> removeNoteFromBaseWorker;
+	void ExecRemoveNoteWorker();
+	std::function<void()> removeNoteWorker;
+	bool RemoveNoteSQL();
 
 	bool CheckAlarm(const QDateTime &dateToCompare);
 

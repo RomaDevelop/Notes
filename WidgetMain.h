@@ -60,7 +60,8 @@ private:
 	Note* NoteOfCurrentRow();
 
 	void SlotCreationNewNote();
-	Note& MakeNewNote(Note noteSrc, bool doSave);
+	enum newNoteReason { loaded, created };
+	Note& MakeNewNote(Note noteSrc, newNoteReason reason);
 	int MakeWidgetsForMainTable(NoteInMain &newNote); // returns index
 	void UpdateWidgetsFromNote(NoteInMain &note);
 

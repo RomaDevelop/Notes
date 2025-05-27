@@ -65,6 +65,13 @@ namespace Fields {
 class DataBase: public MyQSqlDatabase
 {
 public:
+	static void BackupBase()
+	{
+		QString dtStr = QDateTime::currentDateTime().toString(DateTimeFormatForFileName);
+		if(!QFile::copy(baseDataCurrent->baseFilePathName, Note::notesBackupsPath + "/" + dtStr + " " + baseDataCurrent->baseFileNoPath))
+			QMbError("creation backup error for base  " + baseDataCurrent->baseFilePathName);
+	}
+
 	static QString GroupId(const QString &groupName)
 	{
 		return DoSqlQueryGetFirstCell("select " + Fields::idGroup() + " from " + Fields::Groups() + "\n"
@@ -104,6 +111,15 @@ public:
 
 		return note->id;
 	}
+	static QStringList NoteById(const QString &id)
+	{
+		return DoSqlQueryGetFirstRec("select * from "+Fields::Notes()+" where "+Fields::idNote()+" = " + id);
+	}
+	static bool CheckNoteId(const QString &id)
+	{
+		return DoSqlQueryGetFirstCell("select count("+Fields::idNote()+") from "+Fields::Notes()
+									  +" where "+Fields::idNote()+" = " + id).toInt();
+	}
 	static std::vector<Note> NotesFromDefaultGroup()
 	{
 		std::vector<Note> notes;
@@ -117,13 +133,52 @@ public:
 	}
 	static void SaveNote(Note *note)
 	{
-		auto res = DoSqlQueryExt("update "+Fields::Notes()+" set "+Fields::nameNote() + " = :name, " + Fields::activeNotify() + " = :actNotif, "
-									+Fields::dtNotify()+" = :dtNotif, "+Fields::dtPostpone() + " = :dtPosp, " + Fields::content() + " = :content\n"
-								 "where "+Fields::idNote()+" = :idNote",
-				   {{":idNote", QSn(note->id)}, {":name", note->Name()}, {":actNotif", QSn(note->activeNotify)},
-					{":dtNotif", note->DTNotify().toString(Fields::dtFormat())},
-					{":dtPosp", note->DTPostpone().toString(Fields::dtFormat())},
-					{":content", note->Content()}});
+		if(note->group != note->defaultGroup.get()) { QMbError("not default groups unrealesed. Not Saved"); return; }
+
+		// если это новая
+		if(note->id == Note::idMarkerCreateNewNote)
+		{
+			InsertNoteInDefaultGroup(note);
+			if(!CheckNoteId(QSn(note->id))) QMbError("SaveNote: note "+note->Name()+" save error");
+		}
+		else // если не новая
+		{
+			if(!CheckNoteId(QSn(note->id)))
+			{
+				QMbError("SaveNote: note with id "+QSn(note->id)+" doesnt exists");
+				return;
+			}
+
+			auto res = DoSqlQueryExt("update "+Fields::Notes()+" set "+Fields::nameNote() + " = :name, " + Fields::activeNotify()
+									 + " = :actNotif, " +Fields::dtNotify()+" = :dtNotif, "+Fields::dtPostpone()
+									 + " = :dtPosp, " + Fields::content() + " = :content\n"
+																			"where "+Fields::idNote()+" = :idNote",
+									 {{":idNote", QSn(note->id)}, {":name", note->Name()}, {":actNotif", QSn(note->activeNotify)},
+									  {":dtNotif", note->DTNotify().toString(Fields::dtFormat())},
+									  {":dtPosp", note->DTPostpone().toString(Fields::dtFormat())},
+									  {":content", note->Content()}});
+		}
+	}
+	static bool RemoveNote(Note *note)
+	{
+		if(note->group != note->defaultGroup.get()) { QMbError("not default groups unrealesed. Not removed"); return false; }
+
+		if(!CheckNoteId(QSn(note->id)))
+		{
+			QMbError("RemoveNote: note with id "+QSn(note->id)+" doesnt exists");
+			return false;
+		}
+
+		auto res = DoSqlQueryExt("delete from "+Fields::Notes()+" where "+Fields::idNote()+" = :idNote",
+								 {{":idNote", QSn(note->id)}});
+
+		if(CheckNoteId(QSn(note->id)))
+		{
+			QMbError("RemoveNote: note with id "+QSn(note->id)+" after delete sql continue exist");
+			return false;
+		}
+
+		return true;
 	}
 };
 
@@ -354,13 +409,14 @@ std::vector<Note> Note::LoadNotes()
 	MyQSqlDatabase::Init(clientBase, {});
 
 	std::vector<Note> notes;
-	QString currentDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName_ms);
+	QString loadStartDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName);
 	auto files = QDir(Note::notesSavesPath).entryList(QDir::Files,QDir::Name);
 	for(int i=0; i<files.size(); i++)
 	{
+		QString thisOptionDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName_ms);
 		QString filePathName = Note::notesSavesPath + "/" + files[i];
-		if(!QFile::copy(filePathName, Note::notesBackupsPath + "/" + currentDt + " loaded " + files[i]))
-			QMbError("creation backup note error for file  " + files[i]);
+		if(!QFile::copy(filePathName, Note::notesBackupsPath + "/" + loadStartDt + "/" + thisOptionDt + " " + files[i]))
+			QMbError("creation backup note error for file  " + filePathName);
 
 		auto fileContent = MyQFileDir::ReadFile1(filePathName);
 
@@ -378,6 +434,7 @@ std::vector<Note> Note::LoadNotes()
 	}
 	notes.clear();
 
+	DataBase::BackupBase();
 	notes = DataBase::NotesFromDefaultGroup();
 
 	return notes;
@@ -403,10 +460,15 @@ QString Note::MakeNameFileToSaveNote()
 	return fileName;
 }
 
-void Note::RemoveNoteFromBase()
+void Note::ExecRemoveNoteWorker()
 {
-	if(removeNoteFromBaseWorker) removeNoteFromBaseWorker();
+	if(removeNoteWorker) removeNoteWorker();
 	else qdbg << "Note::Remove() execed, but removeWorker not valid";
+}
+
+bool Note::RemoveNoteSQL()
+{
+	return DataBase::RemoveNote(this);
 }
 
 bool Note::CheckAlarm(const QDateTime & dateToCompare)

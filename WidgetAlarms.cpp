@@ -167,7 +167,7 @@ void WidgetAlarms::AddNote(Note * note)
 	});
 	connect(btnRemove, &QPushButton::clicked, [note](){
 		if(QMessageBox::question(0,"Remove note","Removing note "+note->Name()+"\n\nAre you shure?") == QMessageBox::Yes)
-			note->RemoveNoteFromBase();
+			note->ExecRemoveNoteWorker();
 	});
 
 	QTimer::singleShot(10,this,[this]{ FitColWidth(); });

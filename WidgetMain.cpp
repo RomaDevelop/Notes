@@ -105,7 +105,10 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	QString currentDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName);
 
 	Note::notesSavesPath = filesPath + "/notes";
-	Note::notesBackupsPath = filesPath + "/notes_backups/"+currentDt;
+	Note::notesBackupsPath = filesPath + "/notes_backups";
+	if(!QDir().mkpath(Note::notesBackupsPath)) QMbError("mkpath error " + Note::notesBackupsPath);
+	if(0) CodeMarkers::to_do("поставить меньше 1000");
+	MyQFileDir::RemoveOldFiles(Note::notesBackupsPath, 1000);
 
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
 	QHBoxLayout *hlo1 = new QHBoxLayout;
@@ -178,7 +181,7 @@ void WidgetMain::CreateHeaderPanel(QHBoxLayout *hlo1)
 		if(!note) { QMbError("NoteOfRow(table->currentRow()) returned nullptr"); return; }
 
 		if(QMessageBox::question(0,"Remove note","Removing note "+note->Name()+"\n\nAre you shure?") == QMessageBox::Yes)
-				note->RemoveNoteFromBase();
+				note->ExecRemoveNoteWorker();
 	});
 
 // FastActions
@@ -414,13 +417,10 @@ void WidgetMain::LoadSettings()
 
 void WidgetMain::LoadNotes()
 {
-	if(!QDir().mkpath(Note::notesBackupsPath)) QMbError("mkpath error " + Note::notesBackupsPath);
-	MyQFileDir::RemoveOldFiles(Note::notesBackupsPath, 1000);
-
 	auto notes = Note::LoadNotes();
 	for(auto &note:notes)
 	{
-		MakeNewNote(note, false);
+		MakeNewNote(note, loaded);
 	}
 }
 
@@ -467,13 +467,13 @@ void WidgetMain::SlotCreationNewNote()
 
 	Note tmpNote(newName, false, dt, dt.addSecs(3600), Note::StartText());
 
-	auto &newNote = MakeNewNote(tmpNote, true);
+	auto &newNote = MakeNewNote(tmpNote, created);
 	UpdateNotesIndexes();
 
 	WidgetNoteEditor::MakeOrShowNoteEditor(newNote, true);
 }
 
-Note & WidgetMain::MakeNewNote(Note noteSrc, bool doSave)
+Note & WidgetMain::MakeNewNote(Note noteSrc, newNoteReason reason)
 {
 	notes.emplace_back(std::unique_ptr<NoteInMain>(new NoteInMain));
 	NoteInMain &newNoteInMainRef = *notes.back().get();
@@ -484,7 +484,11 @@ Note & WidgetMain::MakeNewNote(Note noteSrc, bool doSave)
 
 	MakeWidgetsForMainTable(newNoteInMainRef);
 
-	if(doSave) newNote->SaveNote("MakeNewNote-doSave");
+	if(reason == created)
+	{
+		newNote->id = Note::idMarkerCreateNewNote;
+		newNote->SaveNote("MakeNewNote-doSave");
+	}
 
 	auto saveNoteFoo = [newNote](void*){ newNote->SaveNote("saveNoteFoo"); };
 
@@ -493,7 +497,7 @@ Note & WidgetMain::MakeNewNote(Note noteSrc, bool doSave)
 	newNote->AddCBDTUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
 	newNote->AddCBGroupChanged(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
 
-	newNote->removeNoteFromBaseWorker = [this, newNote](){
+	newNote->removeNoteWorker = [this, newNote](){
 		RemoveNote(newNote);
 		CheckNotesForAlarm();
 	};
@@ -592,6 +596,8 @@ void WidgetMain::RemoveNote(Note* note)
 		auto &notePl = notes[index];
 		if(notePl->note.get() == note)
 		{
+			if(!note->RemoveNoteSQL()) return;
+
 			if(!note->file.isEmpty())
 			{
 				if(!QFile::remove(note->file)) QMbError("Error removing file " + note->file);
