@@ -1,7 +1,14 @@
 #include "NetClient.h"
 
+#include <QProgressDialog>
+#include <QCoreApplication>
+#include <QPointer>
+
+#include "InputBlocker.h"
+
 #include "MyQShortings.h"
 #include "MyQTextEdit.h"
+#include "MyCppDifferent.h"
 #include "CodeMarkers.h"
 
 void NetClient::Log(const QString &str)
@@ -45,17 +52,40 @@ void NetClient::CreateWindowSocket(bool show)
 	hlo1->addWidget(btnTestSend);
 	connect(btnTestSend,&QPushButton::clicked,[this](){ SendToServer("test send", true); });
 
-	QPushButton *btnTestRequest = new QPushButton("test request");
+	QPushButton *btnTestRequest = new QPushButton("test");
 	hlo1->addWidget(btnTestRequest);
 	connect(btnTestRequest,&QPushButton::clicked,[this](){
+		Log("btnTestRequest pressed");
 
-#error
-		qdbg << "теперь нужно реализовать запуск ожидания ответа в графике"
-				""
-				"при этом если ответа нет больше нужного, прерывать ожидание";
+		auto blocker = new InputBlocker(qApp);
+		qApp->installEventFilter(blocker);
 
+		QProgressDialog *progress = new QProgressDialog("Получение данных", "", 0, 0);
+		QPointer<QProgressDialog> progressQPtr(progress);
+		progress->setWindowModality(Qt::ApplicationModal);
+		progress->setCancelButton(nullptr);
 
-		RequestToServer(NetConstants::request_group_names(), "", {[this](){ Log("answ get"); }});
+		if(0) CodeMarkers::to_do("make timer singleShot pool");
+		QTimer::singleShot(500, [progress]() { if(!progress->wasCanceled()) progress->show(); });
+		QTimer::singleShot(3000, [progress, blocker]()
+		{
+			if(!progress->wasCanceled()) qApp->removeEventFilter(blocker);
+			progress->hide();
+			progress->deleteLater();
+		});
+
+		auto answFoo = [this, progressQPtr, blocker](){
+			Log("answ get");
+			if(progressQPtr)
+			{
+				qApp->removeEventFilter(blocker);
+				progressQPtr->cancel();
+				progressQPtr->close();
+			}
+			else Error("answer get, but to late");
+		};
+
+		RequestToServer(NetConstants::request_group_names(), "", std::move(answFoo));
 	});
 
 	hlo1->addStretch();

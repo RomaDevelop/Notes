@@ -23,6 +23,8 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	QWidget(parent),
 	note {note}
 {
+	qdbg << "Редактирующие шрифт кнопки если выделен текст разных форматов делаею его весь одинаковым";
+
 	setWindowTitle(note.Name() + " - NoteEditor");
 	setAttribute(Qt::WA_DeleteOnClose);
 

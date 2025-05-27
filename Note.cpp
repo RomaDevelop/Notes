@@ -1,6 +1,8 @@
 #include "Note.h"
 
 #include <QDebug>
+#include <QProgressDialog>
+#include <QPointer>
 
 #include "MyQShortings.h"
 #include "MyCppDifferent.h"
@@ -83,10 +85,13 @@ NotesGroup* Note::DialogCreateNewGroup()
 {
 	if(!netClient->canNetwork) return nullptr;
 
-	netClient->RequestToServer(NetConstants::request_group_names(), "", {[](){ netClient->Log("answ get"); }});
-
 	auto inpRes = MyQDialogs::InputLine("Group creation", "Input new group name");
 	if(!inpRes.accepted) return nullptr;
+
+
+
+	QMbInfo("force return nullptr");
+	return nullptr;
 
 	NotesGroup* newGroup = AddGroup(inpRes.text);
 

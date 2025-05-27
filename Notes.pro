@@ -22,6 +22,7 @@ SOURCES += \
 HEADERS += \
     ../include/AdditionalTray.h \
     ../include/ClickableQWidget.h \
+    ../include/InputBlocker.h \
     ../include/MyQTextEdit.h \
     ../include/PlatformDependent.h \
     FastActions.h \
