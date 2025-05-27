@@ -598,12 +598,6 @@ void WidgetMain::RemoveNote(Note* note)
 		{
 			if(!note->RemoveNoteSQL()) return;
 
-			if(!note->file.isEmpty())
-			{
-				if(!QFile::remove(note->file)) QMbError("Error removing file " + note->file);
-			}
-			else QMbError("note("+note->Name()+")->file is empty");
-
 			if(int row = RowOfNote(note); row != -1)
 			{
 				table->removeRow(row);

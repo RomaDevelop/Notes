@@ -47,7 +47,6 @@ public:
 	int index = -1;
 	int id = -1;
 	inline static const int idMarkerCreateNewNote = -2;
-	QString file;
 
 	QString ToStrForLog();
 

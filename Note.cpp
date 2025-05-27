@@ -9,11 +9,11 @@
 #include "MyQSqlDatabase.h"
 
 const BaseData clientBaseRegular {"Client base",
-								  "D:\\Documents\\C++ QT\\Notes\\Client base.mdb",
-								  "D:\\Documents\\C++ QT\\Notes\\storage"};
+									"D:\\Documents\\C++ QT\\Notes\\Client base.mdb",
+									"D:\\Documents\\C++ QT\\Notes\\storage"};
 const BaseData clientBaseDebug {"Client base debug",
-								"D:\\Documents\\C++ QT\\Notes\\Client base debug.mdb",
-								"D:\\Documents\\C++ QT\\Notes\\storage_debug"};
+									"D:\\Documents\\C++ QT\\Notes\\Client base debug.mdb",
+									"D:\\Documents\\C++ QT\\Notes\\storage_debug"};
 
 #ifdef QT_DEBUG
 const BaseData clientBase {clientBaseDebug};
@@ -187,7 +187,6 @@ QString Note::ToStrForLog()
 	QString str;
 	str.append(name).append(" (").append(QSn(index)).append(") ").append(group->name).append("\n");
 	str.append(dtNotify.toString(DateTimeFormat)).append(" ").append(dtPostpone.toString(DateTimeFormat));
-	str.append("\nfile: ").append(file);
 	str.append("\nContent: ").append(content.size() < 50 ? content : content.left(47) + "...");
 	return str;
 }
@@ -293,7 +292,6 @@ void Note::InitFromTmpNote(Note &note)
 	dtNotify = std::move(note.dtNotify);
 	dtPostpone = std::move(note.dtPostpone);
 	group = note.group;
-	file = std::move(note.file);
 	index = note.index;
 	id = note.id;
 	content = std::move(note.content);
@@ -366,7 +364,6 @@ std::unique_ptr<Note> Note::LoadNote(const QString &text, const QString &fileFro
 							   QDateTime().fromString(fileParts[3], SaveKeyWods::dtFormat()),
 							   std::move(fileParts[4])
 							   ));
-		noteUptr->file = fileFrom;
 		return noteUptr;
 	}
 	else // содержит версию
@@ -377,7 +374,6 @@ std::unique_ptr<Note> Note::LoadNote(const QString &text, const QString &fileFro
 		{
 			auto &loadFunctoin = it->second;
 			auto noteUptr = std::make_unique<Note>(loadFunctoin(text));
-			noteUptr->file = fileFrom;
 			return noteUptr;
 		}
 		else { QMbError("Not found load function for version "+QSn(v)+" in file " + Note::notesSavesPath + "/" + fileFrom); return {}; }
@@ -415,6 +411,7 @@ std::vector<Note> Note::LoadNotes()
 	{
 		QString thisOptionDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName_ms);
 		QString filePathName = Note::notesSavesPath + "/" + files[i];
+		QDir().mkpath(Note::notesBackupsPath + "/" + loadStartDt);
 		if(!QFile::copy(filePathName, Note::notesBackupsPath + "/" + loadStartDt + "/" + thisOptionDt + " " + files[i]))
 			QMbError("creation backup note error for file  " + filePathName);
 
