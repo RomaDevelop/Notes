@@ -49,9 +49,7 @@ private:
 
 	QString settingsFile;
 	void showEvent(QShowEvent *event) override;
-	void closeEvent (QCloseEvent *event) override;
-	void SaveSettings();
-	bool hasValidGeo = false;
+	QByteArray geo;
 
 	QFont fontForLabels;
 	QFontMetrics fontMetrixForLabels;
