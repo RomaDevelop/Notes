@@ -47,7 +47,16 @@ void NetClient::CreateWindowSocket(bool show)
 
 	QPushButton *btnTestRequest = new QPushButton("test request");
 	hlo1->addWidget(btnTestRequest);
-	connect(btnTestRequest,&QPushButton::clicked,[this](){ RequestToServer(NetConstants::request_group_names(), "", {}); });
+	connect(btnTestRequest,&QPushButton::clicked,[this](){
+
+#error
+		qdbg << "теперь нужно реализовать запуск ожидания ответа в графике"
+				""
+				"при этом если ответа нет больше нужного, прерывать ожидание";
+
+
+		RequestToServer(NetConstants::request_group_names(), "", {[this](){ Log("answ get"); }});
+	});
 
 	hlo1->addStretch();
 
@@ -88,6 +97,10 @@ void NetClient::SlotReadyRead()
 		{
 			QStringRef lastUpdate(&command, NetConstants::last_update().size(), command.size() - NetConstants::last_update().size());
 			Log("last update on server is " + lastUpdate);
+		}
+		else if(command.startsWith(NetConstants::request_answ()))
+		{
+			RequestsAnswersWorker(std::move(command));
 		}
 		else if(command == NetConstants::unexpacted())
 		{
@@ -136,6 +149,28 @@ void NetClient::RequestToServer(const QString &requestType, QString content, std
 	socket->write(NetConstants::end_marker().toUtf8());
 }
 
+void NetClient::RequestsAnswersWorker(QString text)
+{
+	CodeMarkers::can_be_optimized("give copy text to DecodeRequestCommand, but can move, but it used in error");
+	auto requestData = NetClient::DecodeRequestAnswer(text);
+	if(!requestData.errors.isEmpty())
+	{
+		Error("error decoding request answer: "+requestData.errors + "; full text:\n"+text);
+		SendToServer("error decoding request answer: "+requestData.errors, true);
+		return;
+	}
+
+	auto it = requestAswerWorkers.find(requestData.id.toInt());
+	if(it == requestAswerWorkers.end())
+	{
+		Error("error working request answer, not found worker for id; full text:\n"+text);
+		SendToServer("error working request answer, not found worker for id; full text:\n"+text, true);
+		return;
+	}
+
+	it->second();
+}
+
 NetClient::RequestData NetClient::DecodeRequestCommand(QString command)
 {
 	CodeMarkers::can_be_optimized("can be faster, no remove+LeftRef, but take MidRef");
@@ -149,9 +184,8 @@ NetClient::RequestData NetClient::DecodeRequestCommand(QString command)
 	int spaceIndex = command.indexOf(' ');
 	if(spaceIndex == -1) { data.errors = "not found space to close id"; return data; }
 
-	bool ok;
-	data.id = command.leftRef(spaceIndex).toInt(&ok);
-	if(!ok) { data.errors = "bad id"; return data; }
+	if(IsInt(command.leftRef(spaceIndex))) data.id = command.leftRef(spaceIndex).toString();
+	else { data.errors = "bad id"; return data; }
 
 	command.remove(0,spaceIndex +1);
 
@@ -159,6 +193,27 @@ NetClient::RequestData NetClient::DecodeRequestCommand(QString command)
 	if(spaceIndex == -1) { data.errors = "not found space to close requestType"; return data; }
 	data.type = command.left(spaceIndex);
 	if(NetConstants::allReuestTypes().count(data.type) == 0) { data.errors = "bad requestType"; data.type = ""; return data; }
+
+	command.remove(0,spaceIndex +1);
+
+	data.content = std::move(command);
+
+	return data;
+}
+
+NetClient::RequestData NetClient::DecodeRequestAnswer(QString command)
+{
+	RequestData data;
+
+	if(!command.startsWith(NetConstants::request_answ())) { data.errors = "bad start"; return data; }
+
+	command.remove(0,NetConstants::request_answ().size());
+
+	int spaceIndex = command.indexOf(' ');
+	if(spaceIndex == -1) { data.errors = "not found space to close id"; return data; }
+
+	if(IsInt(command.leftRef(spaceIndex))) data.id = command.leftRef(spaceIndex).toString();
+	else { data.errors = "bad id"; return data; }
 
 	command.remove(0,spaceIndex +1);
 

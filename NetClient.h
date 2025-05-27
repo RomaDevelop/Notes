@@ -21,7 +21,7 @@ class NetClient : public QObject
 public:
 	explicit NetClient(QObject *parent = nullptr) : QObject(parent)
 	{
-		CreateWindowSocket(false);
+		CreateWindowSocket(true);
 		CreateSocket();
 	}
 
@@ -43,8 +43,10 @@ public slots:
 public:
 	void SendToServer(QString str, bool sendEndMarker);
 	void RequestToServer(const QString &requestType, QString content, std::function<void()> answWorker);
-	declare_struct_4_fields_move(RequestData, int, id, QString, type, QString, content, QString, errors);
+	void RequestsAnswersWorker(QString text);
+	declare_struct_4_fields_move(RequestData, QString, id, QString, type, QString, content, QString, errors);
 	static RequestData DecodeRequestCommand(QString command);
+	static RequestData DecodeRequestAnswer(QString command);
 	int TakeIdRequest() { return idRequest++; };
 	int idRequest = 1;
 	std::map<int, std::function<void()>> requestAswerWorkers; // int = id
