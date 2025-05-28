@@ -10,50 +10,26 @@
 #include "MyQDialogs.h"
 #include "MyQSqlDatabase.h"
 
+#include "InputBlocker.h"
+
 #include "DataBase.h"
 
 QString Note::ToStrForLog()
 {
 	QString str;
-	str.append(name).append(" (").append(QSn(index)).append(") ").append(group->name).append("\n");
+	str.append(name).append(" (").append(QSn(index)).append(") ").append(group).append("\n");
 	str.append(dtNotify.toString(DateTimeFormat)).append(" ").append(dtPostpone.toString(DateTimeFormat));
 	str.append("\nContent: ").append(content.size() < 50 ? content : content.left(47) + "...");
 	return str;
 }
 
-NotesGroup* Note::AddGroup(QString groupName)
-{
-	if(groupsMap.count(groupName) > 0)
-	{
-		QMbError("Group " + groupName + " already exists");
-		return nullptr;
-	}
-
-	groups.push_back(std::make_shared<NotesGroup>());
-	NotesGroup* newGrPtr = groups.back().get();
-	newGrPtr->name = std::move(groupName);
-	groupsMap[newGrPtr->name] = newGrPtr;
-
-	return newGrPtr;
-}
-
-QStringList Note::GroupsNames()
-{
-	QStringList res;
-	for(auto &node:groupsMap)
-	{
-		res += node.first;
-	}
-	return res;
-}
-
 void Note::DialogMoveToGroup()
 {
-	QStringList grNames = GroupsNames();
+	QStringList grNames = DataBase::GroupsNames();
 	static QString createNew = "Create new";
 	grNames.prepend(createNew);
-	QString currentGroupRow = group->name + " (current)";
-	for(auto &grName:grNames) if(grName == group->name) grName = currentGroupRow;
+	QString currentGroupRow = group + " (current)";
+	for(auto &grName:grNames) if(grName == group) grName = currentGroupRow;
 	auto res = MyQDialogs::ListDialog("Moving note to group", grNames);
 	if(!res.accepted) return;
 
@@ -61,19 +37,11 @@ void Note::DialogMoveToGroup()
 
 	if(res.choosedText == createNew)
 	{
-		auto newGroup = DialogCreateNewGroup();
-		if(newGroup) ChangeGroup(newGroup);
+		DialogCreateNewGroup();
 		return;
 	}
 
-	if(auto it = groupsMap.find(res.choosedText); it == groupsMap.end())
-	{
-		QMbError("group "+res.choosedText+" not found");
-	}
-	else
-	{
-		ChangeGroup(it->second);
-	}
+	ChangeGroup(res.choosedText);
 }
 
 void Note::DialogEditCurrentGroup()
@@ -81,43 +49,93 @@ void Note::DialogEditCurrentGroup()
 
 }
 
-NotesGroup* Note::DialogCreateNewGroup()
+void Note::DialogCreateNewGroup()
 {
-	if(!netClient->canNetwork) return nullptr;
+	if(!netClient->canNetwork) return;
 
 	auto inpRes = MyQDialogs::InputLine("Group creation", "Input new group name");
-	if(!inpRes.accepted) return nullptr;
+	if(!inpRes.accepted) return;
+	if(inpRes.text.isEmpty()) { QMbError("Empty group name"); return; }
 
+	QString newGroupName = std::move(inpRes.text);
 
+	auto blocker = new InputBlocker(qApp);
+	qApp->installEventFilter(blocker);
 
-	QMbInfo("force return nullptr");
-	return nullptr;
+	QProgressDialog *progress = new QProgressDialog("Получение данных", "", 0, 0);
+	QPointer<QProgressDialog> progressQPtr(progress);
+	progress->setWindowModality(Qt::ApplicationModal);
+	progress->setCancelButton(nullptr);
 
-	NotesGroup* newGroup = AddGroup(inpRes.text);
-
-	return newGroup;
-}
-
-void Note::ChangeGroup(QString groupName, bool createNewIfNeed)
-{
-	if(auto it = groupsMap.find(groupName); it != groupsMap.end())
-		group = it->second;
-	else
+	if(0) CodeMarkers::to_do("make timer singleShot pool");
+	QTimer::singleShot(500, [progress]() { if(!progress->wasCanceled()) progress->show(); });
+	QTimer::singleShot(3000, [progress, blocker]()
 	{
-		if(createNewIfNeed)
+		if(!progress->wasCanceled()) qApp->removeEventFilter(blocker);
+		progress->hide();
+		progress->deleteLater();
+	});
+
+	NetClient::AnswerWorkerFunction answFoo = [progressQPtr, blocker, newGroupName](NetClient::RequestData &&answData){
+		if(progressQPtr)
 		{
-			auto newGroup = AddGroup(std::move(groupName));
-			if(!newGroup) { QMbError("Error group creation"); return; }
-			else group = newGroup;
+			qApp->removeEventFilter(blocker);
+			progressQPtr->cancel();
+			progressQPtr->close();
 		}
-		else { QMbError("Group was not set"); return; }
-	}
-	for(auto &cb:cbsGroupChanged) cb.cb(cb.handler);
+		else
+		{
+			netClient->Error("answer get, but to late");
+			return;
+		}
+
+		netClient->Log("answ get: " + answData.content);
+		auto id = NetConstants::GetIdGroupFromAnsw_try_create_group(answData.content);
+		if(id < 0) QMbError("error decoding in GetIdGroupFromAnsw_try_create_group, answ is " + QSn(id));
+		else
+		{
+			auto resId = DataBase::TryCreateNewGroup(newGroupName, QSn(id));
+			if(resId != id) QMbError("TryCreateNewGroup in local base error, resId differs: " + QSn(resId));
+		}
+	};
+
+	netClient->RequestToServer(NetConstants::request_try_create_group(), newGroupName, std::move(answFoo));
 }
 
-void Note::ChangeGroup(NotesGroup *newGroup)
+void Note::ChangeGroup(QString groupName)
 {
-	group = newGroup;
+	auto grId = DataBase::GroupId(groupName);
+	if(grId.isEmpty()) { QMbError("ChangeGroup:: grId.isEmpty() for group " + groupName); return; }
+
+	if(!DataBase::MoveNoteToGroup(QSn(id), grId)) { QMbError("DataBase::MoveNoteToGroup returned false to " + groupName); return; }
+
+#error
+	qdbg << "синхронизация на сервере должна быть отложенная"
+			""
+			"при измении группы заметки она должна синхронизироваться на сервере"
+			"	если группа ранее была дефолт - то на сервере будет для неё новая запись"
+			"		сервер передаст id заметки у себя и он будет сохранен локально"
+			"		нужно хранить в структуре заметки айди на сервере"
+			"	если группа не была дефолт, то запись на сервере должна быть обновлена"
+			"		отправить всем клиентам информацию, что обновлена"
+			""
+			"сохранение заметок"
+			"	заметка сохраняется в локальной БД, отправляется асинхронный запрос на сервер о сохранении"
+			"	сервер отправляет всем клиентам информацию, что заметка была изменена"
+			""
+			"удаление заметок"
+			"	заметка удаляется из локальной БД, отправляется асинхронный запрос на сервер на удаление"
+			"		клиент и сервер сохраняют удалённые заметки каждый в своей корзине"
+			"	сервер отправляет всем клиентам информацию, что заметка была удалена"
+			""
+			"при старте работы"
+			"	считываются заметки из локальной бд"
+			"	все, что не в дефолтной группе сравниваются с сервером"
+			"	нужно хранить дату изменения"
+			"	ежели заметка на сервере отсутсвует скорее всего она была удалена"
+			"		выводить сообщение клиенту, какие заметки были удалены";
+
+	group = groupName;
 	for(auto &cb:cbsGroupChanged) cb.cb(cb.handler);
 }
 
@@ -139,7 +157,7 @@ void Note::InitFromRecord(QStringList &row)
 	activeNotify = row[Fields::activeNotifyInd].toInt();
 	dtNotify = QDateTime::fromString(row[Fields::dtNotifyInd], Fields::dtFormat());
 	dtPostpone = QDateTime::fromString(row[Fields::dtPostponeInd], Fields::dtFormat());
-	//group = note.group;
+	group = DataBase::GroupName(row[Fields::idGroupInd]);
 	id = row[Fields::idNoteInd].toInt();
 	content = std::move(row[Fields::contentInd]);
 }
@@ -180,7 +198,7 @@ void Note::SaveNote(const QString &reason)
 	noteText.append(QSn(this->activeNotify)).append(SaveKeyWods::endValue());
 	noteText.append(this->dtNotify.toString(SaveKeyWods::dtFormat())).append(SaveKeyWods::endValue());
 	noteText.append(this->dtPostpone.toString(SaveKeyWods::dtFormat())).append(SaveKeyWods::endValue());
-	noteText.append(SaveKeyWods::group()).append(group->name).append(SaveKeyWods::endValue());
+	noteText.append(SaveKeyWods::group()).append(group).append(SaveKeyWods::endValue());
 	noteText.append(this->content).append(SaveKeyWods::endValue());
 
 	NetNoteSaved(noteText);
@@ -230,7 +248,7 @@ Note Note::LoadNote_v1(const QString &text)
 	newNote.dtPostpone = QDateTime().fromString(fileParts[4], SaveKeyWods::dtFormat());
 
 	fileParts[5].remove(0, SaveKeyWods::group().size());
-	newNote.ChangeGroup(std::move(fileParts[5]), true);
+	newNote.ChangeGroup(std::move(fileParts[5]));
 
 	newNote.content = std::move(fileParts[6]);
 	return newNote;
@@ -238,8 +256,6 @@ Note Note::LoadNote_v1(const QString &text)
 
 std::vector<Note> Note::LoadNotes()
 {
-	MyQSqlDatabase::Init(clientBase, {});
-
 	std::vector<Note> notes;
 	QString loadStartDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName);
 	auto files = QDir(Note::notesSavesPath).entryList(QDir::Files,QDir::Name);
@@ -268,7 +284,7 @@ std::vector<Note> Note::LoadNotes()
 	notes.clear();
 
 	DataBase::BackupBase();
-	notes = DataBase::NotesFromDefaultGroup();
+	notes = DataBase::NotesFromBD();
 
 	return notes;
 }
@@ -407,7 +423,12 @@ void Note::RemoveCbs(void * handler, int removedCountShouldBe)
 			countRemoved++;
 		}
 	if(removedCountShouldBe != countRemoved)
-		QMbError("removedCountShouldBe != countRemoved for note " + name);
+	{
+		qdbg << "RemoveCbs: removedCountShouldBe != countRemoved ("+QSn(removedCountShouldBe)
+					+" != "+QSn(countRemoved)+") for note " + name;
+		QMbError("RemoveCbs: removedCountShouldBe != countRemoved ("+QSn(removedCountShouldBe)
+					+" != "+QSn(countRemoved)+") for note " + name);
+	}
 }
 
 

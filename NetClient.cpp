@@ -3,6 +3,7 @@
 #include <QProgressDialog>
 #include <QCoreApplication>
 #include <QPointer>
+#include <QLabel>
 
 #include "InputBlocker.h"
 
@@ -10,6 +11,13 @@
 #include "MyQTextEdit.h"
 #include "MyCppDifferent.h"
 #include "CodeMarkers.h"
+
+void NetClient::SlotTest()
+{
+	Log("btnTestRequest pressed");
+
+
+}
 
 void NetClient::Log(const QString &str)
 {
@@ -41,6 +49,7 @@ void NetClient::CreateSocket()
 void NetClient::CreateWindowSocket(bool show)
 {
 	widget = std::make_unique<QWidget>();
+	widget->setWindowTitle("NetClient");
 
 	QVBoxLayout *vlo_main = new QVBoxLayout(widget.get());
 	QHBoxLayout *hlo1 = new QHBoxLayout;
@@ -54,39 +63,11 @@ void NetClient::CreateWindowSocket(bool show)
 
 	QPushButton *btnTestRequest = new QPushButton("test");
 	hlo1->addWidget(btnTestRequest);
-	connect(btnTestRequest,&QPushButton::clicked,[this](){
-		Log("btnTestRequest pressed");
+	connect(btnTestRequest,&QPushButton::clicked, this, &NetClient::SlotTest);
 
-		auto blocker = new InputBlocker(qApp);
-		qApp->installEventFilter(blocker);
-
-		QProgressDialog *progress = new QProgressDialog("Получение данных", "", 0, 0);
-		QPointer<QProgressDialog> progressQPtr(progress);
-		progress->setWindowModality(Qt::ApplicationModal);
-		progress->setCancelButton(nullptr);
-
-		if(0) CodeMarkers::to_do("make timer singleShot pool");
-		QTimer::singleShot(500, [progress]() { if(!progress->wasCanceled()) progress->show(); });
-		QTimer::singleShot(3000, [progress, blocker]()
-		{
-			if(!progress->wasCanceled()) qApp->removeEventFilter(blocker);
-			progress->hide();
-			progress->deleteLater();
-		});
-
-		auto answFoo = [this, progressQPtr, blocker](){
-			Log("answ get");
-			if(progressQPtr)
-			{
-				qApp->removeEventFilter(blocker);
-				progressQPtr->cancel();
-				progressQPtr->close();
-			}
-			else Error("answer get, but to late");
-		};
-
-		RequestToServer(NetConstants::request_group_names(), "", std::move(answFoo));
-	});
+	hlo1->addWidget(new QLabel("arg:"));
+	leArg = new QLineEdit;
+	hlo1->addWidget(leArg);
 
 	hlo1->addStretch();
 
@@ -162,7 +143,7 @@ void NetClient::SendToServer(QString str, bool sendEndMarker)
 	if(sendEndMarker) socket->write(NetConstants::end_marker().toUtf8());
 }
 
-void NetClient::RequestToServer(const QString &requestType, QString content, std::function<void()> answWorker)
+void NetClient::RequestToServer(const QString &requestType, QString content, AnswerWorkerFunction answWorker)
 {
 	CodeMarkers::can_be_optimized("takes copy, than make other copy");
 
@@ -182,15 +163,15 @@ void NetClient::RequestToServer(const QString &requestType, QString content, std
 void NetClient::RequestsAnswersWorker(QString text)
 {
 	CodeMarkers::can_be_optimized("give copy text to DecodeRequestCommand, but can move, but it used in error");
-	auto requestData = NetClient::DecodeRequestAnswer(text);
-	if(!requestData.errors.isEmpty())
+	auto requestAnswerData = NetClient::DecodeRequestAnswer(text);
+	if(!requestAnswerData.errors.isEmpty())
 	{
-		Error("error decoding request answer: "+requestData.errors + "; full text:\n"+text);
-		SendToServer("error decoding request answer: "+requestData.errors, true);
+		Error("error decoding request answer: "+requestAnswerData.errors + "; full text:\n"+text);
+		SendToServer("error decoding request answer: "+requestAnswerData.errors, true);
 		return;
 	}
 
-	auto it = requestAswerWorkers.find(requestData.id.toInt());
+	auto it = requestAswerWorkers.find(requestAnswerData.id.toInt());
 	if(it == requestAswerWorkers.end())
 	{
 		Error("error working request answer, not found worker for id; full text:\n"+text);
@@ -198,7 +179,7 @@ void NetClient::RequestsAnswersWorker(QString text)
 		return;
 	}
 
-	it->second();
+	it->second(std::move(requestAnswerData));
 }
 
 NetClient::RequestData NetClient::DecodeRequestCommand(QString command)

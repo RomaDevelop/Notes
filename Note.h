@@ -17,13 +17,6 @@
 using QStringRefWr = std::reference_wrapper<QString>;
 using QStringRefWr_const = std::reference_wrapper<const QString>;
 
-struct NotesGroup
-{
-	QString name;
-	QString describtion;
-	QDateTime lastUpdate;
-};
-
 struct Note
 {
 	bool activeNotify = false;
@@ -50,19 +43,13 @@ public:
 
 	QString ToStrForLog();
 
-	inline static const QString& defaultGroupMarker() { static QString str = "defaultGroup"; return str; }
-	inline static std::shared_ptr<NotesGroup> defaultGroup { new NotesGroup {defaultGroupMarker(), "", {}} };
-	inline static std::vector<std::shared_ptr<NotesGroup>> groups { defaultGroup };
-	inline static std::map<QString, NotesGroup*> groupsMap { std::pair(defaultGroup->name, defaultGroup.get()) };
-	static NotesGroup* AddGroup(QString groupName);
-	inline static QStringList GroupsNames();
+	inline static const QString& defaultGroupName() { static QString str = "defaultGroup"; return str; }
 	void DialogMoveToGroup();
 	void DialogEditCurrentGroup();
-	NotesGroup* DialogCreateNewGroup();
+	void DialogCreateNewGroup();
 
-	NotesGroup *group = defaultGroup.get();
-	void ChangeGroup(QString groupName, bool createNewIfNeed);
-	void ChangeGroup(NotesGroup *newGroup);
+	QString group = defaultGroupName();
+	void ChangeGroup(QString groupName);
 
 	void InitFromTmpNote(Note &note);
 	void InitFromRecord(QStringList &record);

@@ -195,9 +195,12 @@ void WidgetAlarms::AddNote(Note * note)
 	connect(btnPostpone, &QPushButton::clicked, [this, btnPostpone, note](){
 		ShowMenuPostpone(btnPostpone->mapToGlobal(QPoint(0, btnPostpone->height())), setPostpone, note);
 	});
-	connect(btnRemove, &QPushButton::clicked, [note](){
+	connect(btnRemove, &QPushButton::clicked, [this, note](){
 		if(QMessageBox::question(0,"Remove note","Removing note "+note->Name()+"\n\nAre you shure?") == QMessageBox::Yes)
+		{
+			RemoveNoteFromWidgetAlarms(note, true);
 			note->ExecRemoveNoteWorker();
+		}
 	});
 
 	QTimer::singleShot(10,this,[this]{ FitColWidth(); });
@@ -238,7 +241,7 @@ void WidgetAlarms::RemoveNoteFromWidgetAlarms(Note * aNote, bool showError)
 			RemoveNoteFromWidgetAlarms(i);
 			return;
 		}
-	if(showError) QMbError("RemoveNote: note " + aNote->Name() + " not found");
+	if(showError) QMbError("RemoveNoteFromWidgetAlarms: note " + aNote->Name() + " not found");
 }
 
 QDateTime AddSecsFromToday(const QDateTime &dt, qint64 secs)
@@ -369,7 +372,7 @@ void WidgetAlarms::SlotPostpone(std::vector<Note*> notesToPostpone, int delaySec
 		}
 
 		if(!notesToPostpone[i]->CheckAlarm(QDateTime::currentDateTime()))
-			RemoveNoteFromWidgetAlarms(notesToPostpone[i], false);
+			RemoveNoteFromWidgetAlarms(notesToPostpone[i], true);
 
 		if(notes.empty()) hide();
 	}

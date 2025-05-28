@@ -34,7 +34,7 @@
 #include "AdditionalTray.h"
 
 #include "NetConstants.h"
-
+#include "DataBase.h"
 #include "WidgetNoteEditor.h"
 
 void ToDo(){
@@ -101,6 +101,9 @@ void WidgetMain::UpdateNotesIndexes()
 WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 {
 	ToDo();
+
+	MyQSqlDatabase::Init(clientBase, {}, [](const QString &str){ qdbg << str; }, [](const QString &str){ QMbError(str); });
+	DataBase::InitChildDataBase(DataBase::client);
 
 	QString currentDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName);
 
@@ -256,7 +259,7 @@ void WidgetMain::CreateTableContextMenu()
 		auto actionEditGroup = menu->addAction("Редактировать группу...");
 
 		actionEditGroup->setEnabled(true);
-		if(note->group == Note::defaultGroup.get()) actionEditGroup->setEnabled(false);
+		if(note->group == Note::defaultGroupName()) actionEditGroup->setEnabled(false);
 
 		connect(actionMoveToGroup, &QAction::triggered, [note](){ note->DialogMoveToGroup(); });
 		connect(actionEditGroup, &QAction::triggered, [note](){ note->DialogEditCurrentGroup(); });
@@ -495,7 +498,6 @@ Note & WidgetMain::MakeNewNote(Note noteSrc, newNoteReason reason)
 	newNote->AddCBNameUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
 	newNote->AddCBContentUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
 	newNote->AddCBDTUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
-	newNote->AddCBGroupChanged(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
 
 	newNote->removeNoteWorker = [this, newNote](){
 		RemoveNote(newNote);
@@ -566,7 +568,7 @@ int WidgetMain::MakeWidgetsForMainTable(NoteInMain &newNote)
 void WidgetMain::UpdateWidgetsFromNote(NoteInMain &note)
 {
 	note.rowView.itemName->setText("   " + note.note->Name());
-	note.rowView.itemGroup->setText(note.note->group->name);
+	note.rowView.itemGroup->setText(note.note->group);
 	note.rowView.chBox->setChecked(note.note->activeNotify);
 	note.rowView.dteNotify->setDateTime(note.note->DTNotify());
 	note.rowView.dtePostpone->setDateTime(note.note->DTPostpone());

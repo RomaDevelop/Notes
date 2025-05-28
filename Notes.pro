@@ -9,6 +9,7 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    ../NotesServer/DataBase.cpp \
     ../include/AdditionalTray.cpp \
     ../include/PlatformDependent.cpp \
     FastActions.cpp \
@@ -20,6 +21,7 @@ SOURCES += \
     main.cpp
 
 HEADERS += \
+    ../NotesServer/DataBase.h \
     ../include/AdditionalTray.h \
     ../include/ClickableQWidget.h \
     ../include/InputBlocker.h \
