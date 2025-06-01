@@ -58,6 +58,15 @@ private:
 	int RowOfNote(Note* note);
 	Note* NoteOfRow(int row);
 	Note* NoteOfCurrentRow();
+	int NoteIndexInWidgetMainNotes(Note* note, bool showError)
+	{
+		for(uint index=0; index<notes.size(); index++)
+		{
+			if(notes[index]->note.get() == note) { return index; }
+		}
+		if(showError) QMbError("note "+note->Name()+" not fount by NoteIndexInWidgetMainNotes");
+		return -1;
+	}
 
 	void SlotCreationNewNote();
 	enum newNoteReason { loaded, created };
@@ -68,6 +77,8 @@ private:
 	void FilterNotes(const QString &nameFilter);
 
 	void RemoveNote(Note* note);
+	bool RemoveNoteSQLOnClient(Note* note);
+	void RemoveNoteInMainWidget(Note* note);
 
 	void DefaultColsWidths();
 };

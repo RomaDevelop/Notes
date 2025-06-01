@@ -35,7 +35,7 @@ public:
 	std::unique_ptr<QWidget> widget;
 	QLineEdit *leArg;
 	QTextEdit *textEditSocket;
-	QTcpSocket *socket;
+	QTcpSocket *socket = nullptr;
 	bool canNetwork = false;
 	int port = 25001;
 	void CreateSocket();
@@ -48,8 +48,9 @@ public:
 	void SendToServer(QString str, bool sendEndMarker);
 
 	declare_struct_4_fields_move(RequestData, QString, id, QString, type, QString, content, QString, errors);
-	using AnswerWorkerFunction = std::function<void(RequestData &&answData)>;
+	using AnswerWorkerFunction = std::function<void(QString &&answContent)>;
 	void RequestToServer(const QString &requestType, QString content, AnswerWorkerFunction answWorker);
+	void RequestToServerWithWait(const QString &requestType, QString content, AnswerWorkerFunction answWorker);
 	void RequestsAnswersWorker(QString text);
 	static RequestData DecodeRequestCommand(QString command);
 	static RequestData DecodeRequestAnswer(QString command);

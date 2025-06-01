@@ -25,6 +25,7 @@ private:
 	QString content;
 	QDateTime dtNotify = QDateTime::currentDateTime();
 	QDateTime dtPostpone = QDateTime::currentDateTime();
+	QDateTime dtLastUpdated;
 
 public:
 	Note() = default;
@@ -38,7 +39,8 @@ public:
 	}
 
 	int index = -1;
-	int id = -1;
+	qint64 id = -1;
+	qint64 idOnServer = -1;
 	inline static const int idMarkerCreateNewNote = -2;
 
 	QString ToStrForLog();
@@ -49,7 +51,7 @@ public:
 	void DialogCreateNewGroup();
 
 	QString group = defaultGroupName();
-	void ChangeGroup(QString groupName);
+	void MoveToGroup(QString newGroupName);
 
 	void InitFromTmpNote(Note &note);
 	void InitFromRecord(QStringList &record);
@@ -65,12 +67,16 @@ public:
 	bool CmpDTs(const QDateTime &dtNotify, const QDateTime &dtPostpone);
 	void SetDT(QDateTime dtNotify, QDateTime dtPostpone);
 
+	QString DtLastUpdatedStr() { return dtLastUpdated.toString(Fields::dtFormatLastUpated()); }
+
 	static const QString& StartText() { static QString str = "Введите текст"; return str; }
 
-	void SaveNote(const QString &reason);
-	static std::unique_ptr<Note> LoadNote(const QString &text, const QString &fileFrom);
+	void SaveNoteOnClient(const QString &reason);
+	static std::unique_ptr<Note> LoadNote(const QString &text);
 	static Note LoadNote_v1(const QString &text);
-	static std::vector<Note> LoadNotes();
+	static std::vector<Note> LoadNotesFromFiles();
+
+	QString ToStrForNetSend();
 
 	inline static std::map<int, std::function<Note(const QString &text)>> loadsFunctionsMap;
 	static void InitLoadsFooMap()
@@ -84,14 +90,12 @@ public:
 
 	void ExecRemoveNoteWorker();
 	std::function<void()> removeNoteWorker;
-	bool RemoveNoteSQL();
 
 	bool CheckAlarm(const QDateTime &dateToCompare);
 
 	void ShowDialogFastActions(QWidget *widgetToShowUnder);
 
 	inline static NetClient *netClient = nullptr;
-	void NetNoteSaved(QString &text);
 
 // cbs
 	void AddCBNameUpdated(std::function<void(void *handler)> aUpdatedCb, void *handler, int &localCbCounter);
@@ -105,6 +109,7 @@ private:
 	std::vector<cbAndHandler> cbsContentUpdated;
 	std::vector<cbAndHandler> cbsDTUpdated;
 	std::vector<cbAndHandler> cbsGroupChanged;
+	static void EmitCbs(const std::vector<cbAndHandler> &cbs) { for(auto &cb:cbs) cb.cb(cb.handler); }
 // cbs end
 };
 

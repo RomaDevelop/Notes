@@ -2,6 +2,7 @@
 
 #include <QProgressDialog>
 #include <QCoreApplication>
+#include <QMessageBox>
 #include <QPointer>
 #include <QLabel>
 
@@ -12,11 +13,11 @@
 #include "MyCppDifferent.h"
 #include "CodeMarkers.h"
 
+#include "DataBase.h"
+
 void NetClient::SlotTest()
 {
 	Log("btnTestRequest pressed");
-
-
 }
 
 void NetClient::Log(const QString &str)
@@ -38,9 +39,11 @@ void NetClient::Warning(const QString &str)
 
 void NetClient::CreateSocket()
 {
+	socket->deleteLater();
 	socket = new QTcpSocket(this);
 	socket->connectToHost("127.0.0.1", port);
 	connect(socket, &QTcpSocket::connected, this, &NetClient::SlotConnected);
+	connect(socket, &QTcpSocket::disconnected, [this](){ canNetwork = false; });
 	connect(socket, &QTcpSocket::readyRead, this, &NetClient::SlotReadyRead);
 	connect(socket, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(SlotError(QAbstractSocket::SocketError)));
 	// в старом стиле из-за кривизны qt
@@ -56,6 +59,20 @@ void NetClient::CreateWindowSocket(bool show)
 	QHBoxLayout *hlo2 = new QHBoxLayout;
 	vlo_main->addLayout(hlo1);
 	vlo_main->addLayout(hlo2);
+
+	QPushButton *btnTestClear = new QPushButton("clear");
+	hlo1->addWidget(btnTestClear);
+	connect(btnTestClear,&QPushButton::clicked,[this](){ textEditSocket->clear(); });
+
+	QPushButton *btnTestConnect = new QPushButton("connect");
+	hlo1->addWidget(btnTestConnect);
+	connect(btnTestConnect,&QPushButton::clicked,[this](){ CreateSocket(); });
+
+	QPushButton *btnSqlClearNotes = new QPushButton(" clear notes ");
+	hlo1->addWidget(btnSqlClearNotes);
+	connect(btnSqlClearNotes,&QPushButton::clicked,[](){
+		DataBase::DoSqlQuery("delete from " + Fields::Notes());
+	});
 
 	QPushButton *btnTestSend = new QPushButton("test send");
 	hlo1->addWidget(btnTestSend);
@@ -76,14 +93,15 @@ void NetClient::CreateWindowSocket(bool show)
 
 	if(show) widget->show();
 
-	widget->resize(800,600);
-	QTimer::singleShot(100,[this](){ widget->move(50, 50); widget->activateWindow(); });
+	widget->resize(650,600);
+	QTimer::singleShot(100,[this](){ widget->move(700, 10); widget->activateWindow(); });
 }
 
 void NetClient::SlotReadyRead()
 {
 	QTcpSocket *sock = (QTcpSocket*)sender();
 	QString readed = sock->readAll();
+	Log("received: " + readed);
 	if(readed.endsWith(';')) readed.chop(1);
 	else
 	{
@@ -141,6 +159,8 @@ void NetClient::SendToServer(QString str, bool sendEndMarker)
 	str.replace(NetConstants::end_marker(), NetConstants::end_marker_replace());
 	socket->write(str.toUtf8());
 	if(sendEndMarker) socket->write(NetConstants::end_marker().toUtf8());
+
+	Log("send: " + (sendEndMarker ? str + NetConstants::end_marker() : str));
 }
 
 void NetClient::RequestToServer(const QString &requestType, QString content, AnswerWorkerFunction answWorker)
@@ -151,13 +171,56 @@ void NetClient::RequestToServer(const QString &requestType, QString content, Ans
 	requestAswerWorkers[idRqst] = std::move(answWorker);
 	CodeMarkers::to_do("а у запроса должен быть еще и срок действия, который если вышел - то ГАЛЯ у нас отмена");
 
-	content.replace(NetConstants::end_marker(), NetConstants::end_marker_replace());
-	socket->write(NetConstants::request().toUtf8());
-	socket->write(QSn(idRqst).append(' ').toUtf8());
-	socket->write(requestType.toUtf8());
-	socket->write(" ");
-	socket->write(content.toUtf8()); // <
-	socket->write(NetConstants::end_marker().toUtf8());
+	SendToServer(NetConstants::request(), false);
+	SendToServer(QSn(idRqst).append(' '), false);
+	SendToServer(requestType, false);
+	SendToServer(" ", false);
+	SendToServer(content, true);
+}
+
+void NetClient::RequestToServerWithWait(const QString &requestType, QString content, AnswerWorkerFunction answWorker)
+{
+	if(!answWorker) Warning("RequestToServerWithWait called without answWorker");
+
+	static auto blocker = new InputBlocker(qApp);
+	qApp->installEventFilter(blocker);
+
+	QProgressDialog *progress = new QProgressDialog("Resrver response waiting", "", 0, 0);
+	QPointer<QProgressDialog> progressQPtr(progress);
+	progress->setWindowModality(Qt::ApplicationModal);
+	progress->setCancelButton(nullptr);
+
+	if(0) CodeMarkers::to_do("make timer singleShot pool");
+	QTimer::singleShot(500, [progress]() { if(!progress->wasCanceled()) progress->show(); });
+	QTimer::singleShot(3000, [progress]()
+	{
+		if(!progress->wasCanceled())
+		{
+			qApp->removeEventFilter(blocker);
+			QMbError("Server doesn't response");
+		}
+		progress->hide();
+		progress->deleteLater();
+	});
+
+	NetClient::AnswerWorkerFunction answFoo = [this, progressQPtr, answWorkerMoved = std::move(answWorker)](QString &&answContent){
+		if(progressQPtr)
+		{
+			qApp->removeEventFilter(blocker);
+			progressQPtr->cancel();
+			progressQPtr->close();
+		}
+		else
+		{
+			Error("answer get, but to late");
+			return;
+		}
+
+		Log("answ get: " + answContent);
+		if(answWorkerMoved) answWorkerMoved(std::move(answContent));
+	};
+
+	RequestToServer(requestType, content, std::move(answFoo));
 }
 
 void NetClient::RequestsAnswersWorker(QString text)
@@ -167,7 +230,6 @@ void NetClient::RequestsAnswersWorker(QString text)
 	if(!requestAnswerData.errors.isEmpty())
 	{
 		Error("error decoding request answer: "+requestAnswerData.errors + "; full text:\n"+text);
-		SendToServer("error decoding request answer: "+requestAnswerData.errors, true);
 		return;
 	}
 
@@ -175,11 +237,10 @@ void NetClient::RequestsAnswersWorker(QString text)
 	if(it == requestAswerWorkers.end())
 	{
 		Error("error working request answer, not found worker for id; full text:\n"+text);
-		SendToServer("error working request answer, not found worker for id; full text:\n"+text, true);
 		return;
 	}
 
-	it->second(std::move(requestAnswerData));
+	it->second(std::move(requestAnswerData.content));
 }
 
 NetClient::RequestData NetClient::DecodeRequestCommand(QString command)

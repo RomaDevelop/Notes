@@ -40,31 +40,42 @@
 void ToDo(){
 	qdbg << "ToDo in WidgetMain.cpp line " + QSn(__LINE__);
 
-			///
-			/// нужно создавать id заметок, ибо как их еще идентифицировать на сервере
-			/// для дефолт групп они будут вестись локально
-			/// для остальных нужно получать айди от сервера
-			///		можно конечно еще ввести переменную в которой будет порядковый номер,
-			///		чтобы если айди не будет получет сразу, то все равно сохранялся порядок заметок
-			///		но НАХУЯ???
-			///
-			/// создание/переименование группы должны происходить с разрешения сервера
-			///
-			/// сервер должен уметь хранить разные группы заметок
-			/// клиент запрашивает даты обновления нужных групп заметок
-			/// клиент сравнивает то что пришло
-			///		если заметки на сервере не существует или она отстала клиент передает её на сервер
-			///		если заметка на сервере опережает заметку на клиенте - она обновляется
-			///
-			///	при удалении заметки клиент сообщает об этом серверу, он фиксирует, что такая заметка была удалена
-			/// при последующих обращениях сервер сообщает об удалённых заметках
-			/// серрвер хранит сведения об удаленной заметке, пока все клиенты не получат данные, что она удалена
-			///
-			/// запуск таймера из иконки в трее
-			///
-			/// очистка старых файлов и каталогов
-			///
-			/// нужна возможность хранить ссылки в заметках. Как?
+//	#error
+
+	/// (позже) создание заметки в выбранной группе
+	///
+	/// сохранение заметки - работа с сервером
+	///
+	/// При измененнии заметки сервер
+	/// Отправляет всем остальным клиентам информацию о перемещении заметки
+	/// А что если клиент не активен? синхронизация при запуске.
+	///
+	/// Синхронизация при запуске клиента
+	/// Клиент передает сведения об изменениях заметок. Если заметка на сервере отстаёт - она обновляется.
+	/// Если на клиенте отстаёт - обновляется на клиенте.
+	/// "при старте работы"
+	/// "	считываются заметки из локальной бд"
+	/// "	все, что не в дефолтной группе сравниваются с сервером"
+	/// "	нужно хранить дату изменения"
+	/// "	ежели заметка на сервере отсутсвует скорее всего она была удалена"
+	/// "		выводить сообщение клиенту, какие заметки были удалены"
+	/// 				"проверять, есть ли на сервере такие заметки каких нет локально"
+	///
+	/// Если заметка отсутствует на сервере - значит она была удалена другим клиентом. Удаляем заметку.
+	/// Если на сервере имеются заметки которых нет у клиента - значит они были созданы другим клиентом создаем их на клиенте.
+	/// Иные ситуации исключены.
+
+	/// "клиент и сервер сохраняют удалённые заметки каждый в своей корзине"
+	/// "";
+
+	/// клиент запрашивает даты обновления нужных групп заметок
+	/// клиент сравнивает то что пришло
+	///		если заметки на сервере не существует или она отстала клиент передает её на сервер
+	///		если заметка на сервере опережает заметку на клиенте - она обновляется
+	///
+	/// запуск таймера из иконки в трее
+	///
+	/// нужна возможность хранить ссылки в заметках. Как?
 }
 
 namespace ColIndexes {
@@ -93,7 +104,7 @@ void WidgetMain::UpdateNotesIndexes()
 		if(notes[i]->note->index != i)
 		{
 			notes[i]->note->index = i;
-			notes[i]->note->SaveNote("update indexes");
+			notes[i]->note->SaveNoteOnClient("update indexes");
 		}
 	}
 }
@@ -420,7 +431,7 @@ void WidgetMain::LoadSettings()
 
 void WidgetMain::LoadNotes()
 {
-	auto notes = Note::LoadNotes();
+	auto notes = Note::LoadNotesFromFiles();
 	for(auto &note:notes)
 	{
 		MakeNewNote(note, loaded);
@@ -490,10 +501,10 @@ Note & WidgetMain::MakeNewNote(Note noteSrc, newNoteReason reason)
 	if(reason == created)
 	{
 		newNote->id = Note::idMarkerCreateNewNote;
-		newNote->SaveNote("MakeNewNote-doSave");
+		newNote->SaveNoteOnClient("MakeNewNote-doSave");
 	}
 
-	auto saveNoteFoo = [newNote](void*){ newNote->SaveNote("saveNoteFoo"); };
+	auto saveNoteFoo = [newNote](void*){ newNote->SaveNoteOnClient("saveNoteFoo"); };
 
 	newNote->AddCBNameUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
 	newNote->AddCBContentUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
@@ -593,26 +604,49 @@ void WidgetMain::FilterNotes(const QString &nameFilter)
 
 void WidgetMain::RemoveNote(Note* note)
 {
-	for(uint index=0; index<notes.size(); index++)
+	auto index = NoteIndexInWidgetMainNotes(note, true);
+	if(index==-1) { return; }
+
+	if(!RemoveNoteSQLOnClient(notes[index]->note.get())) return;
+
+	RemoveNoteInMainWidget(notes[index]->note.get());
+}
+
+bool WidgetMain::RemoveNoteSQLOnClient(Note * note)
+{
+	if(note->group == note->defaultGroupName()) { DataBase::RemoveNoteOnClient(QSn(note->id), true); return true; }
+	else
 	{
-		auto &notePl = notes[index];
-		if(notePl->note.get() == note)
-		{
-			if(!note->RemoveNoteSQL()) return;
-
-			if(int row = RowOfNote(note); row != -1)
+		auto answFoo = [this, note](QString &&answContent){
+			if(answContent == NetConstants::success())
 			{
-				table->removeRow(row);
+				if(DataBase::RemoveNoteOnClient(QSn(note->id), true))
+					RemoveNoteInMainWidget(note);
+				else
+				{
+					QMbError("DataBase::RemoveNoteOnClient returned false; tryed to remove " + note->Name());
+				}
 			}
+			else QMbError("Can't remove note, bad server answ");
+		};
 
-			notes.erase(notes.begin() + index);
-
-			UpdateNotesIndexes();
-			return;
-		}
+		netClient->RequestToServerWithWait(NetConstants::request_remove_note(), QSn(note->idOnServer), std::move(answFoo));
+		return false;
 	}
-	if(!note) QMbError("RemoveNote nullptr note get");
-	else QMbError("note("+note->Name()+") not found");
+}
+
+void WidgetMain::RemoveNoteInMainWidget(Note * note)
+{
+	if(int row = RowOfNote(note); row != -1)
+	{
+		table->removeRow(row);
+	}
+
+	auto index = NoteIndexInWidgetMainNotes(note, true);
+	if(index==-1) { return; }
+	notes.erase(notes.begin() + index);
+
+	UpdateNotesIndexes();
 }
 
 void WidgetMain::DefaultColsWidths()

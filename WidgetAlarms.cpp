@@ -97,21 +97,16 @@ WidgetAlarms::~WidgetAlarms()
 		auto geo = saveGeometry();
 		settings.setValue("geo", geo);
 
-		if (geo.size() < 16) {
-			qDebug() << "Недостаточно данных для извлечения геометрии.";
-			return;
-		}
-
 		QWidget newWidget;
 		newWidget.restoreGeometry(geo);
 
-		auto geoRect = geometry();
-		QString geoStr = "X:" + QSn(geoRect.x()) + " Y: " + QSn(geoRect.y())
-				+ " Width: " + QSn(geoRect.width()) + " Height: " + QSn(geoRect.height()) + "\n";
-		QString log = QDateTime::currentDateTime().toString(DateTimeFormat) +
-				" WidgetAlarms::SaveSettings saved geo: " + geoStr + "\n";
-		qdbg << " WidgetAlarms::SaveSettings saved geo: " + geoStr + "\n";
-		MyQFileDir::AppendFile(QFileInfo(settingsFile).path() + "/save geo log.txt", log);
+//		auto geoRect = geometry();
+//		QString geoStr = "X:" + QSn(geoRect.x()) + " Y: " + QSn(geoRect.y())
+//				+ " Width: " + QSn(geoRect.width()) + " Height: " + QSn(geoRect.height()) + "\n";
+//		QString log = QDateTime::currentDateTime().toString(DateTimeFormat) +
+//				" WidgetAlarms::SaveSettings saved geo: " + geoStr + "\n";
+//		qdbg << " WidgetAlarms::SaveSettings saved geo: " + geoStr + "\n";
+//		MyQFileDir::AppendFile(QFileInfo(settingsFile).path() + "/save geo log.txt", log);
 	}
 }
 

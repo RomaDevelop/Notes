@@ -10,6 +10,7 @@ CONFIG += c++17
 
 SOURCES += \
     ../NotesServer/DataBase.cpp \
+    ../NotesServer/NetConstants.cpp \
     ../include/AdditionalTray.cpp \
     ../include/PlatformDependent.cpp \
     FastActions.cpp \
@@ -22,6 +23,7 @@ SOURCES += \
 
 HEADERS += \
     ../NotesServer/DataBase.h \
+    ../NotesServer/NetConstants.h \
     ../include/AdditionalTray.h \
     ../include/ClickableQWidget.h \
     ../include/InputBlocker.h \
