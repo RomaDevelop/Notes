@@ -17,10 +17,10 @@
 QString Note::ToStrForLog()
 {
 	QString str;
-	str.append(name).append(" (").append(QSn(index)).append(") ").append(group).append("\n");
+	str.append(name).append(" ").append(group).append("\n");
 	str.append("notif, postpone, last updated: ").append(dtNotify.toString(Fields::dtFormat()));
 	str.append(" ").append(dtPostpone.toString(Fields::dtFormat())).append(" ").append(dtLastUpdated.toString(Fields::dtFormatLastUpated()));
-	str.append("\nContent: ").append(content.size() < 50 ? content : content.left(47) + "...");
+	str.append("\nContent: ").append(content.size() < 20 ? content : content.left(17) + "...");
 	return str;
 }
 
@@ -61,12 +61,12 @@ void Note::DialogCreateNewGroup()
 	QString newGroupName = std::move(inpRes.text);
 
 	auto answFoo = [newGroupName](QString &&answContent){
-		auto id = NetConstants::GetIdGroupFromAnsw_try_create_group(answContent);
-		if(id < 0) QMbError("Group was not created, answer is " + QSn(id) + "");
+		auto idNewGroup = NetConstants::GetFromAnsw_try_create_group_IdGroup(answContent);
+		if(idNewGroup < 0) QMbError("Group was not created, answer is " + QSn(idNewGroup) + "");
 		else
 		{
-			auto resId = DataBase::TryCreateNewGroup(newGroupName, QSn(id));
-			if(resId == id) QMbInfo("Group " + newGroupName + " created");
+			auto resId = DataBase::TryCreateNewGroup(newGroupName, QSn(idNewGroup));
+			if(resId == idNewGroup) QMbInfo("Group " + newGroupName + " created");
 			else QMbError("TryCreateNewGroup in local base error, resId differs: " + QSn(resId));
 		}
 	};
@@ -111,8 +111,8 @@ void Note::MoveToGroup(QString newGroupName)
 
 		this->dtLastUpdated = QDateTime::currentDateTime();
 		Note tmpNote(*this);
-		tmpNote.group = std::move(newGroupName);
-		netClient->RequestToServerWithWait(NetConstants::request_create_note_on_server(), tmpNote.ToStrForNetSend(), std::move(answFoo));
+		tmpNote.group = newGroupName;
+		netClient->RequestToServerWithWait(NetConstants::request_create_note_on_server(), tmpNote.ToStr_v1(), std::move(answFoo));
 	}
 	else // перемещение не из дефолтной, заметка на сервере уже существует
 	{
@@ -144,7 +144,6 @@ void Note::InitFromTmpNote(Note &note)
 	dtNotify = std::move(note.dtNotify);
 	dtPostpone = std::move(note.dtPostpone);
 	group = note.group;
-	index = note.index;
 	id = note.id;
 	idOnServer = note.idOnServer;
 	content = std::move(note.content);
@@ -162,6 +161,13 @@ void Note::InitFromRecord(QStringList &row)
 	idOnServer = row[Fields::idNoteOnServerInd].toInt();
 	content = std::move(row[Fields::contentInd]);
 	dtLastUpdated = QDateTime::fromString(row[Fields::lastUpdatedInd], Fields::dtFormatLastUpated());
+}
+
+void Note::UpdateThisNoteFromSQL()
+{
+	auto rec = DataBase::NoteByIdOnServer(QSn(idOnServer));
+	if(rec.isEmpty()) { QMbError("UpdateThisNoteFromSQL"); return; }
+	InitFromRecord(rec);
 }
 
 void Note::SetName(QString newName)
@@ -185,27 +191,31 @@ void Note::SetDT(QDateTime dtNotify, QDateTime dtPostpone)
 {
 	this->dtNotify = std::move(dtNotify);
 	this->dtPostpone = std::move(dtPostpone);
-	for(auto &cb:cbsDTUpdated) cb.cb(cb.handler);
+	for(uint i=0; i<cbsDTUpdated.size(); i++)
+	{
+		auto &cb = cbsDTUpdated[i];
+		cb.cb(cb.handler);
+	}
 }
 
 void Note::SaveNoteOnClient(const QString &reason)
 {
-	qdbg << "SaveNote for "+reason+" i:" + QSn(index) + " name:" + name;
+	qdbg << "SaveNote for "+reason+" name:" + name;
 
-	if(group == defaultGroupName()) DataBase::SaveNoteOnClient(this);
-	else
+	dtLastUpdated = QDateTime::currentDateTime();
+
+	DataBase::SaveNoteOnClient(this);
+
+	if(group != defaultGroupName())
 	{
-		if(!netClient->canNetwork) { QMbError("connection to server is lost, can't save this note"); return; }
-		else
-		{
-			// удалить ноут айди
-			// формировать и обрабатыать запрос на сохранение
-			// а если не получилось - нужно откатывать изменения, мрак
-			NetConstants::request_save_note();
-			netClient->SendToServer(NetConstants::note_saved(), false);
-			netClient->SendToServer(ToStrForNetSend(), true);
-			netClient->Log("NetNoteSaved send");
-		}
+		NetClient::AnswerWorkerFunction answFoo = [](QString &&answContent){
+			if(answContent != NetConstants::success())
+				QMbWarning("Server can't save note, and try again later");
+		};
+
+		if(netClient->canNetwork)
+			netClient->RequestToServerWithWait(NetConstants::request_note_saved(), ToStr_v1(), answFoo);
+		else QMbWarning("Server not connected, can't save, connect and try again");
 	}
 }
 
@@ -242,25 +252,49 @@ std::unique_ptr<Note> Note::LoadNote(const QString &text)
 	return {};
 }
 
-Note Note::LoadNote_v1(const QString &text)
+Note Note::FromStr_v1(const QString &text)
 {
 	auto fileParts = text.split(SaveKeyWods::endValue());
-	if(fileParts.size() < 7) { QMbError("Wrong file content (size="+QSn(fileParts.size())+")"); return {}; }
+	if(fileParts.size() < 10) { QMbError("Wrong file content (size="+QSn(fileParts.size())+")"); return {}; }
 
 	Note newNote;
 	newNote.name = std::move(fileParts[1]);
-	newNote.activeNotify = fileParts[2].toUInt();
-	newNote.dtNotify = QDateTime().fromString(fileParts[3], Fields::dtFormat());
-	newNote.dtPostpone = QDateTime().fromString(fileParts[4], Fields::dtFormat());
-	newNote.group = std::move(fileParts[5]);
-	newNote.group.remove(0, SaveKeyWods::group().size());
-
-	newNote.content = std::move(fileParts[6]);
-	if(fileParts.size() >= 8) newNote.dtLastUpdated = QDateTime().fromString(fileParts[7], Fields::dtFormatLastUpated());
+	newNote.id = fileParts[2].toLongLong();
+	newNote.idOnServer = fileParts[3].toLongLong();
+	newNote.activeNotify = fileParts[4].toLongLong();
+	newNote.dtNotify = QDateTime().fromString(fileParts[5], Fields::dtFormat());
+	newNote.dtPostpone = QDateTime().fromString(fileParts[6], Fields::dtFormat());
+	newNote.group = std::move(fileParts[7]);
+	newNote.content = std::move(fileParts[8]);
+	newNote.dtLastUpdated = QDateTime().fromString(fileParts[9], Fields::dtFormatLastUpated());
 	return newNote;
 }
 
-std::vector<Note> Note::LoadNotesFromFiles()
+QString Note::ToStr_v1()
+{
+	QString noteText;
+	noteText.append(SaveKeyWods::version()).append("1").append(SaveKeyWods::endValue());
+	noteText.append(name).append(SaveKeyWods::endValue());
+	noteText.append(QSn(id)).append(SaveKeyWods::endValue());
+	noteText.append(QSn(idOnServer)).append(SaveKeyWods::endValue());
+	noteText.append(QSn(activeNotify)).append(SaveKeyWods::endValue());
+	noteText.append(dtNotify.toString(Fields::dtFormat())).append(SaveKeyWods::endValue());
+	noteText.append(dtPostpone.toString(Fields::dtFormat())).append(SaveKeyWods::endValue());
+	noteText.append(group).append(SaveKeyWods::endValue());
+	noteText.append(content).append(SaveKeyWods::endValue());
+	noteText.append(dtLastUpdated.toString(Fields::dtFormatLastUpated())).append(SaveKeyWods::endValue());
+	return noteText;
+}
+
+std::vector<Note> Note::LoadNotes()
+{
+	LoadNotesFromFilesAndSaveInBd();
+
+	auto notes = DataBase::NotesFromBD();
+	return notes;
+}
+
+void Note::LoadNotesFromFilesAndSaveInBd()
 {
 	std::vector<Note> notes;
 	QString loadStartDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName);
@@ -280,7 +314,6 @@ std::vector<Note> Note::LoadNotesFromFiles()
 		{
 			Note &noteRef = *note_uptr.get();
 			notes.emplace_back(std::move(noteRef));
-			notes.back().index = i;
 
 			if(notes.back().group != notes.back().defaultGroupName())
 			{
@@ -295,25 +328,6 @@ std::vector<Note> Note::LoadNotesFromFiles()
 		else QMbError("error loading note from file " + filePathName);
 	}
 	notes.clear();
-
-	DataBase::BackupBase();
-	notes = DataBase::NotesFromBD();
-
-	return notes;
-}
-
-QString Note::ToStrForNetSend()
-{
-	QString noteText;
-	noteText.append(SaveKeyWods::version()).append("1").append(SaveKeyWods::endValue());
-	noteText.append(this->name).append(SaveKeyWods::endValue());
-	noteText.append(QSn(this->activeNotify)).append(SaveKeyWods::endValue());
-	noteText.append(this->dtNotify.toString(Fields::dtFormat())).append(SaveKeyWods::endValue());
-	noteText.append(this->dtPostpone.toString(Fields::dtFormat())).append(SaveKeyWods::endValue());
-	noteText.append(SaveKeyWods::group()).append(group).append(SaveKeyWods::endValue());
-	noteText.append(this->content).append(SaveKeyWods::endValue());
-	noteText.append(this->dtLastUpdated.toString(Fields::dtFormatLastUpated())).append(SaveKeyWods::endValue());
-	return noteText;
 }
 
 int Note::GetVersion(const QString &text)
@@ -323,17 +337,6 @@ int Note::GetVersion(const QString &text)
 	if(index == -1) return -1;
 	QString v = text.mid(SaveKeyWods::version().size(), index - SaveKeyWods::version().size());
 	return v.toInt();
-}
-
-QString Note::MakeNameFileToSaveNote()
-{
-	QString fileName = notesSavesPath;
-	fileName += "/note";
-	fileName += QSn(index).rightJustified(5,'0');
-	fileName += "-";
-	fileName += QString(name).replace(QRegularExpression("[\\\\/:*?\"<>|]"), "_");
-	fileName += ".txt";
-	return fileName;
 }
 
 void Note::ExecRemoveNoteWorker()
@@ -359,8 +362,6 @@ void Note::ShowDialogFastActions(QWidget *widgetToShowUnder)
 		MyQDialogs::MenuUnderWidget(widgetToShowUnder, actions.actionsVals, actions.GetVectFunctions());
 	else MyQDialogs::MenuUnderWidget(widgetToShowUnder, { MyQDialogs::DisabledItem("Actions not found") });
 }
-
-
 
 void Note::AddCBNameUpdated(std::function<void (void *)> aUpdatedCb, void *handler, int &localCbCounter)
 {

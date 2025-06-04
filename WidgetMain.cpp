@@ -42,36 +42,24 @@ void ToDo(){
 
 //	#error
 
-	/// (позже) создание заметки в выбранной группе
+	/// (позже) создание заметки сразу в выбранной группе
+	/// (позже) при измененнии заметки сервер отправляет всем остальным клиентам информацию
+	/// (позже) делать историю редактирования заметок ибо возможна ситуация что на одном клиенте сохранили, а на сервер не ушло, 
+	///				потом на другом клиенте сохранили и первые изменения будут потеряны
+	///	(позже) для минимизации вышеописанной ситуации нужно сигнализировать о том что нет связи с сервером, 
+	///				и еще хранить на клиенте неотгруженные изменения и если соединение появилось - отгружать их
+	///	(позже) для сокращения трафика передавать сохрание не всей заметки, а по полям, а в случае контента - даже только измененный фрагмент
+	///	(позже) сделать cb note removed и подключить к нему WidgetAlarms и в удалении убрать обязательное удальение строки из WidgetAlarms
+	/// (позже) для сокращения трафика, расчитывать дату изменении группы заметок и сравнивать сначала её, а уже если надо - работать по заметка группы
 	///
-	/// сохранение заметки - работа с сервером
+	/// !!! Проход через проксю
 	///
-	/// При измененнии заметки сервер
-	/// Отправляет всем остальным клиентам информацию о перемещении заметки
-	/// А что если клиент не активен? синхронизация при запуске.
+	/// Синхронизация заметок с сервером
+	///		в процессе: WidgetServer::request_synch_note_worker
 	///
-	/// Синхронизация при запуске клиента
-	/// Клиент передает сведения об изменениях заметок. Если заметка на сервере отстаёт - она обновляется.
-	/// Если на клиенте отстаёт - обновляется на клиенте.
-	/// "при старте работы"
-	/// "	считываются заметки из локальной бд"
-	/// "	все, что не в дефолтной группе сравниваются с сервером"
-	/// "	нужно хранить дату изменения"
-	/// "	ежели заметка на сервере отсутсвует скорее всего она была удалена"
-	/// "		выводить сообщение клиенту, какие заметки были удалены"
-	/// 				"проверять, есть ли на сервере такие заметки каких нет локально"
-	///
-	/// Если заметка отсутствует на сервере - значит она была удалена другим клиентом. Удаляем заметку.
-	/// Если на сервере имеются заметки которых нет у клиента - значит они были созданы другим клиентом создаем их на клиенте.
-	/// Иные ситуации исключены.
-
-	/// "клиент и сервер сохраняют удалённые заметки каждый в своей корзине"
-	/// "";
-
-	/// клиент запрашивает даты обновления нужных групп заметок
-	/// клиент сравнивает то что пришло
-	///		если заметки на сервере не существует или она отстала клиент передает её на сервер
-	///		если заметка на сервере опережает заметку на клиенте - она обновляется
+	/// Развертка сервера
+	/// 
+	/// клиент и сервер сохраняют удалённые заметки каждый в своей корзине
 	///
 	/// запуск таймера из иконки в трее
 	///
@@ -96,18 +84,7 @@ namespace ColIndexes {
 	const int postponeDTeditWidth = 130;
 }
 
-void WidgetMain::UpdateNotesIndexes()
-{
-	if(0) CodeMarkers::to_do("do not resave all note file for change index");
-	for(int i=0; i<(int)notes.size(); i++)
-	{
-		if(notes[i]->note->index != i)
-		{
-			notes[i]->note->index = i;
-			notes[i]->note->SaveNoteOnClient("update indexes");
-		}
-	}
-}
+
 
 WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 {
@@ -115,6 +92,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 
 	MyQSqlDatabase::Init(clientBase, {}, [](const QString &str){ qdbg << str; }, [](const QString &str){ QMbError(str); });
 	DataBase::InitChildDataBase(DataBase::client);
+	DataBase::BackupBase();
 
 	QString currentDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName);
 
@@ -130,8 +108,8 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	vlo_main->addLayout(hlo1);
 	vlo_main->addLayout(hlo2);
 
-// HeaderPanel
-	CreateHeaderPanel(hlo1);
+// Row1
+	CreateRow1(hlo1);
 
 // Table
 	table = new QTableWidget;
@@ -169,6 +147,8 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 
 	netClient = new NetClient(this);
 	Note::netClient = netClient;
+	connect(netClient, &NetClient::SignalNoteRemoved, this, &WidgetMain::SlotForNetClientNoteRemoved);
+	connect(netClient, &NetClient::SignalNoteChangedGgroup, this, &WidgetMain::SlotForNetClientNoteChangedGroup);
 }
 
 WidgetMain::~WidgetMain()
@@ -178,7 +158,7 @@ WidgetMain::~WidgetMain()
 	/// сохранение задач должно надежно происходить при их изменении
 }
 
-void WidgetMain::CreateHeaderPanel(QHBoxLayout *hlo1)
+void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 {
 // Add
 	QToolButton *btnPlus = new QToolButton();
@@ -233,12 +213,22 @@ void WidgetMain::CreateHeaderPanel(QHBoxLayout *hlo1)
 	hlo1->addWidget(btnTest);
 	connect(btnTest,&QPushButton::clicked, this, &WidgetMain::SlotTest);
 
+// Synch
+	QPushButton *btnSynch = new QPushButton("Synch");
+	btnSynch->setFixedWidth(QFontMetrics(btnSynch->font()).horizontalAdvance(btnSynch->text()) + 20);
+	hlo1->addWidget(btnSynch);
+	connect(btnSynch, &QPushButton::clicked, [this](){
+		for(auto &note:notes)
+			if(note->note->group != Note::defaultGroupName())
+				netClient->SynchronizeNote(note->note.get());
+	});
+
 // Save path
-	QPushButton *btnSavePath = new QPushButton("Save path");
-	btnSavePath->setFixedWidth(QFontMetrics(btnSavePath->font()).horizontalAdvance(btnSavePath->text()) + 20);
-	hlo1->addWidget(btnSavePath);
-	connect(btnSavePath,&QPushButton::clicked,[](){
-		MyQExecute::OpenDir(Note::notesSavesPath);
+	QPushButton *btnDB = new QPushButton("DB");
+	btnDB->setFixedWidth(QFontMetrics(btnDB->font()).horizontalAdvance(btnDB->text()) + 20);
+	hlo1->addWidget(btnDB);
+	connect(btnDB,&QPushButton::clicked,[](){
+		MyQExecute::Execute(DataBase::baseDataCurrent->baseFilePathName);
 	});
 
 	QPushButton *btnSettings = new QPushButton("Settings.ini");
@@ -361,12 +351,7 @@ void WidgetMain::CheckNotesForAlarm()
 
 void WidgetMain::SlotTest()
 {
-//	QString text;
-//	for(auto &note:notes)
-//	{
-//		text += "[" + note->note->group->name + "]:[" + note->note->group->describtion + "]\n";
-//	}
-//	MyQDialogs::ShowText(text);
+	//netClient->Log(DataBase::DoSqlQueryGetFirstRec("select * from Notes where idNote=60").join(" "));
 }
 
 void WidgetMain::closeEvent(QCloseEvent * event)
@@ -431,7 +416,7 @@ void WidgetMain::LoadSettings()
 
 void WidgetMain::LoadNotes()
 {
-	auto notes = Note::LoadNotesFromFiles();
+	auto notes = Note::LoadNotes();
 	for(auto &note:notes)
 	{
 		MakeNewNote(note, loaded);
@@ -472,6 +457,25 @@ Note *WidgetMain::NoteOfCurrentRow()
 	return NoteOfRow(table->currentRow());
 }
 
+NoteInMain * WidgetMain::NoteById(qint64 id)
+{
+	for(auto &note:notes)
+	{
+		if(note->note->id == id) return note.get();
+	}
+	return nullptr;
+}
+
+int WidgetMain::NoteIndexInWidgetMainNotes(Note * note, bool showError)
+{
+	for(uint index=0; index<notes.size(); index++)
+	{
+		if(notes[index]->note.get() == note) { return index; }
+	}
+	if(showError) QMbError("note "+note->Name()+" not fount by NoteIndexInWidgetMainNotes");
+	return -1;
+}
+
 void WidgetMain::SlotCreationNewNote()
 {
 	QString newName = MyQDialogs::InputLine("Создание заметки", "Введите название новой заметки", "").text;
@@ -482,7 +486,6 @@ void WidgetMain::SlotCreationNewNote()
 	Note tmpNote(newName, false, dt, dt.addSecs(3600), Note::StartText());
 
 	auto &newNote = MakeNewNote(tmpNote, created);
-	UpdateNotesIndexes();
 
 	WidgetNoteEditor::MakeOrShowNoteEditor(newNote, true);
 }
@@ -511,9 +514,12 @@ Note & WidgetMain::MakeNewNote(Note noteSrc, newNoteReason reason)
 	newNote->AddCBDTUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
 
 	newNote->removeNoteWorker = [this, newNote](){
-		RemoveNote(newNote);
+		RemoveNote(newNote, true);
 		CheckNotesForAlarm();
 	};
+
+	if(newNote->group != Note::defaultGroupName())
+		netClient->SynchronizeNote(newNote);
 
 	return *newNote;
 }
@@ -602,12 +608,13 @@ void WidgetMain::FilterNotes(const QString &nameFilter)
 	}
 }
 
-void WidgetMain::RemoveNote(Note* note)
+void WidgetMain::RemoveNote(Note* note, bool execSqlRemove)
 {
 	auto index = NoteIndexInWidgetMainNotes(note, true);
 	if(index==-1) { return; }
 
-	if(!RemoveNoteSQLOnClient(notes[index]->note.get())) return;
+	if(execSqlRemove)
+		if(!RemoveNoteSQLOnClient(notes[index]->note.get())) return;
 
 	RemoveNoteInMainWidget(notes[index]->note.get());
 }
@@ -645,8 +652,6 @@ void WidgetMain::RemoveNoteInMainWidget(Note * note)
 	auto index = NoteIndexInWidgetMainNotes(note, true);
 	if(index==-1) { return; }
 	notes.erase(notes.begin() + index);
-
-	UpdateNotesIndexes();
 }
 
 void WidgetMain::DefaultColsWidths()
@@ -667,6 +672,22 @@ void WidgetMain::DefaultColsWidths()
 	int nameWidth = table->width() - (ColIndexes::chBoxWidth+ColIndexes::notifyDTeditWidth+ColIndexes::postponeDTeditWidth + 5);
 	if(table->verticalScrollBar()->isVisible()) nameWidth -= table->verticalScrollBar()->width();
 	table->setColumnWidth(ColIndexes::name, nameWidth);
+}
+
+void WidgetMain::SlotForNetClientNoteRemoved(qint64 id)
+{
+	auto note = NoteById(id);
+	if(!note) QMbError("SlotForNetClientNoteRemoved note not found");
+	else RemoveNote(note->note.get(), false);
+}
+
+void WidgetMain::SlotForNetClientNoteChangedGroup(qint64 id)
+{
+	auto note = NoteById(id);
+	if(!note) { QMbError("SlotForNetClientNoteRemoved note not found"); return; }
+
+	note->note->UpdateThisNoteFromSQL();
+	UpdateWidgetsFromNote(*note);
 }
 
 

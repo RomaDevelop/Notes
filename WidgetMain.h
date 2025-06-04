@@ -31,7 +31,6 @@ public:
 
 	std::vector<std::unique_ptr<NoteInMain>> notes;
 
-	void UpdateNotesIndexes();
 	std::unique_ptr<WidgetAlarms> widgetAlarms;
 
 	NetClient *netClient;
@@ -41,7 +40,7 @@ public:
 	void closeEvent (QCloseEvent *event) override;
 
 private:
-	void CreateHeaderPanel(QHBoxLayout *hlo1);
+	void CreateRow1(QHBoxLayout *hlo1);
 	void CreateTableContextMenu();
 	void CreateTrayIcon();
 	void CreateNotesAlarmChecker();
@@ -58,15 +57,8 @@ private:
 	int RowOfNote(Note* note);
 	Note* NoteOfRow(int row);
 	Note* NoteOfCurrentRow();
-	int NoteIndexInWidgetMainNotes(Note* note, bool showError)
-	{
-		for(uint index=0; index<notes.size(); index++)
-		{
-			if(notes[index]->note.get() == note) { return index; }
-		}
-		if(showError) QMbError("note "+note->Name()+" not fount by NoteIndexInWidgetMainNotes");
-		return -1;
-	}
+	NoteInMain* NoteById(qint64 id);
+	int NoteIndexInWidgetMainNotes(Note* note, bool showError);
 
 	void SlotCreationNewNote();
 	enum newNoteReason { loaded, created };
@@ -76,11 +68,14 @@ private:
 
 	void FilterNotes(const QString &nameFilter);
 
-	void RemoveNote(Note* note);
+	void RemoveNote(Note* note, bool execSqlRemove);
 	bool RemoveNoteSQLOnClient(Note* note);
 	void RemoveNoteInMainWidget(Note* note);
 
 	void DefaultColsWidths();
+
+	void SlotForNetClientNoteRemoved(qint64 id);
+	void SlotForNetClientNoteChangedGroup(qint64 id);
 };
 
 

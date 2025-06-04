@@ -180,7 +180,14 @@ void WidgetAlarms::AddNote(Note * note)
 
 	SetLabelText(newNoteInAlarms);
 
-	auto cb = [this, newNoteInAlarmsPtr](void*){ SetLabelText(*newNoteInAlarmsPtr); };
+	auto cb = [this, newNoteInAlarmsPtr](void*){
+		if(!newNoteInAlarmsPtr->note->CheckAlarm(QDateTime::currentDateTime()))
+		{
+			RemoveNoteFromWidgetAlarms(newNoteInAlarmsPtr->note, true);
+			return;
+		}
+		SetLabelText(*newNoteInAlarmsPtr);
+	};
 	note->AddCBNameUpdated(cb, newNoteInAlarmsPtr, newNoteInAlarmsPtr->cbCounter);
 	note->AddCBDTUpdated(cb, newNoteInAlarmsPtr, newNoteInAlarmsPtr->cbCounter);
 
@@ -366,9 +373,6 @@ void WidgetAlarms::SlotPostpone(std::vector<Note*> notesToPostpone, int delaySec
 			notesToPostpone[i]->SetDT(AddSecsFromToday(notesToPostpone[i]->DTNotify(), itogDelaySecs), notesToPostpone[i]->DTNotify());
 		}
 
-		if(!notesToPostpone[i]->CheckAlarm(QDateTime::currentDateTime()))
-			RemoveNoteFromWidgetAlarms(notesToPostpone[i], true);
-
 		if(notes.empty()) hide();
 	}
 }
@@ -383,13 +387,13 @@ void WidgetAlarms::showEvent(QShowEvent * event)
 	{
 		restoreGeometry(geo);
 
-		auto geoRect = geometry();
-		QString geoStr = "X:" + QSn(geoRect.x()) + " Y: " + QSn(geoRect.y())
-				 + " Width: " + QSn(geoRect.width()) + " Height: " + QSn(geoRect.height()) + "\n";
-		QString log = QDateTime::currentDateTime().toString(DateTimeFormat) +
-							" WidgetAlarms::showEvent restored geo: " + geoStr + "\n";
-		qdbg << " WidgetAlarms::showEvent restored geo: " + geoStr + "\n";
-		MyQFileDir::AppendFile(QFileInfo(settingsFile).path() + "/save geo log.txt", log);
+//		auto geoRect = geometry();
+//		QString geoStr = "X:" + QSn(geoRect.x()) + " Y: " + QSn(geoRect.y())
+//				 + " Width: " + QSn(geoRect.width()) + " Height: " + QSn(geoRect.height()) + "\n";
+//		QString log = QDateTime::currentDateTime().toString(DateTimeFormat) +
+//							" WidgetAlarms::showEvent restored geo: " + geoStr + "\n";
+//		qdbg << " WidgetAlarms::showEvent restored geo: " + geoStr + "\n";
+//		MyQFileDir::AppendFile(QFileInfo(settingsFile).path() + "/save geo log.txt", log);
 	}
 	else
 	{

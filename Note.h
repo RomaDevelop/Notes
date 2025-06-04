@@ -38,7 +38,6 @@ public:
 		content = std::move(content_);
 	}
 
-	int index = -1;
 	qint64 id = -1;
 	qint64 idOnServer = -1;
 	inline static const int idMarkerCreateNewNote = -2;
@@ -55,6 +54,7 @@ public:
 
 	void InitFromTmpNote(Note &note);
 	void InitFromRecord(QStringList &record);
+	void UpdateThisNoteFromSQL();
 
 	QString Name() { return name; }
 	void SetName(QString newName);
@@ -73,18 +73,18 @@ public:
 
 	void SaveNoteOnClient(const QString &reason);
 	static std::unique_ptr<Note> LoadNote(const QString &text);
-	static Note LoadNote_v1(const QString &text);
-	static std::vector<Note> LoadNotesFromFiles();
-
-	QString ToStrForNetSend();
+	static Note FromStr_v1(const QString &text);
+	QString ToStr_v1();
+	static std::vector<Note> LoadNotes();
+	static void LoadNotesFromFilesAndSaveInBd();
 
 	inline static std::map<int, std::function<Note(const QString &text)>> loadsFunctionsMap;
 	static void InitLoadsFooMap()
 	{
-		loadsFunctionsMap[1] = [](const QString &text){ return LoadNote_v1(text); };
+		loadsFunctionsMap[1] = [](const QString &text){ return FromStr_v1(text); };
 	}
 	static int GetVersion(const QString &text);
-	QString MakeNameFileToSaveNote();
+
 	inline static QString notesSavesPath;
 	inline static QString notesBackupsPath;
 
