@@ -17,6 +17,11 @@
 #include "DataBase.h"
 #include "Note.h"
 
+NetClient::~NetClient()
+{
+	if(socket) socket->disconnectFromHost();
+}
+
 void NetClient::SlotTest()
 {
 	Log(DataBase::DoSqlQueryGetFirstRec("select idgroup from Notes where idNote=60").join(" "));
@@ -26,6 +31,7 @@ void NetClient::Log(const QString &str, bool appendInLastRow)
 {
 	if(appendInLastRow) MyQTextEdit::AppendInLastRow(textEditSocket, str);
 	else textEditSocket->append(str);
+	MyQTextEdit::ColorizeLastCount(textEditSocket, Qt::black, str.size());
 }
 
 void NetClient::Error(const QString &str)
@@ -46,10 +52,10 @@ void NetClient::CreateSocket()
 	socket = new QTcpSocket(this);
 	socket->connectToHost("127.0.0.1", port);
 	connect(socket, &QTcpSocket::connected, this, &NetClient::SlotConnected);
-	connect(socket, &QTcpSocket::disconnected, [this](){ canNetwork = false; });
+	connect(socket, &QTcpSocket::disconnected, [this](){ Log("disconnected"); canNetwork = false; });
 	connect(socket, &QTcpSocket::readyRead, this, &NetClient::SlotReadyRead);
 	connect(socket, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(SlotError(QAbstractSocket::SocketError)));
-	// в старом стиле из-за кривизны qt
+		// в старом стиле из-за кривизны Qt
 }
 
 void NetClient::CreateWindowSocket(bool show)
@@ -71,9 +77,9 @@ void NetClient::CreateWindowSocket(bool show)
 	hlo1->addWidget(btnTestConnect);
 	connect(btnTestConnect,&QPushButton::clicked,[this](){ CreateSocket(); });
 
-	QPushButton *btnTestDisconnect = new QPushButton("disconnect");
-	hlo1->addWidget(btnTestDisconnect);
-	connect(btnTestDisconnect,&QPushButton::clicked,[this](){ if(socket) socket->disconnect(); });
+	QPushButton *btnDisconnect = new QPushButton("disconnect");
+	hlo1->addWidget(btnDisconnect);
+	connect(btnDisconnect,&QPushButton::clicked,[this](){ if(socket) socket->disconnectFromHost(); });
 
 	QPushButton *btnSqlClearNotes = new QPushButton(" clear notes ");
 	hlo1->addWidget(btnSqlClearNotes);
@@ -83,7 +89,7 @@ void NetClient::CreateWindowSocket(bool show)
 
 	QPushButton *btnTestSend = new QPushButton("test send");
 	hlo1->addWidget(btnTestSend);
-	connect(btnTestSend,&QPushButton::clicked,[this](){ SendToServer("test send", true); });
+	connect(btnTestSend,&QPushButton::clicked,[this](){ SendInSock(socket, "test send", true); });
 
 	QPushButton *btnTestRequest = new QPushButton("test");
 	hlo1->addWidget(btnTestRequest);
@@ -110,7 +116,7 @@ void NetClient::SlotConnected()
 
 	QCryptographicHash hash(QCryptographicHash::Md5);
 	hash.addData((NetConstants::test_passwd()).toUtf8());
-	SendToServer(NetConstants::auth().toUtf8() + hash.result().toHex(), true);
+	SendInSock(socket, NetConstants::auth().toUtf8() + hash.result().toHex(), true);
 }
 
 void NetClient::SlotReadyRead()
@@ -146,6 +152,10 @@ void NetClient::SlotReadyRead()
 			QStringRef lastUpdate(&command, NetConstants::last_update().size(), command.size() - NetConstants::last_update().size());
 			Log("last update on server is " + lastUpdate);
 		}
+		else if(command.startsWith(NetConstants::request()))
+		{
+			RequestsWorker(sock, std::move(command));
+		}
 		else if(command.startsWith(NetConstants::request_answ()))
 		{
 			RequestsAnswersWorker(std::move(command));
@@ -177,25 +187,12 @@ void NetClient::SlotError(QAbstractSocket::SocketError err)
 
 
 
-void NetClient::SendToServer(QString str, bool sendEndMarker)
-{
-	CodeMarkers::can_be_optimized("takes copy, than make other copy");
-
-	Log("sending: " + (str == " " ? "_space_" : sendEndMarker ? str + NetConstants::end_marker() : str));
-
-	str.replace(NetConstants::end_marker(), NetConstants::end_marker_replace());
-	socket->write(str.toUtf8());
-	if(sendEndMarker) socket->write(NetConstants::end_marker().toUtf8());
-
-	Log(" | sended", true);
-}
-
 void NetClient::MsgToServer(const QString &msgType, QString content)
 {
-	SendToServer(NetConstants::msg(), false);
-	SendToServer(msgType, false);
-	SendToServer(" ", false);
-	SendToServer(std::move(content), true);
+	SendInSock(socket, NetConstants::msg(), false);
+	SendInSock(socket, msgType, false);
+	SendInSock(socket, " ", false);
+	SendInSock(socket, std::move(content), true);
 }
 
 NetClient::MsgData NetClient::DecodeMsg(QString msg)
@@ -220,29 +217,18 @@ NetClient::MsgData NetClient::DecodeMsg(QString msg)
 	return data;
 }
 
-void NetClient::RequestToServer(const QString &requestType, QString content, AnswerWorkerFunction answWorker)
+void NetClient::RequestToServerWithWait(QTcpSocket * sock, const QString & requestType, QString content, Requester::AnswerWorkerFunction answWorker)
 {
-	CodeMarkers::can_be_optimized("takes copy, than make other copy");
+	if(!canNetwork)
+	{
+		QMbError("Server not connected, operation impossible");
+		return;
+	}
 
-	CodeMarkers::to_do("нужно удалять из requestAswerWorkers спустя время если не пришло");
-
-	int idRqst = TakeIdRequest();
-	requestAswerWorkers[idRqst] = std::move(answWorker);
-	CodeMarkers::to_do("а у запроса должен быть еще и срок действия, который если вышел - то ГАЛЯ у нас отмена");
-
-	SendToServer(NetConstants::request(), false);
-	SendToServer(QSn(idRqst).append(' '), false);
-	SendToServer(requestType, false);
-	SendToServer(" ", false);
-	SendToServer(content, true);
-}
-
-void NetClient::RequestToServerWithWait(const QString &requestType, QString content, AnswerWorkerFunction answWorker)
-{
 	if(!answWorker) Warning("RequestToServerWithWait called without answWorker");
 
-	//static auto blocker = new InputBlocker(qApp);
-	//qApp->installEventFilter(blocker);
+	static auto blocker = new InputBlocker(qApp);
+	qApp->installEventFilter(blocker);
 
 	QProgressDialog *progress = new QProgressDialog("Resrver response waiting", "", 0, 0);
 	QPointer<QProgressDialog> progressQPtr(progress);
@@ -255,7 +241,7 @@ void NetClient::RequestToServerWithWait(const QString &requestType, QString cont
 	{
 		if(!progress->wasCanceled())
 		{
-			//qApp->removeEventFilter(blocker);
+			qApp->removeEventFilter(blocker);
 			QMbError("Server doesn't response");
 		}
 		progress->hide();
@@ -266,7 +252,7 @@ void NetClient::RequestToServerWithWait(const QString &requestType, QString cont
 		Log("answ get: " + answContent);
 		if(progressQPtr)
 		{
-			//qApp->removeEventFilter(blocker);
+			qApp->removeEventFilter(blocker);
 			progressQPtr->cancel();
 			progressQPtr->close();
 			if(answWorkerMoved) answWorkerMoved(std::move(answContent));
@@ -274,86 +260,18 @@ void NetClient::RequestToServerWithWait(const QString &requestType, QString cont
 		else Error("but it is too late to work it");
 	};
 
-	RequestToServer(requestType, content, std::move(answFoo));
+	RequestInSock(sock, requestType, content, std::move(answFoo));
 }
 
-void NetClient::RequestsAnswersWorker(QString text)
-{
-	CodeMarkers::can_be_optimized("give copy text to DecodeRequestCommand, but can move, but it used in error");
-	auto requestAnswerData = NetClient::DecodeRequestAnswer(text);
-	if(!requestAnswerData.errors.isEmpty())
-	{
-		Error("error decoding request answer: "+requestAnswerData.errors + "; full text:\n"+text);
-		return;
-	}
-
-	auto it = requestAswerWorkers.find(requestAnswerData.id.toInt());
-	if(it == requestAswerWorkers.end())
-	{
-		Error("error working request answer, not found worker for id; full text:\n"+text);
-		return;
-	}
-
-	it->second(std::move(requestAnswerData.content));
-
-	requestAswerWorkers.erase(it);
-}
-
-NetClient::RequestData NetClient::DecodeRequestCommand(QString command)
-{
-	CodeMarkers::can_be_optimized("can be faster, no remove+LeftRef, but take MidRef");
-
-	RequestData data;
-
-	if(!command.startsWith(NetConstants::request())) { data.errors = "bad start"; return data; }
-
-	command.remove(0,NetConstants::request().size());
-
-	int spaceIndex = command.indexOf(' ');
-	if(spaceIndex == -1) { data.errors = "not found space to close id"; return data; }
-
-	if(IsInt(command.leftRef(spaceIndex))) data.id = command.leftRef(spaceIndex).toString();
-	else { data.errors = "bad id"; return data; }
-
-	command.remove(0,spaceIndex +1);
-
-	spaceIndex = command.indexOf(' ');
-	if(spaceIndex == -1) { data.errors = "not found space to close requestType"; return data; }
-	data.type = command.left(spaceIndex);
-	if(NetConstants::allReuestTypes().count(data.type) == 0) { data.errors = "bad requestType"; data.type = ""; return data; }
-
-	command.remove(0,spaceIndex +1);
-
-	data.content = std::move(command);
-
-	return data;
-}
-
-NetClient::RequestData NetClient::DecodeRequestAnswer(QString command)
-{
-	RequestData data;
-
-	if(!command.startsWith(NetConstants::request_answ())) { data.errors = "bad start"; return data; }
-
-	command.remove(0,NetConstants::request_answ().size());
-
-	int spaceIndex = command.indexOf(' ');
-	if(spaceIndex == -1) { data.errors = "not found space to close id"; return data; }
-
-	if(IsInt(command.leftRef(spaceIndex))) data.id = command.leftRef(spaceIndex).toString();
-	else { data.errors = "bad id"; return data; }
-
-	command.remove(0,spaceIndex +1);
-
-	data.content = std::move(command);
-
-	return data;
-}
-
-void NetClient::SynchronizeNote(Note * note)
+void NetClient::SynchronizeAllNotes(std::vector<Note*> allClientNotes)
 {
 	if(0) CodeMarkers:: to_do("склейку запросов на синхронизацию для одной заметки");
-	synchQueue.emplace(NetConstants::SynchData(note, QSn(note->idOnServer), note->DtLastUpdatedStr()));
+	for(auto &note:allClientNotes)
+	{
+		if(note->group == Note::defaultGroupName()) continue;
+		synchQueue.emplace(NetConstants::SynchData(note, QSn(note->idOnServer), note->DtLastUpdatedStr()));
+	}
+	synchQueue.emplace(NetConstants::SynchData({}, EndAllNotesMarker(), {}));
 }
 
 void NetClient::SynchFromQueue()
@@ -361,10 +279,19 @@ void NetClient::SynchFromQueue()
 	if(!canNetwork) return;
 	if(synchQueue.empty()) return;
 
+	bool endAllNotesMarkerFound = false;
 	std::vector<NetConstants::SynchData> datas;
 	for(int i=0; i<10 && !synchQueue.empty(); i++)
 	{
-		datas.push_back(synchQueue.front());
+		if(synchQueue.front().idOnSever == EndAllNotesMarker())
+		{
+			endAllNotesMarkerFound = true;
+		}
+		else
+		{
+			datas.push_back(std::move(synchQueue.front()));
+		}
+
 		synchQueue.pop();
 	}
 	QString request = NetConstants::MakeRequest_synch_note(datas);
@@ -399,7 +326,14 @@ void NetClient::SynchFromQueue()
 		}
 	};
 
-	RequestToServer(NetConstants::request_synch_note(), request, std::move(answFoo));
+	RequestInSock(socket, NetConstants::request_synch_note(), request, std::move(answFoo));
+
+	if(endAllNotesMarkerFound)
+	{
+		MsgToServer(NetConstants::msg_all_client_notes_synch_sended(), {});
+
+		MsgToServer(NetConstants::msg_highest_idOnServer(), DataBase::HighestIdOnServer());
+	}
 }
 
 void NetClient::CommandsToClientWorker(QString text)
@@ -501,4 +435,190 @@ void NetClient::command_remove_note_worker(QString && commandContent)
 	}
 }
 
+void NetClient::command_update_note_worker(QString && commandContent)
+{
+	auto note = Note::LoadNote(commandContent);
+	if(!note) {
+		Error("command_update_note_worker: cant load note from data: " + commandContent);
+		MsgToServer(NetConstants::msg_error(), "command_update_note_worker: cant load note from data: " + commandContent);
+		return;
+	}
 
+	auto rec = DataBase::NoteByIdOnServer(QSn(note->idOnServer));
+	if(rec.isEmpty())
+	{
+		note->id = DataBase::InsertNoteInClientDB(note.get());
+		emit SignalNewNoteAppeared(note->id);
+		return;
+	}
+
+	note->id = rec[Fields::idNoteInd].toLongLong();
+	if(note->id <= 0)
+	{
+		Error("can't define local note id " + note->Name());
+		return;
+	}
+
+	auto res = DataBase::SaveNoteOnClient(note.get());
+	if(res.isEmpty()) emit SignalNoteUpdated(note->id);
+	else
+	{
+		Error("command_update_note_worker: saving note error: " + res);
+		MsgToServer(NetConstants::msg_error(), "command_update_note_worker: saving note error: " + res);
+	}
+}
+
+void NetClient::request_get_note_worker(QTcpSocket * sock, NetClient::RequestData && requestData)
+{
+	QString &idOnServer = requestData.content;
+	auto rec = DataBase::NoteByIdOnServer(idOnServer);
+	if(rec.isEmpty())
+	{
+		Error("CheckNoteId "+idOnServer+" false");
+		AnswerForRequestSending(sock, requestData, NetConstants::invalid());
+		return;
+	}
+
+	Note note;
+	note.InitFromRecord(rec);
+	AnswerForRequestSending(sock, requestData, note.ToStr_v1());
+}
+
+void Requester::SendInSock(QTcpSocket * sock, QString str, bool sendEndMarker)
+{
+	CodeMarkers::can_be_optimized("takes copy, than make other copy");
+
+	Log("sending: " + (str == " " ? "_space_" : sendEndMarker ? str + NetConstants::end_marker() : str));
+
+	str.replace(NetConstants::end_marker(), NetConstants::end_marker_replace());
+
+	sock->write(str.toUtf8());
+	if(sendEndMarker) sock->write(NetConstants::end_marker().toUtf8());
+
+	Log(" | sended", true);
+}
+
+void Requester::RequestInSock(QTcpSocket *sock, const QString & requestType, QString content, Requester::AnswerWorkerFunction answWorker)
+{
+	CodeMarkers::can_be_optimized("takes copy, than make other copy");
+
+	CodeMarkers::to_do("нужно удалять из requestAswerWorkers спустя время если не пришло");
+
+	int idRqst = TakeIdRequest();
+	requestAswerWorkers[idRqst] = std::move(answWorker);
+	CodeMarkers::to_do("а у запроса должен быть еще и срок действия, который если вышел - то ГАЛЯ у нас отмена");
+
+	SendInSock(sock, NetConstants::request(), false);
+	SendInSock(sock, QSn(idRqst).append(' '), false);
+	SendInSock(sock, requestType, false);
+	SendInSock(sock, " ", false);
+	SendInSock(sock, content, true);
+}
+
+void Requester::RequestsWorker(QTcpSocket * sock, QString text)
+{
+	CodeMarkers::can_be_optimized("give copy text to DecodeRequestCommand, but can move, but it used in error");
+	auto requestData = NetClient::DecodeRequestCommand(text);
+	if(!requestData.errors.isEmpty())
+	{
+		Error("error decoding request: "+requestData.errors + "; full text:\n"+text);
+		AnswerForRequestSending(sock, requestData, NetConstants::not_did());
+		// почему стоит ответить - чтобы клиент не ждал пока истечет таймаут
+		return;
+	}
+
+	Log("get reuqest "+requestData.type+" "+requestData.id+", start work");
+
+	if(auto it = RequestWorkersMap().find(requestData.type); it != RequestWorkersMap().end())
+	{
+		std::function<void(QTcpSocket *sock, NetClient::RequestData &&requestData)> &requestWorker = it->second;
+		requestWorker(sock, std::move(requestData));
+	}
+	else Error("Unrealesed requestData.type " + requestData.type);
+}
+
+void Requester::AnswerForRequestSending(QTcpSocket * sock, RequestData & requestData, QString str)
+{
+	MyCppDifferent::sleep_ms(answDelay);
+	if(requestData.id.isEmpty() || requestData.content.isEmpty())
+	{
+		Error("AnswerForRequestSending executed with empty requestData: id=["+requestData.id+"] content=["+requestData.content+"]");
+		return;
+	}
+	SendInSock(sock, NetConstants::request_answ(), false);
+	SendInSock(sock, std::move(requestData.id.append(" ")), false);
+	SendInSock(sock, std::move(str), true);
+}
+
+void Requester::RequestsAnswersWorker(QString text)
+{
+	CodeMarkers::can_be_optimized("give copy text to DecodeRequestCommand, but can move, but it used in error");
+	auto requestAnswerData = NetClient::DecodeRequestAnswer(text);
+	if(!requestAnswerData.errors.isEmpty())
+	{
+		Error("error decoding request answer: "+requestAnswerData.errors + "; full text:\n"+text);
+		return;
+	}
+
+	auto it = requestAswerWorkers.find(requestAnswerData.id.toInt());
+	if(it == requestAswerWorkers.end())
+	{
+		Error("error working request answer, not found worker for id; full text:\n"+text);
+		return;
+	}
+
+	it->second(std::move(requestAnswerData.content));
+
+	requestAswerWorkers.erase(it);
+}
+
+Requester::RequestData Requester::DecodeRequestCommand(QString command)
+{
+	CodeMarkers::can_be_optimized("can be faster, no remove+LeftRef, but take MidRef");
+
+	RequestData data;
+
+	if(!command.startsWith(NetConstants::request())) { data.errors = "bad start"; return data; }
+
+	command.remove(0,NetConstants::request().size());
+
+	int spaceIndex = command.indexOf(' ');
+	if(spaceIndex == -1) { data.errors = "not found space to close id"; return data; }
+
+	if(IsInt(command.leftRef(spaceIndex))) data.id = command.leftRef(spaceIndex).toString();
+	else { data.errors = "bad id"; return data; }
+
+	command.remove(0,spaceIndex +1);
+
+	spaceIndex = command.indexOf(' ');
+	if(spaceIndex == -1) { data.errors = "not found space to close requestType"; return data; }
+	data.type = command.left(spaceIndex);
+	if(NetConstants::allReuestTypes().count(data.type) == 0) { data.errors = "bad requestType"; data.type = ""; return data; }
+
+	command.remove(0,spaceIndex +1);
+
+	data.content = std::move(command);
+
+	return data;
+}
+
+Requester::RequestData Requester::DecodeRequestAnswer(QString command)
+{
+	RequestData data;
+
+	if(!command.startsWith(NetConstants::request_answ())) { data.errors = "bad start"; return data; }
+
+	command.remove(0,NetConstants::request_answ().size());
+
+	int spaceIndex = command.indexOf(' ');
+	if(spaceIndex == -1) { data.errors = "not found space to close id"; return data; }
+
+	if(IsInt(command.leftRef(spaceIndex))) data.id = command.leftRef(spaceIndex).toString();
+	else { data.errors = "bad id"; return data; }
+
+	command.remove(0,spaceIndex +1);
+
+	data.content = std::move(command);
+
+	return data;
+}

@@ -54,6 +54,7 @@ public:
 
 	void InitFromTmpNote(Note &note);
 	void InitFromRecord(QStringList &record);
+	static Note CreateFromRecord(QStringList &record);
 	void UpdateThisNoteFromSQL();
 
 	QString Name() { return name; }
@@ -74,7 +75,7 @@ public:
 	void SaveNoteOnClient(const QString &reason);
 	static std::unique_ptr<Note> LoadNote(const QString &text);
 	static Note FromStr_v1(const QString &text);
-	QString ToStr_v1();
+	QString ToStr_v1() const;
 	static std::vector<Note> LoadNotes();
 	static void LoadNotesFromFilesAndSaveInBd();
 

@@ -26,6 +26,12 @@ QString Note::ToStrForLog()
 
 void Note::DialogMoveToGroup()
 {
+	if(!netClient->canNetwork)
+	{
+		QMbError("Server not connected, operation impossible");
+		return;
+	}
+
 	QStringList grNames = DataBase::GroupsNames();
 	static QString createNew = "Create new";
 	grNames.prepend(createNew);
@@ -47,12 +53,16 @@ void Note::DialogMoveToGroup()
 
 void Note::DialogEditCurrentGroup()
 {
-
+	QMbError("Unrealesed");
 }
 
 void Note::DialogCreateNewGroup()
 {
-	if(!netClient->canNetwork) return;
+	if(!netClient->canNetwork)
+	{
+		QMbError("Server not connected, operation impossible");
+		return;
+	}
 
 	auto inpRes = MyQDialogs::InputLine("Group creation", "Input new group name");
 	if(!inpRes.accepted) return;
@@ -71,7 +81,7 @@ void Note::DialogCreateNewGroup()
 		}
 	};
 
-	netClient->RequestToServerWithWait(NetConstants::request_try_create_group(), newGroupName, std::move(answFoo));
+	netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_try_create_group(), newGroupName, std::move(answFoo));
 }
 
 void Note::MoveToGroup(QString newGroupName)
@@ -112,7 +122,7 @@ void Note::MoveToGroup(QString newGroupName)
 		this->dtLastUpdated = QDateTime::currentDateTime();
 		Note tmpNote(*this);
 		tmpNote.group = newGroupName;
-		netClient->RequestToServerWithWait(NetConstants::request_create_note_on_server(), tmpNote.ToStr_v1(), std::move(answFoo));
+		netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_create_note_on_server(), tmpNote.ToStr_v1(), std::move(answFoo));
 	}
 	else // перемещение не из дефолтной, заметка на сервере уже существует
 	{
@@ -133,7 +143,7 @@ void Note::MoveToGroup(QString newGroupName)
 
 		dtLastUpdated = QDateTime::currentDateTime();
 		auto request = NetConstants::MakeRequest_move_note_to_group(QSn(this->idOnServer), newGroupId, dtLastUpdated);
-		netClient->RequestToServerWithWait(NetConstants::request_move_note_to_group(), std::move(request), std::move(answFoo));
+		netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_move_note_to_group(), std::move(request), std::move(answFoo));
 	}
 }
 
@@ -161,6 +171,13 @@ void Note::InitFromRecord(QStringList &row)
 	idOnServer = row[Fields::idNoteOnServerInd].toInt();
 	content = std::move(row[Fields::contentInd]);
 	dtLastUpdated = QDateTime::fromString(row[Fields::lastUpdatedInd], Fields::dtFormatLastUpated());
+}
+
+Note Note::CreateFromRecord(QStringList & record)
+{
+	Note note;
+	note.InitFromRecord(record);
+	return note;
 }
 
 void Note::UpdateThisNoteFromSQL()
@@ -204,18 +221,23 @@ void Note::SaveNoteOnClient(const QString &reason)
 
 	dtLastUpdated = QDateTime::currentDateTime();
 
-	DataBase::SaveNoteOnClient(this);
+	auto saveRes = DataBase::SaveNoteOnClient(this);
+	if(!saveRes.isEmpty())
+	{
+		QMbError("Saving note error: " + saveRes);
+		return;
+	}
 
 	if(group != defaultGroupName())
 	{
 		NetClient::AnswerWorkerFunction answFoo = [](QString &&answContent){
 			if(answContent != NetConstants::success())
-				QMbWarning("Server can't save note, and try again later");
+				QMbWarning("Server can't save note, it saved local");
 		};
 
 		if(netClient->canNetwork)
-			netClient->RequestToServerWithWait(NetConstants::request_note_saved(), ToStr_v1(), answFoo);
-		else QMbWarning("Server not connected, can't save, connect and try again");
+			netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_note_saved(), ToStr_v1(), answFoo);
+		else QMbWarning("Server not connected, note saved local");
 	}
 }
 
@@ -270,7 +292,7 @@ Note Note::FromStr_v1(const QString &text)
 	return newNote;
 }
 
-QString Note::ToStr_v1()
+QString Note::ToStr_v1() const
 {
 	QString noteText;
 	noteText.append(SaveKeyWods::version()).append("1").append(SaveKeyWods::endValue());

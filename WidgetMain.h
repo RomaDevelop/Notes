@@ -30,6 +30,7 @@ public:
 	QTableWidget *table;
 
 	std::vector<std::unique_ptr<NoteInMain>> notes;
+	std::vector<Note*> AllNotesVect() { std::vector<Note*> v; for(auto &n:notes) v.push_back(n->note.get()); return v; }
 
 	std::unique_ptr<WidgetAlarms> widgetAlarms;
 
@@ -75,7 +76,8 @@ private:
 	void DefaultColsWidths();
 
 	void SlotForNetClientNoteRemoved(qint64 id);
-	void SlotForNetClientNoteChangedGroup(qint64 id);
+	void SlotForNetClientNoteChangedGroupOrUpdated(qint64 id);
+	void SlotForNetClientNewNoteAppeared(qint64 id);
 };
 
 

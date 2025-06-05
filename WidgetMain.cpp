@@ -148,7 +148,9 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	netClient = new NetClient(this);
 	Note::netClient = netClient;
 	connect(netClient, &NetClient::SignalNoteRemoved, this, &WidgetMain::SlotForNetClientNoteRemoved);
-	connect(netClient, &NetClient::SignalNoteChangedGgroup, this, &WidgetMain::SlotForNetClientNoteChangedGroup);
+	connect(netClient, &NetClient::SignalNoteChangedGgroup, this, &WidgetMain::SlotForNetClientNoteChangedGroupOrUpdated);
+	connect(netClient, &NetClient::SignalNoteUpdated, this, &WidgetMain::SlotForNetClientNoteChangedGroupOrUpdated);
+	connect(netClient, &NetClient::SignalNewNoteAppeared, this, &WidgetMain::SlotForNetClientNewNoteAppeared);
 }
 
 WidgetMain::~WidgetMain()
@@ -218,9 +220,7 @@ void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 	btnSynch->setFixedWidth(QFontMetrics(btnSynch->font()).horizontalAdvance(btnSynch->text()) + 20);
 	hlo1->addWidget(btnSynch);
 	connect(btnSynch, &QPushButton::clicked, [this](){
-		for(auto &note:notes)
-			if(note->note->group != Note::defaultGroupName())
-				netClient->SynchronizeNote(note->note.get());
+		netClient->SynchronizeAllNotes(AllNotesVect());
 	});
 
 // Save path
@@ -421,6 +421,7 @@ void WidgetMain::LoadNotes()
 	{
 		MakeNewNote(note, loaded);
 	}
+	netClient->SynchronizeAllNotes(AllNotesVect());
 }
 
 int WidgetMain::RowOfNote(Note * note)
@@ -517,9 +518,6 @@ Note & WidgetMain::MakeNewNote(Note noteSrc, newNoteReason reason)
 		RemoveNote(newNote, true);
 		CheckNotesForAlarm();
 	};
-
-	if(newNote->group != Note::defaultGroupName())
-		netClient->SynchronizeNote(newNote);
 
 	return *newNote;
 }
@@ -637,7 +635,7 @@ bool WidgetMain::RemoveNoteSQLOnClient(Note * note)
 			else QMbError("Can't remove note, bad server answ");
 		};
 
-		netClient->RequestToServerWithWait(NetConstants::request_remove_note(), QSn(note->idOnServer), std::move(answFoo));
+		netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_remove_note(), QSn(note->idOnServer), std::move(answFoo));
 		return false;
 	}
 }
@@ -681,13 +679,20 @@ void WidgetMain::SlotForNetClientNoteRemoved(qint64 id)
 	else RemoveNote(note->note.get(), false);
 }
 
-void WidgetMain::SlotForNetClientNoteChangedGroup(qint64 id)
+void WidgetMain::SlotForNetClientNoteChangedGroupOrUpdated(qint64 id)
 {
 	auto note = NoteById(id);
 	if(!note) { QMbError("SlotForNetClientNoteRemoved note not found"); return; }
 
 	note->note->UpdateThisNoteFromSQL();
 	UpdateWidgetsFromNote(*note);
+}
+
+void WidgetMain::SlotForNetClientNewNoteAppeared(qint64 id)
+{
+	auto rec = DataBase::NoteByIdOnClient(QSn(id));
+	if(rec.isEmpty()) { QMbError("SlotForNetClientNewNoteAppeared note not found"); return; }
+	else MakeNewNote(Note::CreateFromRecord(rec), loaded);
 }
 
 
