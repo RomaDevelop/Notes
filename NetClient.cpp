@@ -50,7 +50,8 @@ void NetClient::CreateSocket()
 {
 	socket->deleteLater();
 	socket = new QTcpSocket(this);
-	socket->connectToHost("127.0.0.1", port);
+	//socket->connectToHost("127.0.0.1", port);
+	socket->connectToHost("83.217.213.213", port);
 	connect(socket, &QTcpSocket::connected, this, &NetClient::SlotConnected);
 	connect(socket, &QTcpSocket::disconnected, [this](){ Log("disconnected"); canNetwork = false; });
 	connect(socket, &QTcpSocket::readyRead, this, &NetClient::SlotReadyRead);

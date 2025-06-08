@@ -86,9 +86,6 @@ public:
 	}
 	static int GetVersion(const QString &text);
 
-	inline static QString notesSavesPath;
-	inline static QString notesBackupsPath;
-
 	void ExecRemoveNoteWorker();
 	std::function<void()> removeNoteWorker;
 

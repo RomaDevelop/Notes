@@ -52,10 +52,13 @@ void ToDo(){
 	///	(позже) сделать cb note removed и подключить к нему WidgetAlarms и в удалении убрать обязательное удальение строки из WidgetAlarms
 	/// (позже) для сокращения трафика, расчитывать дату изменении группы заметок и сравнивать сначала её, а уже если надо - работать по заметка группы
 	///
+	/// дебаг - работать локально, выпуск - через сервер
+	///
 	/// !!! Проход через проксю
 	///
-	/// Синхронизация заметок с сервером
-	///		в процессе: WidgetServer::request_synch_note_worker
+	/// После удаления заметки если она редактировалась, редактор должен закрываться и уничтожаться
+	///
+	/// Синхронизация заметок с сервером - в процессе
 	///
 	/// Развертка сервера
 	/// 
@@ -96,12 +99,6 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 
 	QString currentDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName);
 
-	Note::notesSavesPath = filesPath + "/notes";
-	Note::notesBackupsPath = filesPath + "/notes_backups";
-	if(!QDir().mkpath(Note::notesBackupsPath)) QMbError("mkpath error " + Note::notesBackupsPath);
-	if(0) CodeMarkers::to_do("поставить меньше 1000");
-	MyQFileDir::RemoveOldFiles(Note::notesBackupsPath, 1000);
-
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
 	QHBoxLayout *hlo1 = new QHBoxLayout;
 	QHBoxLayout *hlo2 = new QHBoxLayout;
@@ -122,8 +119,6 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	});
 
 	CreateTableContextMenu();
-
-	QDir().mkpath(Note::notesSavesPath);
 
 	auto labelToGetFont = new QLabel("labelToGetFont");
 	vlo_main->addWidget(labelToGetFont);

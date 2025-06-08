@@ -320,13 +320,15 @@ void Note::LoadNotesFromFilesAndSaveInBd()
 {
 	std::vector<Note> notes;
 	QString loadStartDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName);
-	auto files = QDir(Note::notesSavesPath).entryList(QDir::Files,QDir::Name);
+	QString notesSavesPath = MyQDifferent::PathToExe() + "/files/notes";
+	QString notesBackupsPath = MyQDifferent::PathToExe() + "/files/notes_backups";
+	auto files = QDir(notesSavesPath).entryList(QDir::Files,QDir::Name);
 	for(int i=0; i<files.size(); i++)
 	{
 		QString thisOptionDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName_ms);
-		QString filePathName = Note::notesSavesPath + "/" + files[i];
-		QDir().mkpath(Note::notesBackupsPath + "/" + loadStartDt);
-		if(!QFile::copy(filePathName, Note::notesBackupsPath + "/" + loadStartDt + "/" + thisOptionDt + " " + files[i]))
+		QString filePathName = notesSavesPath + "/" + files[i];
+		QDir().mkpath(notesBackupsPath + "/" + loadStartDt);
+		if(!QFile::copy(filePathName, notesBackupsPath + "/" + loadStartDt + "/" + thisOptionDt + " " + files[i]))
 			QMbError("creation backup note error for file  " + filePathName);
 
 		auto fileContent = MyQFileDir::ReadFile1(filePathName);

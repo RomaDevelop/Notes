@@ -1,0 +1,1 @@
+psexec \\83.217.213.213 -u user -p password -i 1 -d "C:\Users\Administrator\Desktop\release\NotesServer.exe"
