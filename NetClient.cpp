@@ -50,8 +50,11 @@ void NetClient::CreateSocket()
 {
 	socket->deleteLater();
 	socket = new QTcpSocket(this);
-	//socket->connectToHost("127.0.0.1", port);
+#ifdef QT_DEBUG
+	socket->connectToHost("127.0.0.1", port);
+#else
 	socket->connectToHost("83.217.213.213", port);
+#endif
 	connect(socket, &QTcpSocket::connected, this, &NetClient::SlotConnected);
 	connect(socket, &QTcpSocket::disconnected, [this](){ Log("disconnected"); canNetwork = false; });
 	connect(socket, &QTcpSocket::readyRead, this, &NetClient::SlotReadyRead);
@@ -272,7 +275,9 @@ void NetClient::SynchronizeAllNotes(std::vector<Note*> allClientNotes)
 		if(note->group == Note::defaultGroupName()) continue;
 		synchQueue.emplace(NetConstants::SynchData(note, QSn(note->idOnServer), note->DtLastUpdatedStr()));
 	}
-	synchQueue.emplace(NetConstants::SynchData({}, EndAllNotesMarker(), {}));
+	if(!synchQueue.empty())
+		synchQueue.emplace(NetConstants::SynchData({}, EndAllNotesMarker(), {}));
+	else Log("SynchronizeAllNotes called. Nothing to synch");
 }
 
 void NetClient::SynchFromQueue()
@@ -296,6 +301,7 @@ void NetClient::SynchFromQueue()
 		synchQueue.pop();
 	}
 	QString request = NetConstants::MakeRequest_synch_note(datas);
+	if(request.isEmpty()) { Error("SynchFromQueue result MakeRequest_synch_note is empty"); return; }
 
 	AnswerWorkerFunction answFoo = [this, datas_ = std::move(datas)](QString &&answContent){
 		if(0) CodeMarkers::to_do("опасность, тут может быть обращение к уже уничтоженной заметке");
@@ -389,6 +395,12 @@ void NetClient::command_remove_note_worker(QString && commandContent)
 {
 	/// на клиенте пока нет корзины - выводить сообщение, какие заметки предлагается удалить
 	QString &idOnServer = commandContent;
+	if(!IsUInt(idOnServer))
+	{
+		Error("command_remove_note_worker get bad idOnServer: " + idOnServer);
+		MsgToServer(NetConstants::msg_error(), "command_remove_note_worker get bad idOnServer: " + idOnServer);
+		return;
+	}
 	auto record = DataBase::NoteByIdOnServer(idOnServer);
 	if(record.isEmpty())
 	{
@@ -543,7 +555,7 @@ void Requester::AnswerForRequestSending(QTcpSocket * sock, RequestData & request
 	MyCppDifferent::sleep_ms(answDelay);
 	if(requestData.id.isEmpty() || requestData.content.isEmpty())
 	{
-		Error("AnswerForRequestSending executed with empty requestData: id=["+requestData.id+"] content=["+requestData.content+"]");
+		Warning("AnswerForRequestSending executed with empty requestData: id=["+requestData.id+"] content=["+requestData.content+"]");
 		return;
 	}
 	SendInSock(sock, NetConstants::request_answ(), false);
