@@ -53,15 +53,7 @@ class NetClient : public QObject, public Requester
 {
 	Q_OBJECT
 public:
-	explicit NetClient(QObject *parent = nullptr) : QObject(parent)
-	{
-		CreateWindowSocket(true);
-		CreateSocket();
-
-		timerSynch = new QTimer(this);
-		connect(timerSynch, &QTimer::timeout, [this](){ SynchFromQueue(); });
-		timerSynch->start(100);
-	}
+	explicit NetClient(QObject *parent = nullptr);
 	~NetClient();
 	void SlotTest();
 
@@ -76,7 +68,7 @@ public:
 	bool canNetwork = false;
 	int port = 25001;
 	void CreateSocket();
-	void CreateWindowSocket(bool show);
+	void CreateWindow(bool show);
 public slots:
 	void SlotConnected();
 	void SlotReadyRead();
