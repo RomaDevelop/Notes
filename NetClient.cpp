@@ -5,6 +5,11 @@
 #include <QMessageBox>
 #include <QPointer>
 #include <QLabel>
+#include <QComboBox>
+#include <QNetworkProxy>
+#include <QNetworkAccessManager>
+#include <QUrl>
+#include <QNetworkReply>
 
 #include "InputBlocker.h"
 
@@ -17,6 +22,29 @@
 #include "DataBase.h"
 #include "Note.h"
 
+NetClient::NetClient(QObject *parent) : QObject(parent)
+{
+	CreateWindow(true);
+
+	//	QNetworkProxy *proxyPtr = new QNetworkProxy;
+	//	QNetworkProxy &proxy = *proxyPtr;
+	//	proxy.setType(QNetworkProxy::HttpProxy); // Тип прокси (HTTP, SOCKS и т.д.)
+	//	proxy.setHostName("10.123.2.222"); // Адрес прокси-сервера
+	//	proxy.setPort(3128); // Порт прокси-сервера
+	//	proxy.setUser("MyslivchenkoRI"); // Имя пользователя (если требуется)
+	//	proxy.setPassword("GenCtr2025"); // Пароль (если требуется)
+
+	//	// Устанавливаем прокси для QNetworkAccessManager
+	//	QNetworkProxy::setApplicationProxy(proxy);
+	//QNetworkProxyFactory::setUseSystemConfiguration(true);
+
+	CreateSocket();
+
+	timerSynch = new QTimer(this);
+	connect(timerSynch, &QTimer::timeout, [this](){ SynchFromQueue(); });
+	timerSynch->start(100);
+}
+
 NetClient::~NetClient()
 {
 	if(socket) socket->disconnectFromHost();
@@ -24,7 +52,24 @@ NetClient::~NetClient()
 
 void NetClient::SlotTest()
 {
-	Log(DataBase::DoSqlQueryGetFirstRec("select idgroup from Notes where idNote=60").join(" "));
+	QNetworkAccessManager *manager = new QNetworkAccessManager();
+
+	QUrl qurl("http://localhost:25001");
+	QNetworkRequest request(qurl);
+	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+
+	// Отправка POST-запроса
+	QNetworkReply *reply = manager->post(request, "1 ывывы END");
+
+	// Обработка ответа
+	QObject::connect(reply, &QNetworkReply::finished, [reply]() {
+		if (reply->error() == QNetworkReply::NoError) {
+			qDebug() << "Response:" << reply->readAll();
+		} else {
+			qDebug() << "Error:" << reply->errorString();
+		}
+		reply->deleteLater();
+	});
 }
 
 void NetClient::Log(const QString &str, bool appendInLastRow)
@@ -62,7 +107,7 @@ void NetClient::CreateSocket()
 		// в старом стиле из-за кривизны Qt
 }
 
-void NetClient::CreateWindowSocket(bool show)
+void NetClient::CreateWindow(bool show)
 {
 	widget = std::make_unique<QWidget>();
 	widget->setWindowTitle("NetClient");
@@ -70,8 +115,10 @@ void NetClient::CreateWindowSocket(bool show)
 	QVBoxLayout *vlo_main = new QVBoxLayout(widget.get());
 	QHBoxLayout *hlo1 = new QHBoxLayout;
 	QHBoxLayout *hlo2 = new QHBoxLayout;
+	QHBoxLayout *hlo3 = new QHBoxLayout;
 	vlo_main->addLayout(hlo1);
 	vlo_main->addLayout(hlo2);
+	vlo_main->addLayout(hlo3);
 
 	QPushButton *btnTestClear = new QPushButton("clear");
 	hlo1->addWidget(btnTestClear);
@@ -105,8 +152,11 @@ void NetClient::CreateWindowSocket(bool show)
 
 	hlo1->addStretch();
 
+
+	//hlo2->addStretch();
+
 	textEditSocket = new QTextEdit;
-	hlo2->addWidget(textEditSocket);
+	hlo3->addWidget(textEditSocket);
 
 	if(show) widget->show();
 
