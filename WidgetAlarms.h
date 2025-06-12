@@ -14,6 +14,8 @@
 struct NoteInAlarms
 {
 	Note* note;
+	QWidget *widgetAll;
+	QWidget *widgetAllExeptLabels;
 	QLabel* labelCaption1;
 	QLabel* labelCaption2;
 	int cbCounter = 0;
@@ -52,7 +54,7 @@ private:
 	QByteArray geo;
 
 	QFont fontForLabels;
-	QFontMetrics fontMetrixForLabels;
+	QFontMetricsF fontMetrixForLabels;
 
 	void FitColWidth();
 

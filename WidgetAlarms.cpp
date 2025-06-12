@@ -152,29 +152,39 @@ void WidgetAlarms::AddNote(Note * note)
 	table->setRowCount(table->rowCount()+1);
 	int row = table->rowCount()-1;
 	auto widget = new QWidget;
+	auto widgetAllExeptLabels = new QWidget;
 	table->setCellWidget(row, 0, widget);
 
 	auto hlo = new QHBoxLayout(widget);
 	hlo->setContentsMargins(0,0,0,0);
+	auto hlo2 = new QHBoxLayout(widgetAllExeptLabels);
+	hlo2->setContentsMargins(0,0,0,0);
+
 	auto labelCaption1 = new QLabel;
 	labelCaption1->setFont(fontForLabels);
-	labelCaption1->setMaximumWidth(table->width() - 480);
+
 	auto labelCaption2 = new QLabel;
 	labelCaption2->setFont(fontForLabels);
-	hlo->addWidget(labelCaption1);
-	hlo->addWidget(labelCaption2);
-	hlo->addStretch();
 	auto btnReschedule = new QPushButton(" Перенести на ... ");
 	auto btnPostpone = new QPushButton(" Отложить на ... ");
 	auto btnRemove = new QPushButton(" Удалить ");
-	hlo->addWidget(btnReschedule);
-	hlo->addWidget(btnPostpone);
-	hlo->addWidget(btnRemove);
-	hlo->addSpacing(4);
+
+	hlo->addWidget(labelCaption1);
+	hlo->addWidget(labelCaption2);
+	hlo->addStretch();
+
+	hlo->addWidget(widgetAllExeptLabels);
+
+	hlo2->addWidget(btnReschedule);
+	hlo2->addWidget(btnPostpone);
+	hlo2->addWidget(btnRemove);
+	hlo2->addSpacing(4);
 
 	NoteInAlarms *newNoteInAlarmsPtr = notes.emplace_back(new NoteInAlarms).get();
 	NoteInAlarms &newNoteInAlarms = *newNoteInAlarmsPtr;
 	newNoteInAlarms.note = note;
+	newNoteInAlarms.widgetAll = widget;
+	newNoteInAlarms.widgetAllExeptLabels = widgetAllExeptLabels;
 	newNoteInAlarms.labelCaption1 = labelCaption1;
 	newNoteInAlarms.labelCaption2 = labelCaption2;
 
@@ -210,20 +220,20 @@ void WidgetAlarms::AddNote(Note * note)
 
 void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 {
-	int labelCaption1W = table->width() - 440;
-	if(labelCaption1W < 50) labelCaption1W = 50;
-	note.labelCaption1->setMaximumWidth(labelCaption1W);
-
 	QString text1 = "   " + note.note->Name();
-	if(fontMetrixForLabels.boundingRect(text1).width() + 15 > labelCaption1W)
-	{
-		while(fontMetrixForLabels.boundingRect(text1).width() + 20 > labelCaption1W - fontMetrixForLabels.boundingRect("...").width())
-			text1.chop(1);
-		text1 += "...";
-	}
+	QString text2 = "("+note.note->DTNotify().toString("dd MMM yyyy hh:mm:ss")+")";
+
+	int maxWidth = table->width() - fontMetrixForLabels.horizontalAdvance(text2);
+	maxWidth -= note.widgetAllExeptLabels->width() + table->width() * 0.12;
+	/// костыль < + table->width() * 0.12 > вычислен дома экспериментальным путем. Будет ли работать на работе???
+	/// Можно покопать в сторону разделения строки на разные ячейки, потому что у ячеек всё четко
+	///		Скрыть разделяющие ячейки линии только вертикальные невозможно.
+	///		Можно скрыть все и попробовать отрисовать горизонтальные. Возможно через QStyledItemDelegate или ещё как-то
+
+	text1 = fontMetrixForLabels.elidedText("   " + note.note->Name(), Qt::ElideRight, maxWidth);
 
 	note.labelCaption1->setText(text1);
-	note.labelCaption2->setText("("+note.note->DTNotify().toString("dd MMM yyyy hh:mm:ss")+")");
+	note.labelCaption2->setText(text2);
 }
 
 void WidgetAlarms::RemoveNoteFromWidgetAlarms(int index)
@@ -403,7 +413,10 @@ void WidgetAlarms::showEvent(QShowEvent * event)
 		if(geo.isEmpty()) QMbError("geo.isEmpty()");
 	}
 
-	QTimer::singleShot(10,this,[this]{ FitColWidth(); });
+	QTimer::singleShot(10,this,[this]{ resize(size()+QSize(1,1)); resize(size()-QSize(1,1)); });
+										/// Экспериментально подобранный костыль чтобы лейбл с именем получил нужную ширину.
+										/// Несмотря на то что resizeEvent все что делает - FitColWidth,
+										/// тут вызова FitColWidth не достаточно. Ненавижу работу с размерами виджетов Qt !!!!!!!!!!
 
 	event->accept();
 }
