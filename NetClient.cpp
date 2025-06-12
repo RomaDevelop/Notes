@@ -322,7 +322,7 @@ void NetClient::SynchronizeAllNotes(std::vector<Note*> allClientNotes)
 	if(0) CodeMarkers:: to_do("склейку запросов на синхронизацию для одной заметки");
 	for(auto &note:allClientNotes)
 	{
-		if(note->group == Note::defaultGroupName()) continue;
+		if(DataBase::IsGroupLocalByName(note->group)) continue;
 		synchQueue.emplace(NetConstants::SynchData(note, QSn(note->idOnServer), note->DtLastUpdatedStr()));
 	}
 	if(!synchQueue.empty())
@@ -480,7 +480,8 @@ void NetClient::command_remove_note_worker(QString && commandContent)
 		}
 		else if(answ == "Move to default group")
 		{
-			if(DataBase::MoveNoteToGroupOnClient(QSn(note.id), DataBase::DefaultGroupId(), QDateTime::currentDateTime().toString(Fields::dtFormatLastUpated())))
+			if(DataBase::MoveNoteToGroupOnClient(QSn(note.id), DataBase::DefaultGroupId2(),
+												 QDateTime::currentDateTime().toString(Fields::dtFormatLastUpated())))
 			{
 				emit SignalNoteChangedGgroup(note.id);
 			}

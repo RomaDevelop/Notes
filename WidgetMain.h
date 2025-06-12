@@ -47,13 +47,18 @@ private:
 	void CreateNotesAlarmChecker();
 	void CheckNotesForAlarm();
 
+	bool DialogGroupsSubscribes();
+
 	void SlotTest();
 
 	QString filesPath = MyQDifferent::PathToExe()+"/files";
 	QString settingsFile = filesPath + "/settings.ini";
+	QString groupsSubscribesFile = filesPath + "/groups_subscribes.ini";
+	QStringList groupsSubscribesValue;
 
 	void SaveSettings();
 	void LoadSettings();
+	void LoadGroupsSubscribes();
 	void LoadNotes();
 	int RowOfNote(Note* note);
 	Note* NoteOfRow(int row);
@@ -72,6 +77,7 @@ private:
 	void RemoveNote(Note* note, bool execSqlRemove);
 	bool RemoveNoteSQLOnClient(Note* note);
 	void RemoveNoteInMainWidget(Note* note);
+	void ClearNotesInWidgetMain();
 
 	void DefaultColsWidths();
 

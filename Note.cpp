@@ -26,21 +26,33 @@ QString Note::ToStrForLog()
 
 void Note::DialogMoveToGroup()
 {
-	if(!netClient->canNetwork)
-	{
-		QMbError("Server not connected, operation impossible");
-		return;
-	}
-
-	QStringList grNames = DataBase::GroupsNames();
+	QStringPairVector grDatas = DataBase::GroupsIdsAndNames();
 	static QString createNew = "Create new";
-	grNames.prepend(createNew);
-	QString currentGroupRow = group + " (current)";
-	for(auto &grName:grNames) if(grName == group) grName = currentGroupRow;
-	auto res = MyQDialogs::ListDialog("Moving note to group", grNames);
+
+	QStringList list {createNew};
+	int prependedCount = list.size();
+
+	int currentIndex = -1;
+	for(uint i=0; i<grDatas.size(); i++)
+	{
+		auto &grData = grDatas[i];
+		list.append("");
+
+		if(DataBase::IsGroupLocalById(grData.first)) list.back() = grData.second + " (local)";
+		else list.back() = grData.second + " (global)";
+
+		if(grData.second == group)
+		{
+			list.back() += " (current)";
+			currentIndex = i;
+		}
+	}
+	auto res = MyQDialogs::ListDialog("Moving note to group", list);
 	if(!res.accepted) return;
 
-	if(res.choosedText == currentGroupRow) return;
+	res.index -= prependedCount;
+
+	if(res.index == currentIndex) return;
 
 	if(res.choosedText == createNew)
 	{
@@ -48,7 +60,9 @@ void Note::DialogMoveToGroup()
 		return;
 	}
 
-	MoveToGroup(res.choosedText);
+	if(res.index < 0) QMbError("unexpacted error res.index < 0");
+
+	MoveToGroup(grDatas[res.index].second);
 }
 
 void Note::DialogEditCurrentGroup()
@@ -58,38 +72,63 @@ void Note::DialogEditCurrentGroup()
 
 void Note::DialogCreateNewGroup()
 {
-	if(!netClient->canNetwork)
+	auto answ = MyQDialogs::CustomDialog("Group creation", "Choose group type to create",{"local","global"});
+	if(answ == "local")
 	{
-		QMbError("Server not connected, operation impossible");
-		return;
+		auto inpRes = MyQDialogs::InputLine("Group creation", "Input new local group name");
+		if(!inpRes.accepted) return;
+		if(inpRes.text.isEmpty()) { QMbError("Empty group name"); return; }
+
+		auto resId = DataBase::TryCreateNewLocalGroup(inpRes.text);
+		if(resId < 0) QMbInfo("Group " + inpRes.text + " created");
+		else QMbError("TryCreateNewGroup in local base error, resId("+QSn(resId)+") >= 0");
 	}
-
-	auto inpRes = MyQDialogs::InputLine("Group creation", "Input new group name");
-	if(!inpRes.accepted) return;
-	if(inpRes.text.isEmpty()) { QMbError("Empty group name"); return; }
-
-	QString newGroupName = std::move(inpRes.text);
-
-	auto answFoo = [newGroupName](QString &&answContent){
-		auto idNewGroup = NetConstants::GetFromAnsw_try_create_group_IdGroup(answContent);
-		if(idNewGroup < 0) QMbError("Group was not created, answer is " + QSn(idNewGroup) + "");
-		else
+	else if (answ == "global")
+	{
+		if(!netClient->canNetwork)
 		{
-			auto resId = DataBase::TryCreateNewGroup(newGroupName, QSn(idNewGroup));
-			if(resId == idNewGroup) QMbInfo("Group " + newGroupName + " created");
-			else QMbError("TryCreateNewGroup in local base error, resId differs: " + QSn(resId));
+			QMbError("Server not connected, operation impossible");
+			return;
 		}
-	};
 
-	netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_try_create_group(), newGroupName, std::move(answFoo));
+		auto inpRes = MyQDialogs::InputLine("Group creation", "Input new global group name");
+		if(!inpRes.accepted) return;
+		if(inpRes.text.isEmpty()) { QMbError("Empty group name"); return; }
+
+		QString newGroupName = std::move(inpRes.text);
+
+		auto answFoo = [newGroupName](QString &&answContent){
+			auto idNewGroup = NetConstants::GetFromAnsw_try_create_group_IdGroup(answContent);
+			if(idNewGroup < 0) QMbError("Group was not created, answer is " + QSn(idNewGroup) + "");
+			else
+			{
+				auto resId = DataBase::TryCreateNewGlobalGroup(newGroupName, QSn(idNewGroup));
+				if(resId == idNewGroup) QMbInfo("Group " + newGroupName + " created");
+				else QMbError("TryCreateNewGroup in local base error, resId differs: " + QSn(resId));
+			}
+		};
+
+		netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_try_create_group(), newGroupName, std::move(answFoo));
+	}
 }
+
+
 
 void Note::MoveToGroup(QString newGroupName)
 {
 	auto newGroupId = DataBase::GroupId(newGroupName);
 	if(newGroupId.isEmpty()) { QMbError("ChangeGroup:: grId.isEmpty() for group " + newGroupName); return; }
 
-	if(group == defaultGroupName()) // перемещение из дефолтной группы. Заметка будет созаваться на сервере
+	if(DataBase::IsGroupLocalByName(group) && DataBase::IsGroupLocalById(newGroupId))
+	{
+		MoveToGroupOnClient(newGroupId, newGroupName);
+		return;
+	}
+
+	QMbError("MoveToGroup not local work need refactor");
+	return;
+
+	if(group == defaultGroupName2()) // перемещение из дефолтной группы. Заметка будет созаваться на сервере
 	{
 		auto answFoo = [this, newGroupId, newGroupName](QString &&answContent){
 			if(0) CodeMarkers::to_do("if note will be removed before answ get will be trouble");
@@ -129,14 +168,7 @@ void Note::MoveToGroup(QString newGroupName)
 		auto answFoo = [this, newGroupId, newGroupName](QString &&answContent){
 			if(answContent == NetConstants::success())
 			{
-				if(!DataBase::MoveNoteToGroupOnClient(QSn(id), newGroupId, DtLastUpdatedStr()))
-				{
-					QMbError("DataBase::MoveNoteToGroup returned false; tryed move to " + newGroupName);
-					return;
-				}
-
-				group = std::move(newGroupName);
-				EmitCbs(cbsGroupChanged);
+				MoveToGroupOnClient(newGroupId, newGroupName);
 			}
 			else QMbError("Can't move note to group, bad server answ");
 		};
@@ -145,6 +177,18 @@ void Note::MoveToGroup(QString newGroupName)
 		auto request = NetConstants::MakeRequest_move_note_to_group(QSn(this->idOnServer), newGroupId, dtLastUpdated);
 		netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_move_note_to_group(), std::move(request), std::move(answFoo));
 	}
+}
+
+void Note::MoveToGroupOnClient(const QString &newGroupId, const QString &newGroupName)
+{
+	if(!DataBase::MoveNoteToGroupOnClient(QSn(id), newGroupId, DtLastUpdatedStr()))
+	{
+		QMbError("DataBase::MoveNoteToGroup returned false; tryed move to " + newGroupName);
+		return;
+	}
+
+	group = std::move(newGroupName);
+	EmitCbs(cbsGroupChanged);
 }
 
 void Note::InitFromTmpNote(Note &note)
@@ -166,7 +210,7 @@ void Note::InitFromRecord(QStringList &row)
 	activeNotify = row[Fields::activeNotifyInd].toInt();
 	dtNotify = QDateTime::fromString(row[Fields::dtNotifyInd], Fields::dtFormat());
 	dtPostpone = QDateTime::fromString(row[Fields::dtPostponeInd], Fields::dtFormat());
-	group = DataBase::GroupName(row[Fields::idGroupInd]);
+	group = DataBase::GroupName(row[Fields::idGroupIndInNotes]);
 	id = row[Fields::idNoteInd].toInt();
 	idOnServer = row[Fields::idNoteOnServerInd].toInt();
 	content = std::move(row[Fields::contentInd]);
@@ -228,7 +272,7 @@ void Note::SaveNoteOnClient(const QString &reason)
 		return;
 	}
 
-	if(group != defaultGroupName())
+	if(!DataBase::IsGroupLocalByName(group))
 	{
 		NetClient::AnswerWorkerFunction answFoo = [](QString &&answContent){
 			if(answContent != NetConstants::success())
@@ -339,10 +383,10 @@ void Note::LoadNotesFromFilesAndSaveInBd()
 			Note &noteRef = *note_uptr.get();
 			notes.emplace_back(std::move(noteRef));
 
-			if(notes.back().group != notes.back().defaultGroupName())
+			if(notes.back().group != notes.back().defaultGroupName2())
 			{
 				QMbWarning("note->group != note->defaultGroupName()");
-				notes.back().group = notes.back().defaultGroupName();
+				notes.back().group = notes.back().defaultGroupName2();
 			}
 
 			DataBase::InsertNoteInClientDB(&notes.back());

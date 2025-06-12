@@ -134,6 +134,9 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 		delete labelToGetFont;
 
 		LoadSettings();
+
+		LoadGroupsSubscribes();
+
 		LoadNotes();
 	});
 
@@ -252,17 +255,18 @@ void WidgetMain::CreateTableContextMenu()
 		menu = new QMenu(this);
 
 		auto actionMoveToGroup = menu->addAction("Переместить в группу");
-		auto actionEditGroup = menu->addAction("Редактировать группу...");
+		auto actionEditGroup = menu->addAction("Редактировать группу");
+		auto actionGroupsSubscribes = menu->addAction("Подписки на группы");
 
 		actionEditGroup->setEnabled(true);
-		if(note->group == Note::defaultGroupName()) actionEditGroup->setEnabled(false);
+		if(note->group == Note::defaultGroupName2()) actionEditGroup->setEnabled(false);
 
 		connect(actionMoveToGroup, &QAction::triggered, [note](){ note->DialogMoveToGroup(); });
 		connect(actionEditGroup, &QAction::triggered, [note](){ note->DialogEditCurrentGroup(); });
+		connect(actionGroupsSubscribes, &QAction::triggered, [this](){ DialogGroupsSubscribes(); });
 
 		menu->exec(table->viewport()->mapToGlobal(pos));
 	});
-
 }
 
 void WidgetMain::CreateTrayIcon()
@@ -344,6 +348,43 @@ void WidgetMain::CheckNotesForAlarm()
 	widgetAlarms->GiveNotes(alarmedNotes);
 }
 
+bool WidgetMain::DialogGroupsSubscribes()
+{
+	auto groups = DataBase::GroupsAllFields();
+	std::vector<MyQDialogs::CheckBoxDialogItem> items;
+	for(auto &gr:groups)
+	{
+		auto &item = items.emplace_back();
+
+		item.text = gr[Fields::nameGroupIndex];
+		item.enabled = (gr[Fields::idGroupIndexInGroups] != DataBase::DefaultGroupId2());
+		item.checkState = Fields::CheckLogicField(gr[Fields::subscribedIndex]);
+	}
+	auto res = MyQDialogs::CheckBoxDialog("Groups subscribes", items);
+	if(!res.accepted) return false;
+
+	if(res.allItems.size() != groups.size() or items.size() != groups.size())
+	{ QMbError("unexpacted error: res.allItems.size() != groups.size()"); return false; }
+
+	groupsSubscribesValue.clear();
+	for(uint i=0; i<res.allItems.size(); i++)
+	{
+		if(res.allItems[i].checkState != items[i].checkState)
+		{
+			DataBase::SetGroupSubscribed(groups[i][Fields::idGroupIndexInGroups], res.allItems[i].checkState);
+		}
+
+		if(res.allItems[i].checkState) groupsSubscribesValue += groups[i][Fields::idGroupIndexInGroups] + ":1";
+		else groupsSubscribesValue += groups[i][Fields::idGroupIndexInGroups] + ":0";
+	}
+	if(!MyQFileDir::WriteFile(groupsSubscribesFile, groupsSubscribesValue.join(",")))
+		QMbError("Error writing file " + groupsSubscribesFile);
+
+	LoadNotes();
+
+	return true;
+}
+
 void WidgetMain::SlotTest()
 {
 	//netClient->Log(DataBase::DoSqlQueryGetFirstRec("select * from Notes where idNote=60").join(" "));
@@ -409,8 +450,30 @@ void WidgetMain::LoadSettings()
 		QTimer::singleShot(200,[this]{ DefaultColsWidths(); });
 }
 
+void WidgetMain::LoadGroupsSubscribes()
+{
+	if(!QFile::exists(groupsSubscribesFile)) return;
+	auto readRes = MyQFileDir::ReadFile2(groupsSubscribesFile);
+	if(!readRes.success) QMbError("Error reading file " + groupsSubscribesFile);
+	else
+	{
+		groupsSubscribesValue = readRes.content.split(",");
+		for(auto &valPair:groupsSubscribesValue)
+		{
+			auto list = valPair.split(":");
+			if(list.size() != 2) { QMbError("bad content in file " + groupsSubscribesFile); break; }
+
+			QString &id = list[0];
+			bool val = list[1].toUInt();
+
+			DataBase::SetGroupSubscribed(id, val);
+		}
+	}
+}
+
 void WidgetMain::LoadNotes()
 {
+	ClearNotesInWidgetMain();
 	auto notes = Note::LoadNotes();
 	for(auto &note:notes)
 	{
@@ -614,7 +677,10 @@ void WidgetMain::RemoveNote(Note* note, bool execSqlRemove)
 
 bool WidgetMain::RemoveNoteSQLOnClient(Note * note)
 {
-	if(note->group == note->defaultGroupName()) { DataBase::RemoveNoteOnClient(QSn(note->id), true); return true; }
+	if(DataBase::IsGroupLocalByName(note->group)) {
+		DataBase::RemoveNoteOnClient(QSn(note->id), true);
+		return true;
+	}
 	else
 	{
 		auto answFoo = [this, note](QString &&answContent){
@@ -645,6 +711,13 @@ void WidgetMain::RemoveNoteInMainWidget(Note * note)
 	auto index = NoteIndexInWidgetMainNotes(note, true);
 	if(index==-1) { return; }
 	notes.erase(notes.begin() + index);
+}
+
+void WidgetMain::ClearNotesInWidgetMain()
+{
+	while(table->rowCount()) table->removeRow(table->rowCount()-1);
+	notes.clear();
+	if(widgetAlarms) widgetAlarms->GiveNotes({});
 }
 
 void WidgetMain::DefaultColsWidths()

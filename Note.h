@@ -44,13 +44,14 @@ public:
 
 	QString ToStrForLog();
 
-	inline static const QString& defaultGroupName() { static QString str = "defaultGroup"; return str; }
+	inline static const QString& defaultGroupName2() { static QString str = "defaultGroup"; return str; }
 	void DialogMoveToGroup();
 	void DialogEditCurrentGroup();
 	void DialogCreateNewGroup();
 
-	QString group = defaultGroupName();
+	QString group = defaultGroupName2();
 	void MoveToGroup(QString newGroupName);
+	void MoveToGroupOnClient(const QString &newGroupId, const QString &newGroupName);
 
 	void InitFromTmpNote(Note &note);
 	void InitFromRecord(QStringList &record);
