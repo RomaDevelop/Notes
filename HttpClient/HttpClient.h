@@ -10,16 +10,14 @@
 #include <atomic>
 #include <functional>
 
-#include "MyQShortings.h"
-
 class HttpClient  {
 public:
 	HttpClient();
 	~HttpClient();
 
 	std::function<void(const QString&)> logFoo;
-	void Log(const QString &str) { if(logFoo) logFoo(str); else qdbg << str; }
-	void Error(const QString &str) { if(logFoo) logFoo(str); else qdbg << str; }
+	void Log(const QString &str);
+	void Error(const QString &str);
 
 	template<class T>
 	static QString GetFullText(T &container)

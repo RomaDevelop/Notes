@@ -16,11 +16,11 @@ int main(int argc, char *argv[])
 	a.setQuitOnLastWindowClosed(false);
 
 	LaunchParams::Init({
-						   LaunchParams::DeveloperData("RomaWork", "TKO3-206", "C:/Work/C++/Notes",
+						   LaunchParams::DeveloperData(DevNames::RomaWork(), "TKO3-206", "C:/Work/C++/Notes",
 						   "D:/Documents/C++ QT/"),
-						   LaunchParams::DeveloperData("RomaHome", "ELBRUS-HOME-10", "D:/Documents/C++ QT/Notes",
+						   LaunchParams::DeveloperData(DevNames::RomaHome(), "ELBRUS-HOME-10", "D:/Documents/C++ QT/Notes",
 						   "C:/Work/C++/"),
-						   LaunchParams::DeveloperData("RomaNotebook", "ELBRUS-notebook", "D:/Work/Notes",
+						   LaunchParams::DeveloperData(DevNames::RomaNotebook(), "ELBRUS-notebook", "D:/Work/Notes",
 						   "C:/Work/C++/"),
 					   });
 

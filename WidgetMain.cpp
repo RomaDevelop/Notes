@@ -19,6 +19,7 @@
 #include <QTcpSocket>
 #include <QCryptographicHash>
 #include <QScreen>
+#include <QFileDialog>
 
 #include "MyQDifferent.h"
 #include "MyQString.h"
@@ -87,13 +88,29 @@ namespace ColIndexes {
 	const int postponeDTeditWidth = 130;
 }
 
-
-
 WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 {
+	if(!QDir().mkpath(filesPath)) QMbError("Error cration path " + filesPath);
+
 	ToDo();
 
-	MyQSqlDatabase::Init(clientBase, {}, [](const QString &str){ qdbg << str; }, [](const QString &str){ QMbError(str); });
+	auto base = DataBase::defineBase(DataBase::client);
+
+	auto answ = MyQDialogs::CustomDialog("Launching Notes", "Do you want to update repo before launching Notes?", {"Yes", "No"});
+	if(answ == "No") {}
+	else if(answ == "Yes")
+	{
+		if(MyQExecute::Execute(ReadAndGetGitExtensionsExe(GitExtensionsExe, true), {base.pathDataBase}))
+		{
+			QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
+		}
+		else QMbError("Error launching GitExtensions");
+	}
+	else QMbError("Unexpacted answ");
+
+	MyQSqlDatabase::Init(base, {},
+							[](const QString &str){ qdbg << str; },
+							[](const QString &str){ QMbError(str); });
 	DataBase::InitChildDataBase(DataBase::client);
 	DataBase::BackupBase();
 
@@ -139,6 +156,10 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 
 		LoadNotes();
 	});
+
+	QTimer *timerSettingsSaver = new QTimer(this);
+	connect(timerSettingsSaver, &QTimer::timeout, [this](){ SaveSettings(); });
+	timerSettingsSaver->start(1000*60);
 
 	CreateTrayIcon();
 	CreateNotesAlarmChecker();
@@ -189,6 +210,14 @@ void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 		else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
 	});
 
+// Menu
+	hlo1->addSpacing(20);
+
+	QPushButton *btnMenu = new QPushButton("Menu");
+	btnMenu->setFixedWidth(QFontMetrics(btnMenu->font()).horizontalAdvance(btnMenu->text()) + 20);
+	hlo1->addWidget(btnMenu);
+	connect(btnMenu,&QPushButton::clicked, [this, btnMenu]() { SlotMenu(btnMenu); });
+
 // Search
 	hlo1->addSpacing(20);
 
@@ -219,21 +248,6 @@ void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 	hlo1->addWidget(btnSynch);
 	connect(btnSynch, &QPushButton::clicked, [this](){
 		netClient->SynchronizeAllNotes(AllNotesVect());
-	});
-
-// Save path
-	QPushButton *btnDB = new QPushButton("DB");
-	btnDB->setFixedWidth(QFontMetrics(btnDB->font()).horizontalAdvance(btnDB->text()) + 20);
-	hlo1->addWidget(btnDB);
-	connect(btnDB,&QPushButton::clicked,[](){
-		MyQExecute::Execute(DataBase::baseDataCurrent->baseFilePathName);
-	});
-
-	QPushButton *btnSettings = new QPushButton("Settings.ini");
-	btnSettings->setFixedWidth(QFontMetrics(btnSettings->font()).horizontalAdvance(btnSettings->text()) + 20);
-	hlo1->addWidget(btnSettings);
-	connect(btnSettings,&QPushButton::clicked,[this](){
-		MyQExecute::Execute(settingsFile);
 	});
 
 	QPushButton *btnToTray = new QPushButton("To tray");
@@ -390,6 +404,21 @@ void WidgetMain::SlotTest()
 	//netClient->Log(DataBase::DoSqlQueryGetFirstRec("select * from Notes where idNote=60").join(" "));
 }
 
+void WidgetMain::SlotMenu(QPushButton *btn)
+{
+	std::vector<MyQDialogs::MenuItem> items;
+	items.emplace_back("Open DB", [](){ MyQExecute::Execute(DataBase::baseDataCurrent->baseFilePathName); });
+	items.emplace_back("Show DB in explorer", [](){ MyQExecute::ShowInExplorer(DataBase::baseDataCurrent->baseFilePathName); });
+	items.emplace_back(MyQDialogs::SeparatorMenuItem());
+	items.emplace_back("Settings.ini", [this](){ MyQExecute::Execute(settingsFile); });
+	items.emplace_back("Show Settings.ini in explorer", [this](){ MyQExecute::ShowInExplorer(settingsFile); });
+	items.emplace_back(MyQDialogs::SeparatorMenuItem());
+	items.emplace_back("GitExtesions: open repo", [this](){
+		MyQExecute::Execute(ReadAndGetGitExtensionsExe(GitExtensionsExe, true), {DataBase::baseDataCurrent->pathDataBase}); });
+
+	MyQDialogs::MenuUnderWidget(btn, std::move(items));
+}
+
 void WidgetMain::closeEvent(QCloseEvent * event)
 {
 	auto answ = MyQDialogs::CustomDialog("Завершение работы приложения","Вы уверены, что хотите завершить работу приложения?"
@@ -413,15 +442,25 @@ void WidgetMain::closeEvent(QCloseEvent * event)
 
 void WidgetMain::SaveSettings()
 {
-	MyQFileDir::WriteFile(settingsFile, "");
-	QSettings settings(settingsFile, QSettings::IniFormat);
-
 	/// не надо тут пытаться сохранять задачи
 	/// ибо при завершении работы программы инициированном ОС они не будут успевать сохраняться
 	/// сохранение задач должно надежно происходить при их изменении
 
-	settings.setValue("geoMainWidget", this->saveGeometry());
-	settings.setValue("tableHeaderState", this->table->horizontalHeader()->saveState());
+	static QByteArray prevGeo;
+	static QByteArray prevHeaderState;
+	auto newGeo = this->saveGeometry();
+	auto newHeaderState = this->table->horizontalHeader()->saveState();
+	if(prevGeo != newGeo or prevHeaderState != newHeaderState)
+	{
+		MyQFileDir::WriteFile(settingsFile, "");
+		QSettings settings(settingsFile, QSettings::IniFormat);
+
+		settings.setValue("geoMainWidget", newGeo);
+		settings.setValue("tableHeaderState", newHeaderState);
+
+		prevGeo = newGeo;
+		prevHeaderState = newHeaderState;
+	}
 }
 
 void WidgetMain::LoadSettings()
@@ -511,7 +550,7 @@ Note *WidgetMain::NoteOfRow(int row)
 	return nullptr;
 }
 
-Note *WidgetMain::NoteOfCurrentRow()
+Note * WidgetMain::NoteOfCurrentRow()
 {
 	return NoteOfRow(table->currentRow());
 }
@@ -761,6 +800,21 @@ void WidgetMain::SlotForNetClientNewNoteAppeared(qint64 id)
 	auto rec = DataBase::NoteByIdOnClient(QSn(id));
 	if(rec.isEmpty()) { QMbError("SlotForNetClientNewNoteAppeared note not found"); return; }
 	else MakeNewNote(Note::CreateFromRecord(rec), loaded);
+}
+
+QString WidgetMain::ReadAndGetGitExtensionsExe(QString dir, bool showInfoMessageBox)
+{
+	if(GitExtensionsExe.isEmpty() && QFile::exists(filesPath+"/git_extensions_exe.txt"))
+		GitExtensionsExe = MyQFileDir::ReadFile1(filesPath+"/git_extensions_exe.txt");
+
+	if(GitExtensionsExe.isEmpty() || !QFileInfo(GitExtensionsExe).isFile())
+	{
+		if(showInfoMessageBox) QMbInfo("Укажите программу для работы с репозиториями");
+		GitExtensionsExe = QFileDialog::getOpenFileName(nullptr, "Укажите программу для работы с репозиториями",
+														dir, "*.exe");
+		MyQFileDir::WriteFile(filesPath+"/git_extensions_exe.txt", GitExtensionsExe);
+	}
+	return GitExtensionsExe;
 }
 
 

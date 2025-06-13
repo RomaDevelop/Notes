@@ -19,9 +19,33 @@
 
 #include "FastActions.h"
 
-WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
+void WidgetNoteEditor::MakeOrShowNoteEditor(Note &note, bool aNewNote)
+{
+	if(auto existingEditor = existingEditors.find(&note); existingEditor == existingEditors.end())
+	{
+		auto editor = new WidgetNoteEditor(note, aNewNote);
+		editor->show();
+		existingEditors[&note] = editor;
+	}
+	else
+	{
+		if(existingEditor->second->isMinimized())
+		{
+			existingEditor->second->showNormal();
+		}
+		else
+		{
+			existingEditor->second->show();
+			PlatformDependent::SetTopMost(existingEditor->second,true);
+			PlatformDependent::SetTopMost(existingEditor->second,false);
+		}
+	}
+}
+
+WidgetNoteEditor::WidgetNoteEditor(Note &note, bool aNewNote, QWidget *parent):
 	QWidget(parent),
-	note {note}
+	note {note},
+	newNote {aNewNote}
 {
 	qdbg << "Редактирующие шрифт кнопки если выделен текст разных форматов делаею его весь одинаковым";
 
@@ -72,6 +96,15 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	MyQWidget::SetFontPointSize(dtEditPostpone, 12);
 	MyQWidget::SetFontBold(dtEditPostpone, true);
 	dtEditPostpone->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
+
+	if(newNote)
+	{
+		auto curDt = QDateTime::currentDateTime();
+		curDt.setTime({9,0,0});
+
+		dtEditNotify->setDateTime(curDt);
+		dtEditPostpone->setDateTime(curDt);
+	}
 
 	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [this](const QDateTime &datetime){
 		dtEditPostpone->setDateTime(datetime);
@@ -265,44 +298,19 @@ WidgetNoteEditor::~WidgetNoteEditor()
 	else QMbc(0,"Error", "destructor called, but this editor not in the existingEditors");
 }
 
-void WidgetNoteEditor::MakeOrShowNoteEditor(Note & note, bool aNewNote)
-{
-	if(auto existingEditor = existingEditors.find(&note); existingEditor == existingEditors.end())
-	{
-		auto editor = new WidgetNoteEditor(note);
-		editor->show();
-		existingEditors[&note] = editor;
-		editor->newNote = aNewNote;
-	}
-	else
-	{
-		if(existingEditor->second->isMinimized())
-		{
-			existingEditor->second->showNormal();
-		}
-		else
-		{
-			existingEditor->second->show();
-			PlatformDependent::SetTopMost(existingEditor->second,true);
-			PlatformDependent::SetTopMost(existingEditor->second,false);
-		}
-	}
-}
-
 void WidgetNoteEditor::closeEvent(QCloseEvent * event)
 {
 	if(newNote && !dtChanged)
 	{
 		auto answ = MyQDialogs::CustomDialog("Сохранение","Завершить редактирование и сохранить заметку с автоназначенным уведомлением на "
-											 + note.DTNotify().toString(DateTimeFormat) + " ?",
+											 + dtEditNotify->dateTime().toString(DateTimeFormat) + " ?",
 											 {"Да, завершить и сохранить", "Нет, продолжить редактирование"});
-		if(answ == "Да, завершить и сохранить")
-		{
-			dtEditPostpone->setDateTime(note.DTNotify());   // ставим отложить на одну дату с уведомлением
-		}
+		if(answ == "Да, завершить и сохранить") { }
 		else if(answ == "Нет, продолжить редактирование") { event->ignore(); return; }
 		else { QMbError("not realesed button " + answ); return; }
 	}
+
+	newNote = false;
 
 	SaveSettings();
 	event->accept();

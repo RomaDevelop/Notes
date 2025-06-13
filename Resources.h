@@ -11,6 +11,12 @@ DECLARE_RESOURCES(Resources)
 	DECLARE_RESOURCE(add, "add.ico")
 	DECLARE_RESOURCE(list, "list.ico")
 	DECLARE_RESOURCE(remove, "remove.ico")
-END_DECLARE_RESOURCES
+END_DECLARE_RESOURCES;
+
+struct DevNames{
+	inline static const QString& RomaWork() { static QString str="RomaWork"; return str; }
+	inline static const QString& RomaHome() { static QString str="RomaHome"; return str; }
+	inline static const QString& RomaNotebook() { static QString str="RomaNotebook"; return str; }
+};
 
 #endif // RESOURCES_H

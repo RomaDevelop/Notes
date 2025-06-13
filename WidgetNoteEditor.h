@@ -18,7 +18,7 @@ public:
 	static void MakeOrShowNoteEditor(Note &note, bool aNewNote = false);
 
 private:
-	explicit WidgetNoteEditor(Note &note, QWidget *parent = nullptr);
+	explicit WidgetNoteEditor(Note &note, bool aNewNote = false, QWidget *parent = nullptr);
 public:
 	~WidgetNoteEditor();
 private:

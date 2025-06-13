@@ -13,11 +13,11 @@ HEADERS += \
 
 INCLUDEPATH += \
     C:/Qt/boost_1_72_0 \
-	../include
+	../../include
 
 DEPENDPATH += \
     C:/Qt/boost_1_72_0 \
-	../include
+	../../include
 
 LIBS += -lws2_32
 

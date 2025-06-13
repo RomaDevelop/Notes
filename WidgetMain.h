@@ -50,6 +50,7 @@ private:
 	bool DialogGroupsSubscribes();
 
 	void SlotTest();
+	void SlotMenu(QPushButton *btn);
 
 	QString filesPath = MyQDifferent::PathToExe()+"/files";
 	QString settingsFile = filesPath + "/settings.ini";
@@ -84,6 +85,9 @@ private:
 	void SlotForNetClientNoteRemoved(qint64 id);
 	void SlotForNetClientNoteChangedGroupOrUpdated(qint64 id);
 	void SlotForNetClientNewNoteAppeared(qint64 id);
+
+	QString GitExtensionsExe;
+	QString ReadAndGetGitExtensionsExe(QString dir, bool showInfoMessageBox);
 };
 
 

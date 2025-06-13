@@ -323,10 +323,10 @@ void NetClient::SynchronizeAllNotes(std::vector<Note*> allClientNotes)
 	for(auto &note:allClientNotes)
 	{
 		if(DataBase::IsGroupLocalByName(note->group)) continue;
-		synchQueue.emplace(NetConstants::SynchData(note, QSn(note->idOnServer), note->DtLastUpdatedStr()));
+		synchQueue.emplace(NetConstants::SynchData(QSn(note->idOnServer), note->DtLastUpdatedStr()));
 	}
 	if(!synchQueue.empty())
-		synchQueue.emplace(NetConstants::SynchData({}, EndAllNotesMarker(), {}));
+		synchQueue.emplace(NetConstants::SynchData(EndAllNotesMarker(), {}));
 	else Log("SynchronizeAllNotes called. Nothing to synch");
 }
 

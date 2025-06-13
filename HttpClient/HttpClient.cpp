@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+#include "MyQShortings.h"
+
 using tcp = boost::asio::ip::tcp;
 namespace net = boost::asio;
 namespace beast = boost::beast;
@@ -9,6 +11,10 @@ namespace http = beast::http;
 
 HttpClient::HttpClient() {}
 HttpClient::~HttpClient() { stop(); }
+
+void HttpClient::Log(const QString &str) { if(logFoo) logFoo(str); else qdbg << str; }
+
+void HttpClient::Error(const QString &str) { if(logFoo) logFoo(str); else qdbg << str; }
 
 void HttpClient::start(const std::string& host, unsigned short port, const std::string& target) {
 	if (running) return;
