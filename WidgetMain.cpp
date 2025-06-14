@@ -96,6 +96,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 
 	auto base = DataBase::defineBase(DataBase::client);
 
+#ifndef QT_DEBUG
 	auto answ = MyQDialogs::CustomDialog("Launching Notes", "Do you want to update repo before launching Notes?", {"Yes", "No"});
 	if(answ == "No") {}
 	else if(answ == "Yes")
@@ -107,6 +108,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 		else QMbError("Error launching GitExtensions");
 	}
 	else QMbError("Unexpacted answ");
+#endif
 
 	MyQSqlDatabase::Init(base, {},
 							[](const QString &str){ qdbg << str; },

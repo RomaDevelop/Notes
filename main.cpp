@@ -7,6 +7,8 @@
 #include "MyQDifferent.h"
 #include "LaunchParams.h"
 
+#include "DevNames.h"
+
 int main(int argc, char *argv[])
 {
 	qdbg << "дома из-за увеличенных шрифтов есть некоторые уродства";

@@ -29,6 +29,7 @@ HEADERS += \
     ../include/InputBlocker.h \
     ../include/MyQTextEdit.h \
     ../include/PlatformDependent.h \
+    DevNames.h \
     FastActions.h \
     NetClient.h \
     Note.h \
