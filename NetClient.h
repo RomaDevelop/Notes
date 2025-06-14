@@ -6,17 +6,23 @@
 
 #include <QObject>
 #include <QLayout>
-#include <QTcpSocket>
 #include <QTextEdit>
 #include <QPushButton>
 #include <QTimer>
 #include <QCryptographicHash>
 #include <QLabel>
 #include <QLineEdit>
+#include <QNetworkAccessManager>
 
 #include "declare_struct.h"
 
 #include "NetConstants.h"
+
+class ISocket
+{
+public:
+	virtual ~ISocket() {}
+};
 
 class Requester
 {
@@ -27,15 +33,17 @@ public:
 	virtual void Error(const QString &str) = 0;
 	virtual void Warning(const QString &str) = 0;
 
-	void SendInSock(QTcpSocket *sock, QString str, bool sendEndMarker);
+	virtual void Write(ISocket * sock, const QString &str) = 0;
+
+	void SendInSock(ISocket *sock, QString str, bool sendEndMarker);
 
 	declare_struct_4_fields_move(RequestData, QString, id, QString, type, QString, content, QString, errors);
 	using AnswerWorkerFunction = std::function<void(QString &&answContent)>;
-	void RequestInSock(QTcpSocket *sock, const QString &requestType, QString content, AnswerWorkerFunction answWorker);
+	void RequestInSock(ISocket *sock, const QString &requestType, QString content, AnswerWorkerFunction answWorker);
 
-	void RequestsWorker(QTcpSocket *sock, QString text);
-	virtual std::map<QStringRefWr_const, std::function<void(QTcpSocket *sock, RequestData &&requestData)>> & RequestWorkersMap() = 0;
-	void AnswerForRequestSending(QTcpSocket *sock, RequestData &requestData, QString str);
+	void RequestsWorker(ISocket *sock, QString text);
+	virtual std::map<QStringRefWr_const, std::function<void(ISocket *sock, RequestData &&requestData)>> & RequestWorkersMap() = 0;
+	void AnswerForRequestSending(ISocket *sock, RequestData &requestData, QString str);
 	uint answDelay = 0;
 
 	void RequestsAnswersWorker(QString text);
@@ -49,13 +57,14 @@ public:
 
 struct Note;
 
-class NetClient : public QObject, public Requester
+class NetClient : public QObject, public ISocket, public Requester
 {
 	Q_OBJECT
 public:
 	explicit NetClient(QObject *parent = nullptr);
 	~NetClient();
 	void SlotTest();
+	void SlotTestSend();
 
 	virtual void Log(const QString &str, bool appendInLastRow = false) override;
 	virtual void Error(const QString &str) override;
@@ -64,15 +73,19 @@ public:
 	std::unique_ptr<QWidget> widget;
 	QLineEdit *leArg;
 	QTextEdit *textEditSocket;
-	QTcpSocket *socket = nullptr;
 	bool canNetwork = false;
-	int port = 25001;
+
+	QNetworkAccessManager *manager {};
+	QString adress;
+	QString bufForTarget;
+
 	void CreateSocket();
-	void CreateWindow(bool show);
+	void Create2Window(bool show);
+
+	virtual void Write(ISocket * /*sock*/, const QString &str) override;
+
 public slots:
-	void SlotConnected();
-	void SlotReadyRead();
-	void SlotError(QAbstractSocket::SocketError err);
+	void SlotReadyRead(QNetworkReply *reply);
 
 public: signals:
 	void SignalNoteRemoved(qint64 idOnClient);
@@ -85,7 +98,7 @@ public:
 	void MsgToServer(const QString &msgType, QString content);
 	static MsgData DecodeMsg(QString msg);
 
-	void RequestToServerWithWait(QTcpSocket *sock, const QString &requestType, QString content, AnswerWorkerFunction answWorker);
+	void RequestToServerWithWait(const QString &requestType, QString content, AnswerWorkerFunction answWorker);
 
 	void SynchronizeAllNotes(std::vector<Note*> allClientNotes);
 private:
@@ -107,13 +120,16 @@ public:
 		{ std::cref(NetConstants::command_update_note()), [this](QString && commandContent){ command_update_note_worker(std::move(commandContent)); } },
 	};
 
-	void request_get_note_worker(QTcpSocket *sock, NetClient::RequestData && requestData);
+	void request_get_note_worker(ISocket *sock, NetClient::RequestData && requestData);
 
-	std::map<QStringRefWr_const, std::function<void(QTcpSocket *sock, NetClient::RequestData &&requestData)>> requestWorkersMap {
-		{ std::cref(NetConstants::request_get_note()), [this](QTcpSocket *sock, NetClient::RequestData &&requestData){ request_get_note_worker(sock, std::move(requestData)); } },
+	std::map<QStringRefWr_const, std::function<void(ISocket *sock, NetClient::RequestData &&requestData)>> requestWorkersMap {
+		{ std::cref(NetConstants::request_get_note()), [this](ISocket *sock, NetClient::RequestData &&requestData){ request_get_note_worker(sock, std::move(requestData)); } },
 	};
-	virtual std::map<QStringRefWr_const, std::function<void(QTcpSocket *sock, RequestData &&requestData)>> & RequestWorkersMap() override { return requestWorkersMap; }
+	virtual std::map<QStringRefWr_const, std::function<void(ISocket *sock, RequestData &&requestData)>> & RequestWorkersMap() override
+	{ return requestWorkersMap; }
 
+	QString& PrepareTargetWithAuth();
+	static bool ChekAuth(const QString &targetOnServerSide);
 };
 
 #endif // NETCLIENT_H

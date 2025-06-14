@@ -108,7 +108,7 @@ void Note::DialogCreateNewGroup()
 			}
 		};
 
-		netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_try_create_group(), newGroupName, std::move(answFoo));
+		netClient->RequestToServerWithWait(NetConstants::request_try_create_group(), newGroupName, std::move(answFoo));
 	}
 }
 
@@ -161,7 +161,7 @@ void Note::MoveToGroup(QString newGroupName)
 		this->dtLastUpdated = QDateTime::currentDateTime();
 		Note tmpNote(*this);
 		tmpNote.group = newGroupName;
-		netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_create_note_on_server(), tmpNote.ToStr_v1(), std::move(answFoo));
+		netClient->RequestToServerWithWait(NetConstants::request_create_note_on_server(), tmpNote.ToStr_v1(), std::move(answFoo));
 	}
 	else // перемещение не из дефолтной, заметка на сервере уже существует
 	{
@@ -175,7 +175,7 @@ void Note::MoveToGroup(QString newGroupName)
 
 		dtLastUpdated = QDateTime::currentDateTime();
 		auto request = NetConstants::MakeRequest_move_note_to_group(QSn(this->idOnServer), newGroupId, dtLastUpdated);
-		netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_move_note_to_group(), std::move(request), std::move(answFoo));
+		netClient->RequestToServerWithWait(NetConstants::request_move_note_to_group(), std::move(request), std::move(answFoo));
 	}
 }
 
@@ -280,7 +280,7 @@ void Note::SaveNoteOnClient(const QString &reason)
 		};
 
 		if(netClient->canNetwork)
-			netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_note_saved(), ToStr_v1(), answFoo);
+			netClient->RequestToServerWithWait(NetConstants::request_note_saved(), ToStr_v1(), answFoo);
 		else QMbWarning("Server not connected, note saved local");
 	}
 }

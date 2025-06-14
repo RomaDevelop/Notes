@@ -10,6 +10,7 @@
 #include <QNetworkAccessManager>
 #include <QUrl>
 #include <QNetworkReply>
+#include <QMessageAuthenticationCode>
 
 #include "InputBlocker.h"
 
@@ -24,7 +25,7 @@
 
 NetClient::NetClient(QObject *parent) : QObject(parent)
 {
-	CreateWindow(true);
+	Create2Window(true);
 
 	//	QNetworkProxy *proxyPtr = new QNetworkProxy;
 	//	QNetworkProxy &proxy = *proxyPtr;
@@ -47,29 +48,34 @@ NetClient::NetClient(QObject *parent) : QObject(parent)
 
 NetClient::~NetClient()
 {
-	if(socket) socket->disconnectFromHost();
+
 }
 
 void NetClient::SlotTest()
 {
-	QNetworkAccessManager *manager = new QNetworkAccessManager();
+//	QNetworkAccessManager *manager = new QNetworkAccessManager();
 
-	QUrl qurl("http://localhost:25001");
-	QNetworkRequest request(qurl);
-	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+//	QUrl qurl("http://localhost:25001");
+//	QNetworkRequest request(qurl);
+//	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
-	// Отправка POST-запроса
-	QNetworkReply *reply = manager->post(request, "1 ывывы END");
+//	// Отправка POST-запроса
+//	QNetworkReply *reply = manager->post(request, "1 ывывы END");
 
-	// Обработка ответа
-	QObject::connect(reply, &QNetworkReply::finished, [reply]() {
-		if (reply->error() == QNetworkReply::NoError) {
-			qDebug() << "Response:" << reply->readAll();
-		} else {
-			qDebug() << "Error:" << reply->errorString();
-		}
-		reply->deleteLater();
-	});
+//	// Обработка ответа
+//	QObject::connect(reply, &QNetworkReply::finished, [reply]() {
+//		if (reply->error() == QNetworkReply::NoError) {
+//			qDebug() << "Response:" << reply->readAll();
+//		} else {
+//			qDebug() << "Error:" << reply->errorString();
+//		}
+//		reply->deleteLater();
+//	});
+}
+
+void NetClient::SlotTestSend()
+{
+	SendInSock(this, "test send", true);
 }
 
 void NetClient::Log(const QString &str, bool appendInLastRow)
@@ -93,21 +99,17 @@ void NetClient::Warning(const QString &str)
 
 void NetClient::CreateSocket()
 {
-	socket->deleteLater();
-	socket = new QTcpSocket(this);
+	if(manager) manager->deleteLater();
+	manager = new QNetworkAccessManager(this);
 #ifdef QT_DEBUG
-	socket->connectToHost("127.0.0.1", port);
+	adress = "http://127.0.0.1:25002";
 #else
-	socket->connectToHost("83.217.213.213", port);
+	adress = "http://83.217.213.213:25002";
 #endif
-	connect(socket, &QTcpSocket::connected, this, &NetClient::SlotConnected);
-	connect(socket, &QTcpSocket::disconnected, [this](){ Log("disconnected"); canNetwork = false; });
-	connect(socket, &QTcpSocket::readyRead, this, &NetClient::SlotReadyRead);
-	connect(socket, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(SlotError(QAbstractSocket::SocketError)));
-		// в старом стиле из-за кривизны Qt
+	connect(manager, &QNetworkAccessManager::finished, this, &NetClient::SlotReadyRead);
 }
 
-void NetClient::CreateWindow(bool show)
+void NetClient::Create2Window(bool show)
 {
 	widget = std::make_unique<QWidget>();
 	widget->setWindowTitle("NetClient");
@@ -128,10 +130,6 @@ void NetClient::CreateWindow(bool show)
 	hlo1->addWidget(btnTestConnect);
 	connect(btnTestConnect,&QPushButton::clicked,[this](){ CreateSocket(); });
 
-	QPushButton *btnDisconnect = new QPushButton("disconnect");
-	hlo1->addWidget(btnDisconnect);
-	connect(btnDisconnect,&QPushButton::clicked,[this](){ if(socket) socket->disconnectFromHost(); });
-
 	QPushButton *btnSqlClearNotes = new QPushButton(" clear notes ");
 	hlo1->addWidget(btnSqlClearNotes);
 	connect(btnSqlClearNotes,&QPushButton::clicked,[](){
@@ -140,7 +138,7 @@ void NetClient::CreateWindow(bool show)
 
 	QPushButton *btnTestSend = new QPushButton("test send");
 	hlo1->addWidget(btnTestSend);
-	connect(btnTestSend,&QPushButton::clicked,[this](){ SendInSock(socket, "test send", true); });
+	connect(btnTestSend,&QPushButton::clicked,  this, &NetClient::SlotTestSend);
 
 	QPushButton *btnTestRequest = new QPushButton("test");
 	hlo1->addWidget(btnTestRequest);
@@ -164,19 +162,24 @@ void NetClient::CreateWindow(bool show)
 	QTimer::singleShot(100,[this](){ widget->move(700, 10); widget->activateWindow(); });
 }
 
-void NetClient::SlotConnected()
+void NetClient::Write(ISocket *, const QString &str)
 {
-	Log("connected to server, auth try");
-
-	QCryptographicHash hash(QCryptographicHash::Md5);
-	hash.addData((NetConstants::test_passwd()).toUtf8());
-	SendInSock(socket, NetConstants::auth().toUtf8() + hash.result().toHex(), true);
+	QNetworkRequest request(PrepareTargetWithAuth());
+	request.setHeader(QNetworkRequest::ContentTypeHeader, "text/plain");
+	manager->post(request, str.toUtf8());
 }
 
-void NetClient::SlotReadyRead()
+void NetClient::SlotReadyRead(QNetworkReply *reply)
 {
-	QTcpSocket *sock = (QTcpSocket*)sender();
-	QString readed = sock->readAll();
+	QString readed;
+	if (reply->error()) {
+		Error(reply->errorString());
+	}
+	else {
+		readed = reply->readAll();
+	}
+	reply->deleteLater();
+
 	if(readed.endsWith(';')) readed.chop(1);
 	else
 	{
@@ -208,7 +211,7 @@ void NetClient::SlotReadyRead()
 		}
 		else if(command.startsWith(NetConstants::request()))
 		{
-			RequestsWorker(sock, std::move(command));
+			RequestsWorker(this, std::move(command));
 		}
 		else if(command.startsWith(NetConstants::request_answ()))
 		{
@@ -229,24 +232,12 @@ void NetClient::SlotReadyRead()
 	}
 }
 
-void NetClient::SlotError(QAbstractSocket::SocketError err)
-{
-	QString str;
-	if(err == QAbstractSocket::HostNotFoundError) str += "Error: Host not foud. ";
-	if(err == QAbstractSocket::RemoteHostClosedError) str += "Error: Remote host is closed. ";
-	if(err == QAbstractSocket::ConnectionRefusedError) str += "Error: Connection was refused. ";
-	str += socket->errorString();
-	Error(str);
-}
-
-
-
 void NetClient::MsgToServer(const QString &msgType, QString content)
 {
-	SendInSock(socket, NetConstants::msg(), false);
-	SendInSock(socket, msgType, false);
-	SendInSock(socket, " ", false);
-	SendInSock(socket, std::move(content), true);
+	SendInSock(this, NetConstants::msg(), false);
+	SendInSock(this, msgType, false);
+	SendInSock(this, " ", false);
+	SendInSock(this, std::move(content), true);
 }
 
 NetClient::MsgData NetClient::DecodeMsg(QString msg)
@@ -271,7 +262,7 @@ NetClient::MsgData NetClient::DecodeMsg(QString msg)
 	return data;
 }
 
-void NetClient::RequestToServerWithWait(QTcpSocket * sock, const QString & requestType, QString content, Requester::AnswerWorkerFunction answWorker)
+void NetClient::RequestToServerWithWait(const QString & requestType, QString content, Requester::AnswerWorkerFunction answWorker)
 {
 	if(!canNetwork)
 	{
@@ -314,7 +305,7 @@ void NetClient::RequestToServerWithWait(QTcpSocket * sock, const QString & reque
 		else Error("but it is too late to work it");
 	};
 
-	RequestInSock(sock, requestType, content, std::move(answFoo));
+	RequestInSock(this, requestType, content, std::move(answFoo));
 }
 
 void NetClient::SynchronizeAllNotes(std::vector<Note*> allClientNotes)
@@ -383,7 +374,7 @@ void NetClient::SynchFromQueue()
 		}
 	};
 
-	RequestInSock(socket, NetConstants::request_synch_note(), request, std::move(answFoo));
+	RequestInSock(this, NetConstants::request_synch_note(), request, std::move(answFoo));
 
 	if(endAllNotesMarkerFound)
 	{
@@ -532,7 +523,7 @@ void NetClient::command_update_note_worker(QString && commandContent)
 	}
 }
 
-void NetClient::request_get_note_worker(QTcpSocket * sock, NetClient::RequestData && requestData)
+void NetClient::request_get_note_worker(ISocket * sock, NetClient::RequestData && requestData)
 {
 	QString &idOnServer = requestData.content;
 	auto rec = DataBase::NoteByIdOnServer(idOnServer);
@@ -548,24 +539,54 @@ void NetClient::request_get_note_worker(QTcpSocket * sock, NetClient::RequestDat
 	AnswerForRequestSending(sock, requestData, note.ToStr_v1());
 }
 
-void Requester::SendInSock(QTcpSocket * sock, QString str, bool sendEndMarker)
+QString &NetClient::PrepareTargetWithAuth()
+{
+	QString dtStr = QDateTime::currentDateTime().addSecs(-14).toString(NetConstants::auth_date_time_format());
+	
+	QByteArray hmac = QMessageAuthenticationCode::hash(dtStr.toUtf8(), NetConstants::test_passwd().toUtf8(), QCryptographicHash::Sha256);
+	
+	bufForTarget = adress;
+	bufForTarget.append("/").append(dtStr).append("&").append(hmac.toHex());
+	
+	return bufForTarget;
+}
+
+bool NetClient::ChekAuth(const QString &targetOnServerSide)
+{
+	QStringRef payload = targetOnServerSide.midRef(1);
+	auto parts = payload.split('&');
+	if (parts.size() != 2) return false;
+
+	QStringRef dtRef = parts[0];
+	QStringRef receivedHmacHex(parts[1]);
+
+	if(QDateTime::fromString(dtRef.toString(), NetConstants::auth_date_time_format()).msecsTo(QDateTime::currentDateTime())
+			> 15000)
+		return false;
+
+	QByteArray hmacEtalon = QMessageAuthenticationCode::hash(dtRef.toUtf8(), NetConstants::test_passwd().toUtf8(), QCryptographicHash::Sha256);
+
+	return hmacEtalon.toHex() == receivedHmacHex;
+}
+
+void Requester::SendInSock(ISocket * sock, QString str, bool sendEndMarker)
 {
 	CodeMarkers::can_be_optimized("takes copy, than make other copy");
-
+	
 	Log("sending: " + (str == " " ? "_space_" : sendEndMarker ? str + NetConstants::end_marker() : str));
-
+	
 	str.replace(NetConstants::end_marker(), NetConstants::end_marker_replace());
-
-	sock->write(str.toUtf8());
-	if(sendEndMarker) sock->write(NetConstants::end_marker().toUtf8());
-
+	
+	if(sendEndMarker) str.append(NetConstants::end_marker());
+	Write(sock, str);
+	
 	Log(" | sended", true);
 }
 
-void Requester::RequestInSock(QTcpSocket *sock, const QString & requestType, QString content, Requester::AnswerWorkerFunction answWorker)
+void Requester::RequestInSock(ISocket *sock, const QString & requestType, QString content, Requester::AnswerWorkerFunction answWorker)
 {
 	CodeMarkers::can_be_optimized("takes copy, than make other copy");
-
+	
 	CodeMarkers::to_do("нужно удалять из requestAswerWorkers спустя время если не пришло");
 
 	int idRqst = TakeIdRequest();
@@ -579,7 +600,7 @@ void Requester::RequestInSock(QTcpSocket *sock, const QString & requestType, QSt
 	SendInSock(sock, content, true);
 }
 
-void Requester::RequestsWorker(QTcpSocket * sock, QString text)
+void Requester::RequestsWorker(ISocket * sock, QString text)
 {
 	CodeMarkers::can_be_optimized("give copy text to DecodeRequestCommand, but can move, but it used in error");
 	auto requestData = NetClient::DecodeRequestCommand(text);
@@ -595,13 +616,13 @@ void Requester::RequestsWorker(QTcpSocket * sock, QString text)
 
 	if(auto it = RequestWorkersMap().find(requestData.type); it != RequestWorkersMap().end())
 	{
-		std::function<void(QTcpSocket *sock, NetClient::RequestData &&requestData)> &requestWorker = it->second;
+		std::function<void(ISocket *sock, NetClient::RequestData &&requestData)> &requestWorker = it->second;
 		requestWorker(sock, std::move(requestData));
 	}
 	else Error("Unrealesed requestData.type " + requestData.type);
 }
 
-void Requester::AnswerForRequestSending(QTcpSocket * sock, RequestData & requestData, QString str)
+void Requester::AnswerForRequestSending(ISocket * sock, RequestData & requestData, QString str)
 {
 	MyCppDifferent::sleep_ms(answDelay);
 	if(requestData.id.isEmpty() || requestData.content.isEmpty())

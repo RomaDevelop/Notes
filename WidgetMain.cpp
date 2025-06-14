@@ -737,7 +737,7 @@ bool WidgetMain::RemoveNoteSQLOnClient(Note * note)
 			else QMbError("Can't remove note, bad server answ");
 		};
 
-		netClient->RequestToServerWithWait(netClient->socket, NetConstants::request_remove_note(), QSn(note->idOnServer), std::move(answFoo));
+		netClient->RequestToServerWithWait(NetConstants::request_remove_note(), QSn(note->idOnServer), std::move(answFoo));
 		return false;
 	}
 }
