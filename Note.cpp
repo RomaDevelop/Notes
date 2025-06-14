@@ -119,19 +119,21 @@ void Note::MoveToGroup(QString newGroupName)
 	auto newGroupId = DataBase::GroupId(newGroupName);
 	if(newGroupId.isEmpty()) { QMbError("ChangeGroup:: grId.isEmpty() for group " + newGroupName); return; }
 
-	if(DataBase::IsGroupLocalByName(group) && DataBase::IsGroupLocalById(newGroupId))
+	bool currentGroupIsLocal = DataBase::IsGroupLocalByName(group);
+	bool newGroupIsLocal = DataBase::IsGroupLocalById(newGroupId);
+
+	// перемещение из локальной в локальную
+	if(currentGroupIsLocal && newGroupIsLocal)
 	{
 		MoveToGroupOnClient(newGroupId, newGroupName);
 		return;
 	}
 
-	QMbError("MoveToGroup not local work need refactor");
-	return;
-
-	if(group == defaultGroupName2()) // перемещение из дефолтной группы. Заметка будет созаваться на сервере
+	// перемещение из локальной в сетевую - на сервере будет создана новая
+	if(currentGroupIsLocal && !newGroupIsLocal)
 	{
 		auto answFoo = [this, newGroupId, newGroupName](QString &&answContent){
-			if(0) CodeMarkers::to_do("if note will be removed before answ get will be trouble");
+			if(0) CodeMarkers::to_do("if note will be removed before answ get it will be trouble");
 
 			auto idOnServer = NetConstants::GetFromAnsw_create_note_on_server_IdNoteOnServer(answContent);
 			if(idOnServer < 0)
@@ -162,21 +164,23 @@ void Note::MoveToGroup(QString newGroupName)
 		Note tmpNote(*this);
 		tmpNote.group = newGroupName;
 		netClient->RequestToServerWithWait(NetConstants::request_create_note_on_server(), tmpNote.ToStr_v1(), std::move(answFoo));
-	}
-	else // перемещение не из дефолтной, заметка на сервере уже существует
-	{
-		auto answFoo = [this, newGroupId, newGroupName](QString &&answContent){
-			if(answContent == NetConstants::success())
-			{
-				MoveToGroupOnClient(newGroupId, newGroupName);
-			}
-			else QMbError("Can't move note to group, bad server answ");
-		};
 
-		dtLastUpdated = QDateTime::currentDateTime();
-		auto request = NetConstants::MakeRequest_move_note_to_group(QSn(this->idOnServer), newGroupId, dtLastUpdated);
-		netClient->RequestToServerWithWait(NetConstants::request_move_note_to_group(), std::move(request), std::move(answFoo));
+		return;
 	}
+
+	// остальные перемещения, т.е. из сетевой куда угодно
+	//(если в локальную - сервер её удалит)
+	auto answFoo = [this, newGroupId, newGroupName](QString &&answContent){
+		if(answContent == NetConstants::success())
+		{
+			MoveToGroupOnClient(newGroupId, newGroupName);
+		}
+		else QMbError("Can't move note to group, bad server answ");
+	};
+
+	dtLastUpdated = QDateTime::currentDateTime();
+	auto request = NetConstants::MakeRequest_move_note_to_group(QSn(this->idOnServer), newGroupId, dtLastUpdated);
+	netClient->RequestToServerWithWait(NetConstants::request_move_note_to_group(), std::move(request), std::move(answFoo));
 }
 
 void Note::MoveToGroupOnClient(const QString &newGroupId, const QString &newGroupName)

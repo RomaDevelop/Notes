@@ -74,8 +74,10 @@ public:
 	QLineEdit *leArg;
 	QTextEdit *textEditSocket;
 	bool canNetwork = false;
+	bool pollyWhaits = false;
 
 	QNetworkAccessManager *manager {};
+	QTimer *timerPolly {};
 	QString adress;
 	QString bufForTarget;
 

@@ -107,6 +107,22 @@ void NetClient::CreateSocket()
 	adress = "http://83.217.213.213:25002";
 #endif
 	connect(manager, &QNetworkAccessManager::finished, this, &NetClient::SlotReadyRead);
+
+	if(timerPolly) timerPolly->deleteLater();
+	timerPolly = new QTimer(this);
+	pollyWhaits = false;
+	connect(timerPolly, &QTimer::timeout, [this](){
+		if(!pollyWhaits)
+		{
+			auto pollyAnsw = [this](QString &&answContent){
+				pollyWhaits = false;
+				Log("pollyAnsw get " + answContent);
+			};
+			RequestInSock(this, NetConstants::request_polly(), "null", pollyAnsw);
+			pollyWhaits = true;
+		}
+	});
+	timerPolly->start(100);
 }
 
 void NetClient::Create2Window(bool show)
@@ -187,56 +203,54 @@ void NetClient::SlotReadyRead(QNetworkReply *reply)
 		return;
 	}
 
-	auto commands = readed.split(NetConstants::end_marker());
+	auto msgs = readed.split(NetConstants::end_marker());
 
-	for(auto &command:commands)
+	for(auto &msg:msgs)
 	{
-		command.replace(NetConstants::end_marker_replace(), NetConstants::end_marker());
-		Log("received command: " + command);
+		msg.replace(NetConstants::end_marker_replace(), NetConstants::end_marker());
+		Log("received message: " + msg);
 
-		if(command == NetConstants::auth_success())
+		if(msg == NetConstants::auth_success())
 		{
 			canNetwork = true;
 			Log(NetConstants::auth_success());
 		}
-		else if(command == NetConstants::auth_failed())
+		else if(msg == NetConstants::auth_failed())
 		{
 			canNetwork = false;
 			Error(NetConstants::auth_failed());
 		}
-		else if(command.startsWith(NetConstants::last_update()))
+		else if(msg.startsWith(NetConstants::last_update()))
 		{
-			QStringRef lastUpdate(&command, NetConstants::last_update().size(), command.size() - NetConstants::last_update().size());
+			QStringRef lastUpdate(&msg, NetConstants::last_update().size(), msg.size() - NetConstants::last_update().size());
 			Log("last update on server is " + lastUpdate);
 		}
-		else if(command.startsWith(NetConstants::request()))
+		else if(msg.startsWith(NetConstants::request()))
 		{
-			RequestsWorker(this, std::move(command));
+			RequestsWorker(this, std::move(msg));
 		}
-		else if(command.startsWith(NetConstants::request_answ()))
+		else if(msg.startsWith(NetConstants::request_answ()))
 		{
-			RequestsAnswersWorker(std::move(command));
+			RequestsAnswersWorker(std::move(msg));
 		}
-		else if(command.startsWith(NetConstants::command_to_client()))
+		else if(msg.startsWith(NetConstants::command_to_client()))
 		{
-			CommandsToClientWorker(std::move(command));
+			CommandsToClientWorker(std::move(msg));
 		}
-		else if(command == NetConstants::unexpacted())
+		else if(msg == NetConstants::unexpacted())
 		{
 			Error("server says that get unexpacted data from me");
 		}
 		else
 		{
-			Error("received unexpacted data from server {" + command + "}");
+			Error("received unexpacted data from server {" + msg + "}");
 		}
 	}
 }
 
 void NetClient::MsgToServer(const QString &msgType, QString content)
 {
-	SendInSock(this, NetConstants::msg(), false);
-	SendInSock(this, msgType, false);
-	SendInSock(this, " ", false);
+	content.prepend(" ").prepend(msgType).prepend(NetConstants::msg());
 	SendInSock(this, std::move(content), true);
 }
 
@@ -541,8 +555,9 @@ void NetClient::request_get_note_worker(ISocket * sock, NetClient::RequestData &
 
 QString &NetClient::PrepareTargetWithAuth()
 {
-	QString dtStr = QDateTime::currentDateTime().addSecs(-14).toString(NetConstants::auth_date_time_format());
-	
+	QString dtStr = QDateTime::currentDateTime()/*.addMSecs(-14980)*/.toString(NetConstants::auth_date_time_format());
+												// 14980 - проходит, 14990 не проходит
+
 	QByteArray hmac = QMessageAuthenticationCode::hash(dtStr.toUtf8(), NetConstants::test_passwd().toUtf8(), QCryptographicHash::Sha256);
 	
 	bufForTarget = adress;
@@ -579,8 +594,6 @@ void Requester::SendInSock(ISocket * sock, QString str, bool sendEndMarker)
 	
 	if(sendEndMarker) str.append(NetConstants::end_marker());
 	Write(sock, str);
-	
-	Log(" | sended", true);
 }
 
 void Requester::RequestInSock(ISocket *sock, const QString & requestType, QString content, Requester::AnswerWorkerFunction answWorker)
@@ -593,10 +606,9 @@ void Requester::RequestInSock(ISocket *sock, const QString & requestType, QStrin
 	requestAswerWorkers[idRqst] = std::move(answWorker);
 	CodeMarkers::to_do("а у запроса должен быть еще и срок действия, который если вышел - то ГАЛЯ у нас отмена");
 
-	SendInSock(sock, NetConstants::request(), false);
-	SendInSock(sock, QSn(idRqst).append(' '), false);
-	SendInSock(sock, requestType, false);
-	SendInSock(sock, " ", false);
+	QString tmp = NetConstants::request();
+	tmp.append(QSn(idRqst)).append(' ').append(requestType).append(' ');
+	content.prepend(tmp);
 	SendInSock(sock, content, true);
 }
 
@@ -630,8 +642,9 @@ void Requester::AnswerForRequestSending(ISocket * sock, RequestData & requestDat
 		Warning("AnswerForRequestSending executed with empty requestData: id=["+requestData.id+"] content=["+requestData.content+"]");
 		return;
 	}
-	SendInSock(sock, NetConstants::request_answ(), false);
-	SendInSock(sock, std::move(requestData.id.append(" ")), false);
+
+	str.prepend(requestData.id.append(" "));
+	str.prepend(NetConstants::request_answ());
 	SendInSock(sock, std::move(str), true);
 }
 
@@ -678,7 +691,8 @@ Requester::RequestData Requester::DecodeRequestCommand(QString command)
 	spaceIndex = command.indexOf(' ');
 	if(spaceIndex == -1) { data.errors = "not found space to close requestType"; return data; }
 	data.type = command.left(spaceIndex);
-	if(NetConstants::allReuestTypes().count(data.type) == 0) { data.errors = "bad requestType"; data.type = ""; return data; }
+	if(NetConstants::allReuestTypes().count(data.type) == 0)
+		{ data.errors = "requestType not found in map NetConstants::allReuestTypes()"; data.type = ""; return data; }
 
 	command.remove(0,spaceIndex +1);
 

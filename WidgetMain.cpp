@@ -373,7 +373,7 @@ bool WidgetMain::DialogGroupsSubscribes()
 		auto &item = items.emplace_back();
 
 		item.text = gr[Fields::nameGroupIndex];
-		item.enabled = (gr[Fields::idGroupIndexInGroups] != DataBase::DefaultGroupId2());
+		item.enabled = (gr[Fields::idGroupIndexInGroups] != DataBase::DefaultGroupId2()); // отключение chBox-а дефолтной группы
 		item.checkState = Fields::CheckLogicField(gr[Fields::subscribedIndex]);
 	}
 	auto res = MyQDialogs::CheckBoxDialog("Groups subscribes", items);
