@@ -588,7 +588,7 @@ void Requester::SendInSock(ISocket * sock, QString str, bool sendEndMarker)
 {
 	CodeMarkers::can_be_optimized("takes copy, than make other copy");
 	
-	Log("sending: " + (str == " " ? "_space_" : sendEndMarker ? str + NetConstants::end_marker() : str));
+	Log("SendInSock: sending: " + (str == " " ? "_space_" : sendEndMarker ? str + NetConstants::end_marker() : str));
 	
 	str.replace(NetConstants::end_marker(), NetConstants::end_marker_replace());
 	
