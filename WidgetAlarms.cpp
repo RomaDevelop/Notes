@@ -15,6 +15,7 @@
 #include "MyQDifferent.h"
 #include "MyQDialogs.h"
 #include "MyQString.h"
+#include "PlatformDependent.h"
 #include "declare_struct.h"
 
 #include "FastActions.h"
@@ -32,6 +33,7 @@ WidgetAlarms::WidgetAlarms(QFont fontForLabels,
 	settingsFile = MyQDifferent::PathToExe() + "/files/settings_widget_alarms.ini";
 
 	setWindowFlag(Qt::WindowCloseButtonHint, false);
+	setWindowFlag(Qt::WindowDoesNotAcceptFocus, true);
 
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
 	QHBoxLayout *hlo1 = new QHBoxLayout;
@@ -135,7 +137,11 @@ void WidgetAlarms::GiveNotes(const std::vector<Note *> & givingNotes)
 	{
 		show();
 		if(added)
-			this->windowHandle()->alert(5000);
+		{
+			PlatformDependent::SetTopMostFlash(this);
+			if(isMinimized()) this->windowHandle()->alert(5000);
+			else PlatformDependent::SetTopMostFlash(this);
+		}
 	}
 	else hide();
 }
