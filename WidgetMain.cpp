@@ -99,9 +99,9 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 
 #ifndef QT_DEBUG
 	auto answ = MyQDialogs::CustomDialog("Launching Notes", "Do you want to update repo before launching Notes?",
-										 {"Yes", "No", "Abort launch"});
-	if(answ == "No") {}
-	else if(answ == "Yes")
+										 {"Yes, update", "No update", "Abort launch"});
+	if(answ == "No update") {}
+	else if(answ == "Yes, update")
 	{
 		if(MyQExecute::Execute(ReadAndGetGitExtensionsExe(GitExtensionsExe, true), {base.pathDataBase}))
 		{
@@ -697,13 +697,19 @@ void WidgetMain::UpdateWidgetsFromNote(NoteInMain &note)
 	note.rowView.dtePostpone->setDateTime(note.note->DTPostpone());
 }
 
-void WidgetMain::FilterNotes(const QString &nameFilter)
+void WidgetMain::FilterNotes(const QString &textFilter)
 {
+	QString textFilterTranslited = MyQString::Translited(textFilter);
+	QString contntHead;
 	for(int row=0; row<table->rowCount(); row++)
 	{
-		if(nameFilter.isEmpty()
-				|| table->item(row, ColIndexes::name)->text().contains(nameFilter, Qt::CaseInsensitive)
-				|| table->item(row, ColIndexes::name)->text().contains(MyQString::Translited(nameFilter), Qt::CaseInsensitive))
+		QStringRef contentHead(&NoteOfRow(row)->Content(), 0,
+							   NoteOfRow(row)->Content().size() > 2000 ? 2000 : NoteOfRow(row)->Content().size());
+		if(textFilter.isEmpty()
+				|| table->item(row, ColIndexes::name)->text().contains(textFilter, Qt::CaseInsensitive)
+				|| table->item(row, ColIndexes::name)->text().contains(textFilterTranslited, Qt::CaseInsensitive)
+				|| contentHead.contains(textFilter, Qt::CaseInsensitive)
+				|| contentHead.contains(textFilterTranslited, Qt::CaseInsensitive))
 		{
 			table->setRowHidden(row, false);
 		}
