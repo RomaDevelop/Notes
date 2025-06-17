@@ -73,7 +73,7 @@ private:
 	int MakeWidgetsForMainTable(NoteInMain &newNote); // returns index
 	void UpdateWidgetsFromNote(NoteInMain &note);
 
-	void FilterNotes(const QString &nameFilter);
+	void FilterNotes(const QString &textFilter);
 
 	void RemoveNote(Note* note, bool execSqlRemove);
 	bool RemoveNoteSQLOnClient(Note* note);

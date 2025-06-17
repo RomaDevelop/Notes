@@ -51,7 +51,8 @@ void ToDo(){
 	///				и еще хранить на клиенте неотгруженные изменения и если соединение появилось - отгружать их
 	///	(позже) для сокращения трафика передавать сохрание не всей заметки, а по полям, а в случае контента - даже только измененный фрагмент
 	///	(позже) сделать cb note removed и подключить к нему WidgetAlarms и в удалении убрать обязательное удальение строки из WidgetAlarms
-	/// (позже) для сокращения трафика, расчитывать дату изменении группы заметок и сравнивать сначала её, а уже если надо - работать по заметка группы
+	/// (позже) для сокращения трафика, расчитывать дату изменении группы заметок и сравнивать сначала её,
+	///				а уже если надо - работать по заметкам группы
 	///
 	/// дебаг - работать локально, выпуск - через сервер
 	///
@@ -97,7 +98,8 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	auto base = DataBase::defineBase(DataBase::client);
 
 #ifndef QT_DEBUG
-	auto answ = MyQDialogs::CustomDialog("Launching Notes", "Do you want to update repo before launching Notes?", {"Yes", "No"});
+	auto answ = MyQDialogs::CustomDialog("Launching Notes", "Do you want to update repo before launching Notes?",
+										 {"Yes", "No", "Abort launch"});
 	if(answ == "No") {}
 	else if(answ == "Yes")
 	{
@@ -106,6 +108,13 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 			QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
 		}
 		else QMbError("Error launching GitExtensions");
+	}
+	else if(answ == "Abort launch")
+	{
+		this->deleteLater();
+		if(0) CodeMarkers::to_do_afterwards("в этом сценарии вылетает крит, потому что при уничтожении окна идет обращение к виджетам, "
+											"которые в этом сценарии еще не созданы");
+		return;
 	}
 	else QMbError("Unexpacted answ");
 #endif
