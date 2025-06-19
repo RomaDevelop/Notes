@@ -31,6 +31,7 @@
 #include "MyQTableWidget.h"
 #include "CodeMarkers.h"
 #include "Resources.h"
+#include "LaunchParams.h"
 
 #include "AdditionalTray.h"
 
@@ -103,6 +104,30 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	if(answ == "No update") {}
 	else if(answ == "Yes, update")
 	{
+		QString fetchRes;
+		while(fetchRes != "finish")
+		{
+			QProcess process;
+			process.setWorkingDirectory(LaunchParams::CurrentDeveloper()->sourcesPath);
+			process.start("git", QStringList() << "fetch" << "github");
+			if(!process.waitForStarted(1000))
+			{
+				fetchRes = "error waitForStarted " + (QStringList() << "fetch" << "github").join(" ");
+			}
+			else if(!process.waitForFinished(10000))
+			{
+				fetchRes = "error waitForFinished " + (QStringList() << "fetch" << "github").join(" ");
+			}
+			else fetchRes = process.readAllStandardError();
+
+			if(!fetchRes.isEmpty())
+			{
+				auto answ = QMessageBox::question(nullptr, "Fetch errors", "Fetch did with errors:\n\n"+fetchRes+"\n\nTry again?");
+				if(answ == QMessageBox::No) fetchRes = "finish";
+			}
+			else fetchRes = "finish";
+		}
+
 		if(MyQExecute::Execute(ReadAndGetGitExtensionsExe(GitExtensionsExe, true), {base.pathDataBase}))
 		{
 			QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
