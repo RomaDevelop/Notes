@@ -7,7 +7,7 @@ QString FastAction::DoAction() const
 {
 	QString res;
 
-	if(QString curKeyWordCommand = FastActions_ns::execute; command.startsWith(curKeyWordCommand))
+	if(QString curKeyWordCommand = FastActions_ns::execute(); command.startsWith(curKeyWordCommand))
 	{
 		QString subj(command);
 		subj.remove(0, curKeyWordCommand.size());
@@ -35,7 +35,7 @@ FastActions FastActions::Scan(const QString &text)
 	for(int i=0; i<text.size(); i++)
 	{
 		auto c = text[i];
-		for(auto &actionKW:FastActions_ns::all)
+		for(auto &actionKW:FastActions_ns::all())
 		{
 			if(actionKW.startsWith(c)
 					&& i+actionKW.size() <= text.size()
@@ -54,4 +54,27 @@ FastActions FastActions::Scan(const QString &text)
 		}
 	}
 	return actions;
+}
+
+QStringRef Features::HeadForCheckFeature(const QString &content)
+{
+	return QStringRef(&content, 0, content.size() > 1500 ? 1500 : content.size());
+}
+
+bool Features::CheckFeature(const QString &content, const QString &feature)
+{
+	QStringRef head = HeadForCheckFeature(content);
+	return head.contains(feature);
+}
+
+QStringRefWr_const_set Features::ScanForFeatures(const QString &content)
+{
+	QStringRefWr_const_set result;
+	QStringRef head = HeadForCheckFeature(content);
+	for(auto &feature:all())
+	{
+		if(head.contains(feature))
+			result.insert(feature);
+	}
+	return result;
 }

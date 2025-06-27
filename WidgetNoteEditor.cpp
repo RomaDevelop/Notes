@@ -216,19 +216,35 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, bool aNewNote, QWidget *parent):
 		textEdit->setFocus();
 	});
 
+	QPushButton *btnAddFeature = new QPushButton(" Add feature ");
+	hloButtons->addWidget(btnAddFeature);
+	connect(btnAddFeature,&QPushButton::clicked,[this, btnAddFeature](){
+
+		auto addFoo = [this](){
+			auto cursor = this->textEdit->textCursor();
+			cursor.setPosition(0);
+			cursor.insertText(Features::messageForNotify());
+			textEdit->setFocus();
+		};
+
+		MyQDialogs::MenuUnderWidget(btnAddFeature,
+									{
+										{ Features::messageForNotify(), addFoo },
+									});
+	});
 
 	QPushButton *btnAddAction = new QPushButton(" Add action ");
 	hloButtons->addWidget(btnAddAction);
 	connect(btnAddAction,&QPushButton::clicked,[this, btnAddAction](){
 
-		auto executeFoo = [this](){
-			this->textEdit->textCursor().insertText(FastActions_ns::execute);
+		auto addFoo = [this](){
+			this->textEdit->textCursor().insertText(FastActions_ns::execute());
 			textEdit->setFocus();
 		};
 
 		MyQDialogs::MenuUnderWidget(btnAddAction,
 									{
-										{ FastActions_ns::execute, executeFoo },
+										{ FastActions_ns::execute(), addFoo },
 									});
 	});
 

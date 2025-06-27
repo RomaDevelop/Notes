@@ -221,7 +221,15 @@ void WidgetAlarms::AddNote(Note * note)
 		}
 	});
 
-	QTimer::singleShot(10,this,[this]{ FitColWidth(); });
+	bool featureMsgForNotify = Features::CheckFeature(note->Content(), Features::messageForNotify());
+
+	QTimer::singleShot(10,this,[this, featureMsgForNotify, note]{
+		FitColWidth();
+		if(featureMsgForNotify)
+		{
+			QMbInfo("Message-notify for note:\n" + note->Name());
+		}
+	});
 }
 
 void WidgetAlarms::SetLabelText(NoteInAlarms & note)

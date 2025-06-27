@@ -2,6 +2,7 @@
 #define FASTACTIONS_H
 
 #include <vector>
+#include <set>
 
 #include <QStringList>
 #include <QDebug>
@@ -9,11 +10,26 @@
 
 #include "MyQShortings.h"
 
-namespace FastActions_ns {
-	const QString execute = "[execute]";
+using QStringRefWr_const = std::reference_wrapper<const QString>;
+using QStringRefWrVector = std::vector<QStringRefWr_const>;
+using QStringRefWr_const_set = std::set<QStringRefWr_const>;
 
-	const QStringList all {execute};
+namespace FastActions_ns {
+	inline const QString& execute() { static QString str = "[execute]"; return str; }
+
+	inline const QStringList& all() { static QStringList list { execute() }; return list; };
 }
+
+struct Features
+{
+	static const QString& messageForNotify() { static QString str = "[message for notify]"; return str; }
+
+	static const QStringList& all() { static QStringList list { messageForNotify() }; return list; };
+
+	static QStringRef HeadForCheckFeature(const QString &content);
+	static bool CheckFeature(const QString &content, const QString &feature);
+	static QStringRefWr_const_set ScanForFeatures(const QString &content);
+};
 
 struct FastAction
 {
