@@ -74,15 +74,19 @@ public:
 	QLineEdit *leArg;
 	QTextEdit *textEditSocket;
 	bool canNetwork = false;
-	bool pollyWhaits = false;
 
 	QNetworkAccessManager *manager {};
 	QTimer *timerPolly {};
+	void InitPollyCloserTimer();
+	int pollyWhaits = -1;
+	const int pollyTimerTimeoutMs = 100;
+	//const int pollyMaxWaitMs = 3000;
+	const int pollyMaxWaitMs = 20000;
 	QString adress;
 	QString bufForTarget;
 
 	void CreateSocket();
-	void Create2Window(bool show);
+	void CreateWidgets(bool show);
 
 	virtual void Write(ISocket * /*sock*/, const QString &str) override;
 

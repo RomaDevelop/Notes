@@ -17,15 +17,17 @@
 #include "MyQShortings.h"
 #include "MyQTextEdit.h"
 #include "MyCppDifferent.h"
+#include "MyCppRandom.h"
 #include "MyQDialogs.h"
 #include "CodeMarkers.h"
+#include "TextEditCleaner.h"
 
 #include "DataBase.h"
 #include "Note.h"
 
 NetClient::NetClient(QObject *parent) : QObject(parent)
 {
-	Create2Window(true);
+	CreateWidgets(true);
 
 	//	QNetworkProxy *proxyPtr = new QNetworkProxy;
 	//	QNetworkProxy &proxy = *proxyPtr;
@@ -75,7 +77,10 @@ void NetClient::SlotTest()
 
 void NetClient::SlotTestSend()
 {
-	SendInSock(this, "test send", true);
+	QString s = "";
+	for(int i=0; i<25; i++)
+		s += 'a' + MyCppRandom::Get(0,25);
+	SendInSock(this, "test send " + s, true);
 }
 
 void NetClient::Log(const QString &str, bool appendInLastRow)
@@ -97,6 +102,27 @@ void NetClient::Warning(const QString &str)
 	MyQTextEdit::ColorizeLastCount(textEditSocket, Qt::blue, str.size());
 }
 
+void NetClient::InitPollyCloserTimer()
+{
+	return;
+	if(timerPolly) timerPolly->deleteLater();
+	timerPolly = new QTimer(this);
+	pollyWhaits = -1;
+	connect(timerPolly, &QTimer::timeout, [this](){
+		if(pollyWhaits == -1 || pollyWhaits >= pollyMaxWaitMs)
+		{
+			auto pollyAnsw = [this](QString &&answContent){
+				pollyWhaits = -1;
+				Log("pollyAnsw get " + answContent);
+			};
+			RequestInSock(this, NetConstants::request_polly(), "null", pollyAnsw);
+			pollyWhaits = 0;
+		}
+		else pollyWhaits += pollyTimerTimeoutMs;
+	});
+	timerPolly->start(pollyTimerTimeoutMs);
+}
+
 void NetClient::CreateSocket()
 {
 	if(manager) manager->deleteLater();
@@ -108,24 +134,10 @@ void NetClient::CreateSocket()
 #endif
 	connect(manager, &QNetworkAccessManager::finished, this, &NetClient::SlotReadyRead);
 
-	if(timerPolly) timerPolly->deleteLater();
-	timerPolly = new QTimer(this);
-	pollyWhaits = false;
-	connect(timerPolly, &QTimer::timeout, [this](){
-		if(!pollyWhaits)
-		{
-			auto pollyAnsw = [this](QString &&answContent){
-				pollyWhaits = false;
-				Log("pollyAnsw get " + answContent);
-			};
-			RequestInSock(this, NetConstants::request_polly(), "null", pollyAnsw);
-			pollyWhaits = true;
-		}
-	});
-	timerPolly->start(100);
+	InitPollyCloserTimer();
 }
 
-void NetClient::Create2Window(bool show)
+void NetClient::CreateWidgets(bool show)
 {
 	widget = std::make_unique<QWidget>();
 	widget->setWindowTitle("NetClient");
@@ -142,14 +154,19 @@ void NetClient::Create2Window(bool show)
 	hlo1->addWidget(btnTestClear);
 	connect(btnTestClear,&QPushButton::clicked,[this](){ textEditSocket->clear(); });
 
-	QPushButton *btnTestConnect = new QPushButton("connect");
-	hlo1->addWidget(btnTestConnect);
-	connect(btnTestConnect,&QPushButton::clicked,[this](){ CreateSocket(); });
+	QPushButton *btnConnect = new QPushButton("connect");
+	hlo1->addWidget(btnConnect);
+	connect(btnConnect,&QPushButton::clicked,[this](){ CreateSocket(); });
+
+	QPushButton *btnDisconnect = new QPushButton("disconnect");
+	hlo1->addWidget(btnDisconnect);
+	connect(btnDisconnect,&QPushButton::clicked,[this](){ manager->deleteLater(); manager = {}; });
 
 	QPushButton *btnSqlClearNotes = new QPushButton(" clear notes ");
 	hlo1->addWidget(btnSqlClearNotes);
 	connect(btnSqlClearNotes,&QPushButton::clicked,[](){
-		DataBase::DoSqlQuery("delete from " + Fields::Notes());
+		QMbError("disabled");
+		//DataBase::DoSqlQuery("delete from " + Fields::Notes());
 	});
 
 	QPushButton *btnTestSend = new QPushButton("test send");
@@ -166,11 +183,10 @@ void NetClient::Create2Window(bool show)
 
 	hlo1->addStretch();
 
-
-	//hlo2->addStretch();
-
 	textEditSocket = new QTextEdit;
 	hlo3->addWidget(textEditSocket);
+
+	new TextEditCleaner(textEditSocket, 1000, textEditSocket);
 
 	if(show) widget->show();
 
