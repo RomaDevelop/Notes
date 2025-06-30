@@ -110,7 +110,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 			QProcess process;
 			process.setWorkingDirectory(LaunchParams::CurrentDeveloper()->sourcesPath);
 			process.start("git", QStringList() << "fetch" << "github");
-			if(!process.waitForStarted(1000))
+			if(!process.waitForStarted(5000))
 			{
 				fetchRes = "error waitForStarted " + (QStringList() << "fetch" << "github").join(" ");
 			}
