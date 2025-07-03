@@ -36,6 +36,7 @@ public:
 	virtual void Write(ISocket * sock, const QString &str) = 0;
 
 	void SendInSock(ISocket *sock, QString str, bool sendEndMarker);
+	static void PrepareStringToSend(QString &str, bool addEndMarker);
 
 	declare_struct_4_fields_move(RequestData, QString, id, QString, type, QString, content, QString, errors);
 	using AnswerWorkerFunction = std::function<void(QString &&answContent)>;
@@ -43,7 +44,7 @@ public:
 
 	void RequestsWorker(ISocket *sock, QString text);
 	virtual std::map<QStringRefWr_const, std::function<void(ISocket *sock, RequestData &&requestData)>> & RequestWorkersMap() = 0;
-	void AnswerForRequestSending(ISocket *sock, RequestData &requestData, QString str);
+	void AnswerForRequestSending(ISocket *sock, RequestData &&requestData, QString str);
 	uint answDelay = 0;
 
 	void RequestsAnswersWorker(QString text);
@@ -73,25 +74,24 @@ public:
 	std::unique_ptr<QWidget> widget;
 	QLineEdit *leArg;
 	QTextEdit *textEditSocket;
-	bool canNetwork = false;
+	qint64 sessionId = 0;
 
 	QNetworkAccessManager *manager {};
 	QTimer *timerPolly {};
 	void InitPollyCloserTimer();
 	int pollyWhaits = -1;
 	const int pollyTimerTimeoutMs = 100;
-	//const int pollyMaxWaitMs = 3000;
-	const int pollyMaxWaitMs = 20000;
 	QString adress;
 	QString bufForTarget;
 
-	void CreateSocket();
 	void CreateWidgets(bool show);
+	void CreateSocket();
 
 	virtual void Write(ISocket * /*sock*/, const QString &str) override;
 
 public slots:
 	void SlotReadyRead(QNetworkReply *reply);
+	void WorkReaded(const QString &readed);
 
 public: signals:
 	void SignalNoteRemoved(qint64 idOnClient);
@@ -114,6 +114,8 @@ private:
 	void SynchFromQueue();
 
 public:
+	void RequestGetSessionId();
+
 	declare_struct_3_fields_move(CommandData, QString, commandName, QString, content, QString, errors);
 	void CommandsToClientWorker(QString text);
 	static QString PrepareCommandToClient(const QString &commandName, const QString &content);
@@ -134,8 +136,10 @@ public:
 	virtual std::map<QStringRefWr_const, std::function<void(ISocket *sock, RequestData &&requestData)>> & RequestWorkersMap() override
 	{ return requestWorkersMap; }
 
-	QString& PrepareTargetWithAuth();
-	static bool ChekAuth(const QString &targetOnServerSide);
+	QString& PrepareTarget();
+	declare_struct_3_fields_move(TargetContent, QStringRef, dtStrRef, QStringRef, hmac, QStringRef, sessionId);
+	static TargetContent DecodeTarget(const QString &targetOnServerSide);
+	static bool ChekAuth(const TargetContent &targetContent);
 };
 
 #endif // NETCLIENT_H

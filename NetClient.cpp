@@ -104,18 +104,20 @@ void NetClient::Warning(const QString &str)
 
 void NetClient::InitPollyCloserTimer()
 {
-	return;
 	if(timerPolly) timerPolly->deleteLater();
 	timerPolly = new QTimer(this);
 	pollyWhaits = -1;
 	connect(timerPolly, &QTimer::timeout, [this](){
-		if(pollyWhaits == -1 || pollyWhaits >= pollyMaxWaitMs)
+		if(sessionId <= 0) { pollyWhaits = -1; return; }
+
+		if(pollyWhaits == -1 || pollyWhaits >= NetConstants::pollyMaxWaitClientMs)
 		{
 			auto pollyAnsw = [this](QString &&answContent){
 				pollyWhaits = -1;
 				Log("pollyAnsw get " + answContent);
+				WorkReaded(answContent);
 			};
-			RequestInSock(this, NetConstants::request_polly(), "null", pollyAnsw);
+			RequestInSock(this, NetConstants::request_polly(), NetConstants::nothing(), pollyAnsw);
 			pollyWhaits = 0;
 		}
 		else pollyWhaits += pollyTimerTimeoutMs;
@@ -125,6 +127,7 @@ void NetClient::InitPollyCloserTimer()
 
 void NetClient::CreateSocket()
 {
+	if(timerPolly) { timerPolly->deleteLater(); timerPolly = {}; }
 	if(manager) manager->deleteLater();
 	manager = new QNetworkAccessManager(this);
 #ifdef QT_DEBUG
@@ -134,8 +137,12 @@ void NetClient::CreateSocket()
 #endif
 	connect(manager, &QNetworkAccessManager::finished, this, &NetClient::SlotReadyRead);
 
+	RequestGetSessionId();
+
 	InitPollyCloserTimer();
 }
+
+
 
 void NetClient::CreateWidgets(bool show)
 {
@@ -196,7 +203,7 @@ void NetClient::CreateWidgets(bool show)
 
 void NetClient::Write(ISocket *, const QString &str)
 {
-	QNetworkRequest request(PrepareTargetWithAuth());
+	QNetworkRequest request(PrepareTarget());
 	request.setHeader(QNetworkRequest::ContentTypeHeader, "text/plain");
 	manager->post(request, str.toUtf8());
 }
@@ -219,6 +226,11 @@ void NetClient::SlotReadyRead(QNetworkReply *reply)
 		return;
 	}
 
+	WorkReaded(readed);
+}
+
+void NetClient::WorkReaded(const QString &readed)
+{
 	auto msgs = readed.split(NetConstants::end_marker());
 
 	for(auto &msg:msgs)
@@ -226,20 +238,10 @@ void NetClient::SlotReadyRead(QNetworkReply *reply)
 		msg.replace(NetConstants::end_marker_replace(), NetConstants::end_marker());
 		Log("received message: " + msg);
 
-		if(msg == NetConstants::auth_success())
+		if(msg == NetConstants::auth_failed())
 		{
-			canNetwork = true;
-			Log(NetConstants::auth_success());
-		}
-		else if(msg == NetConstants::auth_failed())
-		{
-			canNetwork = false;
+			sessionId = 0;
 			Error(NetConstants::auth_failed());
-		}
-		else if(msg.startsWith(NetConstants::last_update()))
-		{
-			QStringRef lastUpdate(&msg, NetConstants::last_update().size(), msg.size() - NetConstants::last_update().size());
-			Log("last update on server is " + lastUpdate);
 		}
 		else if(msg.startsWith(NetConstants::request()))
 		{
@@ -253,9 +255,13 @@ void NetClient::SlotReadyRead(QNetworkReply *reply)
 		{
 			CommandsToClientWorker(std::move(msg));
 		}
-		else if(msg == NetConstants::unexpacted())
+		else if(msg == NetConstants::nothing())
 		{
-			Error("server says that get unexpacted data from me");
+			Log("received message {"+NetConstants::nothing()+"} from server");
+		}
+		else if(msg == NetConstants::unexpected())
+		{
+			Error("server says that get unexpected data from me");
 		}
 		else
 		{
@@ -294,7 +300,7 @@ NetClient::MsgData NetClient::DecodeMsg(QString msg)
 
 void NetClient::RequestToServerWithWait(const QString & requestType, QString content, Requester::AnswerWorkerFunction answWorker)
 {
-	if(!canNetwork)
+	if(sessionId <= 0)
 	{
 		QMbError("Server not connected, operation impossible");
 		return;
@@ -353,7 +359,7 @@ void NetClient::SynchronizeAllNotes(std::vector<Note*> allClientNotes)
 
 void NetClient::SynchFromQueue()
 {
-	if(!canNetwork) return;
+	if(sessionId <= 0) return;
 	if(synchQueue.empty()) return;
 
 	bool endAllNotesMarkerFound = false;
@@ -412,6 +418,19 @@ void NetClient::SynchFromQueue()
 
 		MsgToServer(NetConstants::msg_highest_idOnServer(), DataBase::HighestIdOnServer());
 	}
+}
+
+void NetClient::RequestGetSessionId()
+{
+	auto answ = [this](QString &&answContent){
+		sessionId = answContent.toULongLong();
+
+		if(sessionId <= 0) Error("Get bad session id: " + QSn(sessionId));
+		else Log("Get session id: " + QSn(sessionId));
+	};
+
+	sessionId = 0;
+	RequestInSock(this, NetConstants::request_get_session_id(), NetConstants::nothing(), answ);
 }
 
 void NetClient::CommandsToClientWorker(QString text)
@@ -560,16 +579,16 @@ void NetClient::request_get_note_worker(ISocket * sock, NetClient::RequestData &
 	if(rec.isEmpty())
 	{
 		Error("CheckNoteId "+idOnServer+" false");
-		AnswerForRequestSending(sock, requestData, NetConstants::invalid());
+		AnswerForRequestSending(sock, std::move(requestData), NetConstants::invalid());
 		return;
 	}
 
 	Note note;
 	note.InitFromRecord(rec);
-	AnswerForRequestSending(sock, requestData, note.ToStr_v1());
+	AnswerForRequestSending(sock, std::move(requestData), note.ToStr_v1());
 }
 
-QString &NetClient::PrepareTargetWithAuth()
+QString &NetClient::PrepareTarget()
 {
 	QString dtStr = QDateTime::currentDateTime()/*.addMSecs(-14980)*/.toString(NetConstants::auth_date_time_format());
 												// 14980 - проходит, 14990 не проходит
@@ -578,26 +597,31 @@ QString &NetClient::PrepareTargetWithAuth()
 	
 	bufForTarget = adress;
 	bufForTarget.append("/").append(dtStr).append("&").append(hmac.toHex());
+	bufForTarget.append("&").append(QSn(sessionId));
 	
 	return bufForTarget;
 }
 
-bool NetClient::ChekAuth(const QString &targetOnServerSide)
+NetClient::TargetContent NetClient::DecodeTarget(const QString &targetOnServerSide)
 {
 	QStringRef payload = targetOnServerSide.midRef(1);
 	auto parts = payload.split('&');
-	if (parts.size() != 2) return false;
+	if (parts.size() < 3) return {};
 
-	QStringRef dtRef = parts[0];
-	QStringRef receivedHmacHex(parts[1]);
+	return TargetContent(parts[0], parts[1], parts[2]);
+}
 
-	if(QDateTime::fromString(dtRef.toString(), NetConstants::auth_date_time_format()).msecsTo(QDateTime::currentDateTime())
+bool NetClient::ChekAuth(const TargetContent &targetContent)
+{
+	if(QDateTime::fromString(targetContent.dtStrRef.toString(), NetConstants::auth_date_time_format()).msecsTo(QDateTime::currentDateTime())
 			> 15000)
 		return false;
 
-	QByteArray hmacEtalon = QMessageAuthenticationCode::hash(dtRef.toUtf8(), NetConstants::test_passwd().toUtf8(), QCryptographicHash::Sha256);
+	QByteArray hmacEtalon = QMessageAuthenticationCode::hash(targetContent.dtStrRef.toUtf8(),
+															 NetConstants::test_passwd().toUtf8(),
+															 QCryptographicHash::Sha256);
 
-	return hmacEtalon.toHex() == receivedHmacHex;
+	return hmacEtalon.toHex() == targetContent.hmac;
 }
 
 void Requester::SendInSock(ISocket * sock, QString str, bool sendEndMarker)
@@ -606,10 +630,15 @@ void Requester::SendInSock(ISocket * sock, QString str, bool sendEndMarker)
 	
 	Log("SendInSock: sending: " + (str == " " ? "_space_" : sendEndMarker ? str + NetConstants::end_marker() : str));
 	
-	str.replace(NetConstants::end_marker(), NetConstants::end_marker_replace());
-	
-	if(sendEndMarker) str.append(NetConstants::end_marker());
+	PrepareStringToSend(str, sendEndMarker);
+
 	Write(sock, str);
+}
+
+void Requester::PrepareStringToSend(QString &str, bool addEndMarker)
+{
+	str.replace(NetConstants::end_marker(), NetConstants::end_marker_replace());
+	if(addEndMarker) str.append(NetConstants::end_marker());
 }
 
 void Requester::RequestInSock(ISocket *sock, const QString & requestType, QString content, Requester::AnswerWorkerFunction answWorker)
@@ -617,6 +646,13 @@ void Requester::RequestInSock(ISocket *sock, const QString & requestType, QStrin
 	CodeMarkers::can_be_optimized("takes copy, than make other copy");
 	
 	CodeMarkers::to_do("нужно удалять из requestAswerWorkers спустя время если не пришло");
+
+	if(content.isEmpty())
+	{
+		Warning("Requester::RequestInSock called with empty content. If content is not required should set content "
+				"NetConstants::nothing()");
+		content = NetConstants::nothing();
+	}
 
 	int idRqst = TakeIdRequest();
 	requestAswerWorkers[idRqst] = std::move(answWorker);
@@ -635,7 +671,7 @@ void Requester::RequestsWorker(ISocket * sock, QString text)
 	if(!requestData.errors.isEmpty())
 	{
 		Error("error decoding request: "+requestData.errors + "; full text:\n"+text);
-		AnswerForRequestSending(sock, requestData, NetConstants::not_did());
+		AnswerForRequestSending(sock, std::move(requestData), NetConstants::not_did());
 		// почему стоит ответить - чтобы клиент не ждал пока истечет таймаут
 		return;
 	}
@@ -647,17 +683,25 @@ void Requester::RequestsWorker(ISocket * sock, QString text)
 		std::function<void(ISocket *sock, NetClient::RequestData &&requestData)> &requestWorker = it->second;
 		requestWorker(sock, std::move(requestData));
 	}
-	else Error("Unrealesed requestData.type " + requestData.type);
+	else
+	{
+		Error("Unrealesed requestData.type " + requestData.type);
+		AnswerForRequestSending(sock, std::move(requestData), NetConstants::not_did());
+		// почему стоит ответить - чтобы клиент не ждал пока истечет таймаут
+	}
 }
 
-void Requester::AnswerForRequestSending(ISocket * sock, RequestData & requestData, QString str)
+void Requester::AnswerForRequestSending(ISocket * sock, RequestData && requestData, QString str)
 {
 	MyCppDifferent::sleep_ms(answDelay);
-	if(requestData.id.isEmpty() || requestData.content.isEmpty())
-	{
-		Warning("AnswerForRequestSending executed with empty requestData: id=["+requestData.id+"] content=["+requestData.content+"]");
+
+	if(requestData.id.isEmpty()) {
+		Error("AnswerForRequestSending executed with empty requestData.id=["+requestData.id+"]");
 		return;
 	}
+
+	if(requestData.content.isEmpty())
+		Warning("AnswerForRequestSending executed with empty requestData.content");
 
 	str.prepend(requestData.id.append(" "));
 	str.prepend(NetConstants::request_answ());

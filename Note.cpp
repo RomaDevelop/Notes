@@ -85,7 +85,7 @@ void Note::DialogCreateNewGroup()
 	}
 	else if (answ == "global")
 	{
-		if(!netClient->canNetwork)
+		if(netClient->sessionId <= 0)
 		{
 			QMbError("Server not connected, operation impossible");
 			return;
@@ -283,7 +283,7 @@ void Note::SaveNoteOnClient(const QString &reason)
 				QMbWarning("Server can't save note, it saved local");
 		};
 
-		if(netClient->canNetwork)
+		if(netClient->sessionId > 0)
 			netClient->RequestToServerWithWait(NetConstants::request_note_saved(), ToStr_v1(), answFoo);
 		else QMbWarning("Server not connected, note saved local");
 	}
