@@ -285,6 +285,7 @@ QDateTime AddSecsFromNow(qint64 secs)
 
 namespace ForPostpone_ns {
 	const int handInput = -1;
+	const int separator = -2;
 }
 
 void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCaseValue, Note* note)
@@ -297,14 +298,15 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 	declare_struct_2_fields_move(Delay, QString, text, int, seconds);
 	std::vector<Delay> delays;
 	const int secondsInDay = 60*60*24;
+	const int daysInMonth = QDate::currentDate().daysInMonth();
 
 	if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
 		delays = 		{{"1 день", secondsInDay}, {"2 дня", secondsInDay*2}, {"3 дня", secondsInDay*3}, {"4 дня", secondsInDay*4},
 						 {"5 дней", secondsInDay*5}, {"6 дней", secondsInDay*6}, {"7 дней", secondsInDay*7}, {"8 дней", secondsInDay*8},
-						 {"9 дней", secondsInDay*9}, {"10 дней", secondsInDay*7}, {"10 дней", secondsInDay*10}, {"11 дней", secondsInDay*11},
-						 {"12 дней", secondsInDay*12}, {"13 дней", secondsInDay*13}, {"14 дней", secondsInDay*14},
-						 {"20 дней", secondsInDay*20}, {"25 дней", secondsInDay*25}, {"30 дней", secondsInDay*30},
-						 {"40 дней", secondsInDay*40}, {"50 дней", secondsInDay*50}, {"60 дней", secondsInDay*60},
+						 {"9 дней", secondsInDay*9}, {"10 дней", secondsInDay*10}, {"11 дней", secondsInDay*11}, {"12 дней", secondsInDay*12},
+						 {"13 дней", secondsInDay*13}, {"14 дней", secondsInDay*14}, {"15 дней", secondsInDay*15}, {"", ForPostpone_ns::separator}, {"18 дней", secondsInDay*18},
+						 {"21 дней", secondsInDay*21}, {"25 дней", secondsInDay*25}, {"Месяц", secondsInDay*daysInMonth}, {"", ForPostpone_ns::separator},
+						 {"40 дней", secondsInDay*40}, {"50 дней", secondsInDay*50}, {"Два месяца", secondsInDay*daysInMonth*2},
 						 {"Ввести вручную", ForPostpone_ns::handInput}};
 	else if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
 		delays = 		{{"5 минут", 60*5}, {"10 минут", 60*10}, {"15 минут", 60*15}, {"20 минут", 60*20},
@@ -326,6 +328,12 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 	for(auto &delay:delays)
 	{
 		int delaySecs = delay.seconds;
+
+		if(delay.seconds == ForPostpone_ns::separator)
+		{
+			menu->addSeparator();
+			continue;
+		}
 
 		if(delay.seconds != ForPostpone_ns::handInput)
 		{

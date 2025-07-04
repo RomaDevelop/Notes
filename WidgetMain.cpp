@@ -725,7 +725,7 @@ void WidgetMain::UpdateWidgetsFromNote(NoteInMain &note)
 void WidgetMain::FilterNotes(const QString &textFilter)
 {
 	QString textFilterTranslited = MyQString::Translited(textFilter);
-	QString contntHead;
+	QString contentHead;
 	for(int row=0; row<table->rowCount(); row++)
 	{
 		QStringRef contentHead(&NoteOfRow(row)->Content(), 0,
