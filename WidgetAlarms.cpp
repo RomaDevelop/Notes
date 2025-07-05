@@ -86,6 +86,7 @@ WidgetAlarms::WidgetAlarms(QFont fontForLabels,
 		if(isVisible()) geo = saveGeometry();
 	});
 	timerGeoSaver->start(200);
+	InitFitColWidthTimer();
 }
 
 WidgetAlarms::~WidgetAlarms()
@@ -190,11 +191,14 @@ void WidgetAlarms::AddNote(Note * note)
 	NoteInAlarms &newNoteInAlarms = *newNoteInAlarmsPtr;
 	newNoteInAlarms.note = note;
 	newNoteInAlarms.widgetAll = widget;
-	newNoteInAlarms.widgetAllExeptLabels = widgetAllExeptLabels;
-	newNoteInAlarms.labelCaption1 = labelCaption1;
-	newNoteInAlarms.labelCaption2 = labelCaption2;
+	NoteInAlarms &newNoteInAlarmsRef = *newNoteInAlarmsPtr;
+	newNoteInAlarmsRef.note = note;
+	newNoteInAlarmsRef.widgetAll = widget;
+	newNoteInAlarmsRef.widgetAllExeptLabels = widgetAllExeptLabels;
+	newNoteInAlarmsRef.labelCaption1 = labelCaption1;
+	newNoteInAlarmsRef.labelCaption2 = labelCaption2;
 
-	SetLabelText(newNoteInAlarms);
+	SetLabelText(newNoteInAlarmsRef);
 
 	auto cb = [this, newNoteInAlarmsPtr](void*){
 		if(!newNoteInAlarmsPtr->note->CheckAlarm(QDateTime::currentDateTime()))
@@ -221,6 +225,7 @@ void WidgetAlarms::AddNote(Note * note)
 		}
 	});
 
+	fitColWidthRequest = true;
 	bool featureMsgForNotify = Features::CheckFeature(note->Content(), Features::messageForNotify());
 
 	QTimer::singleShot(10,this,[this, featureMsgForNotify, note]{
@@ -460,6 +465,19 @@ void WidgetAlarms::FitColWidth()
 	table->setColumnWidth(0, columnWidth);
 
 	for(auto &note:notes) SetLabelText(*note.get());
+}
+
+void WidgetAlarms::InitFitColWidthTimer()
+{
+	auto timer = new QTimer(this);
+	timer->start(10);
+	connect(timer, &QTimer::timeout, this, [this](){
+		if(fitColWidthRequest)
+		{
+			FitColWidth();
+			fitColWidthRequest = false;
+		}
+	});
 }
 
 void WidgetAlarms::resizeEvent(QResizeEvent * event)
