@@ -86,7 +86,9 @@ WidgetAlarms::WidgetAlarms(QFont fontForLabels,
 		if(isVisible()) geo = saveGeometry();
 	});
 	timerGeoSaver->start(200);
+
 	InitFitColWidthTimer();
+	InitMessageForNotifyTimer();
 }
 
 WidgetAlarms::~WidgetAlarms()
@@ -188,9 +190,6 @@ void WidgetAlarms::AddNote(Note * note)
 	hlo2->addSpacing(4);
 
 	NoteInAlarms *newNoteInAlarmsPtr = notes.emplace_back(new NoteInAlarms).get();
-	NoteInAlarms &newNoteInAlarms = *newNoteInAlarmsPtr;
-	newNoteInAlarms.note = note;
-	newNoteInAlarms.widgetAll = widget;
 	NoteInAlarms &newNoteInAlarmsRef = *newNoteInAlarmsPtr;
 	newNoteInAlarmsRef.note = note;
 	newNoteInAlarmsRef.widgetAll = widget;
@@ -226,15 +225,25 @@ void WidgetAlarms::AddNote(Note * note)
 	});
 
 	fitColWidthRequest = true;
-	bool featureMsgForNotify = Features::CheckFeature(note->Content(), Features::messageForNotify());
 
-	QTimer::singleShot(10,this,[this, featureMsgForNotify, note]{
-		FitColWidth();
-		if(featureMsgForNotify)
+	bool featureMsgForNotify = Features::CheckFeature(note->Content(), Features::messageForNotify());
+	if(featureMsgForNotify) notesToShowMessageForNotify.push_back(note);
+}
+
+void WidgetAlarms::MoveNoteUp(const NoteInAlarms &noteInAlarms)
+{
+	QMbError("Не работает MyQTableWidget::SwapRows для cellWidget; return!");
+	return;
+
+	for(uint i=1; i<notes.size(); i++)
+	{
+		if(notes[i].get() == &noteInAlarms)
 		{
-			QMbInfo("Message-notify for note:\n" + note->Name());
+			// MyQTableWidget::SwapRows(table, 0, i);
+			std::swap(notes[0], notes[i]);
+			break;
 		}
-	});
+	}
 }
 
 void WidgetAlarms::SetLabelText(NoteInAlarms & note)
@@ -476,6 +485,27 @@ void WidgetAlarms::InitFitColWidthTimer()
 		{
 			FitColWidth();
 			fitColWidthRequest = false;
+		}
+	});
+}
+
+void WidgetAlarms::InitMessageForNotifyTimer()
+{
+	auto timer = new QTimer(this);
+	timer->start(10);
+	connect(timer, &QTimer::timeout, this, [this](){
+		while(!notesToShowMessageForNotify.empty())
+		{
+			Note *note = notesToShowMessageForNotify.front();
+
+			auto answ = MyQDialogs::CustomDialog("Message-notify for note", "Message-notify for note:\n" + note->Name(),
+												 {"Open for edit", /*"Move up in notify widget",*/ "Nothing to do"});
+			if(answ == "Open for edit") { WidgetNoteEditor::MakeOrShowNoteEditor(*note); }
+			//else if(answ == "Move up in notify widget") { MoveNoteUp(newNoteInAlarmsRef); }
+			else if(answ == "Nothing to do") {  }
+			else QMbError("Unrealesed answ");
+
+			notesToShowMessageForNotify.erase(notesToShowMessageForNotify.begin());
 		}
 	});
 }

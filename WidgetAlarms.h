@@ -40,6 +40,7 @@ private:
 	std::vector<std::unique_ptr<NoteInAlarms>> notes;
 	NoteInAlarms* FindNote(Note *noteToFind);
 	void AddNote(Note* note);
+	void MoveNoteUp(const NoteInAlarms& noteInAlarms);
 	void SetLabelText(NoteInAlarms & note);
 	void RemoveNoteFromWidgetAlarms(int index);
 	void RemoveNoteFromWidgetAlarms(Note* aNote, bool showError);
@@ -57,6 +58,11 @@ private:
 	QFontMetricsF fontMetrixForLabels;
 
 	void FitColWidth();
+	void InitFitColWidthTimer();
+	bool fitColWidthRequest = false;
+
+	std::vector<Note*> notesToShowMessageForNotify;
+	void InitMessageForNotifyTimer();
 
 protected:
 	void resizeEvent(QResizeEvent *event) override;
