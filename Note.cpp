@@ -228,6 +228,13 @@ Note Note::CreateFromRecord(QStringList & record)
 	return note;
 }
 
+QString Note::InitFromRecordAndSaveToStr(QStringList &record)
+{
+	Note n;
+	n.InitFromRecord(record);
+	return n.ToStr_v1();
+}
+
 void Note::UpdateThisNoteFromSQL()
 {
 	auto rec = DataBase::NoteByIdOnServer(QSn(idOnServer));

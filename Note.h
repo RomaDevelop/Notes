@@ -56,6 +56,7 @@ public:
 	void InitFromTmpNote(Note &note);
 	void InitFromRecord(QStringList &record);
 	static Note CreateFromRecord(QStringList &record);
+	static QString InitFromRecordAndSaveToStr(QStringList &record);
 	void UpdateThisNoteFromSQL();
 
 	QString Name() { return name; }

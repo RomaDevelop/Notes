@@ -366,7 +366,7 @@ void NetClient::SynchFromQueue()
 	std::vector<NetConstants::SynchData> datas;
 	for(int i=0; i<10 && !synchQueue.empty(); i++)
 	{
-		if(synchQueue.front().idOnSever == EndAllNotesMarker())
+		if(synchQueue.front().idOnServer == EndAllNotesMarker())
 		{
 			endAllNotesMarkerFound = true;
 		}
@@ -399,9 +399,9 @@ void NetClient::SynchFromQueue()
 		for(int i=0; i<results.size(); i++)
 		{
 			if(results[i] == NetConstants::request_synch_res_success())
-				Log("получен ответ об успшной обработке запроса на синхронизацию заметки " + datas_[i].idOnSever);
+				Log("получен ответ об успшной обработке запроса на синхронизацию заметки " + datas_[i].idOnServer);
 			else if(results[i] == NetConstants::request_synch_res_error())
-				Error("geted bad result for synch "+datas_[i].idOnSever);
+				Error("geted bad result for synch "+datas_[i].idOnServer);
 			else
 			{
 				Error("synch result unknown value: "+results[i]);
@@ -557,6 +557,7 @@ void NetClient::command_update_note_worker(QString && commandContent)
 	}
 
 	note->id = rec[Fields::idNoteInd].toLongLong();
+#error
 	if(note->id <= 0)
 	{
 		Error("can't define local note id " + note->Name());
