@@ -156,13 +156,29 @@ NoteInAlarms * WidgetAlarms::FindNote(Note * noteToFind)
 	return nullptr;
 }
 
-void WidgetAlarms::AddNote(Note * note)
+void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessage)
 {
-	table->setRowCount(table->rowCount()+1);
-	int row = table->rowCount()-1;
 	auto widget = new QWidget;
 	auto widgetAllExeptLabels = new QWidget;
-	table->setCellWidget(row, 0, widget);
+	NoteInAlarms *newNoteInAlarmsPtr = nullptr;
+
+	if(addInTop == false)
+	{
+		int row = table->rowCount();
+		table->setRowCount(row+1);
+		table->setCellWidget(row, 0, widget);
+		newNoteInAlarmsPtr = notes.emplace_back(std::make_unique<NoteInAlarms>()).get();
+	}
+	else
+	{
+		int row = 0;
+		table->insertRow(row);
+		table->setCellWidget(row, 0, widget);
+		notes.insert(notes.begin(), std::make_unique<NoteInAlarms>());
+		newNoteInAlarmsPtr = notes.front().get();
+	}
+
+	if(!newNoteInAlarmsPtr) { QMbError("invalid newNoteInAlarmsPtr"); return; }
 
 	auto hlo = new QHBoxLayout(widget);
 	hlo->setContentsMargins(0,0,0,0);
@@ -189,7 +205,6 @@ void WidgetAlarms::AddNote(Note * note)
 	hlo2->addWidget(btnRemove);
 	hlo2->addSpacing(4);
 
-	NoteInAlarms *newNoteInAlarmsPtr = notes.emplace_back(new NoteInAlarms).get();
 	NoteInAlarms &newNoteInAlarmsRef = *newNoteInAlarmsPtr;
 	newNoteInAlarmsRef.note = note;
 	newNoteInAlarmsRef.widgetAll = widget;
@@ -226,24 +241,17 @@ void WidgetAlarms::AddNote(Note * note)
 
 	fitColWidthRequest = true;
 
-	bool featureMsgForNotify = Features::CheckFeature(note->Content(), Features::messageForNotify());
-	if(featureMsgForNotify) notesToShowMessageForNotify.push_back(note);
+	if(!disableFeatureMessage)
+	{
+		bool featureMsgForNotify = Features::CheckFeature(note->Content(), Features::messageForNotify());
+		if(featureMsgForNotify) notesToShowMessageForNotify.push_back(note);
+	}
 }
 
-void WidgetAlarms::MoveNoteUp(const NoteInAlarms &noteInAlarms)
+void WidgetAlarms::MoveNoteUp(Note& note)
 {
-	QMbError("Не работает MyQTableWidget::SwapRows для cellWidget; return!");
-	return;
-
-	for(uint i=1; i<notes.size(); i++)
-	{
-		if(notes[i].get() == &noteInAlarms)
-		{
-			// MyQTableWidget::SwapRows(table, 0, i);
-			std::swap(notes[0], notes[i]);
-			break;
-		}
-	}
+	RemoveNoteFromWidgetAlarms(&note, true);
+	AddNote(&note, true, true);
 }
 
 void WidgetAlarms::SetLabelText(NoteInAlarms & note)
@@ -499,9 +507,9 @@ void WidgetAlarms::InitMessageForNotifyTimer()
 			Note *note = notesToShowMessageForNotify.front();
 
 			auto answ = MyQDialogs::CustomDialog("Message-notify for note", "Message-notify for note:\n" + note->Name(),
-												 {"Open for edit", /*"Move up in notify widget",*/ "Nothing to do"});
+												 {"Open for edit", "Move up in notify widget", "Nothing to do"});
 			if(answ == "Open for edit") { WidgetNoteEditor::MakeOrShowNoteEditor(*note); }
-			//else if(answ == "Move up in notify widget") { MoveNoteUp(newNoteInAlarmsRef); }
+			else if(answ == "Move up in notify widget") { MoveNoteUp(*note); }
 			else if(answ == "Nothing to do") {  }
 			else QMbError("Unrealesed answ");
 
