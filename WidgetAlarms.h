@@ -27,16 +27,15 @@ class WidgetAlarms : public QWidget
 public:
 	QTableWidget *table;
 
-	explicit WidgetAlarms(QFont fontForLabels,
-						  std::function<void()> crNewNoteFoo,
-						  std::function<void()> showMainWindow,
-						  QWidget *parent = nullptr);
+	explicit WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidget *parent = nullptr);
 	~WidgetAlarms();
 	void GiveNotes(const std::vector<Note*> &givingNotes);
 
 	QString tableColWidths;
 
 private:
+	void CreateBottomRow(QHBoxLayout *hlo);
+
 	std::vector<std::unique_ptr<NoteInAlarms>> notes;
 	NoteInAlarms* FindNote(Note *noteToFind);
 	void AddNote(Note* note, bool addInTop = false, bool disableFeatureMessage = false);
@@ -46,9 +45,11 @@ private:
 	void RemoveNoteFromWidgetAlarms(Note* aNote, bool showError);
 
 	enum menuPostponeCase {changeDtNotify, setPostpone};
-	static Note* NoteForPostponeAll() { return nullptr; }
+	static Note* NoteForPostponeAll() { static Note note; return &note; }
+	static Note* NoteForPostponeSelected() { static Note note; return &note; }
 	void ShowMenuPostpone(QPoint pos, menuPostponeCase, Note* note);
-	void SlotPostpone(std::vector<Note*> notesToPostpone, int delaySecs, menuPostponeCase caseCurrent);
+	void SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, menuPostponeCase caseCurrent);
+	std::set<Note*> GetSelectedNotes();
 
 	QString settingsFile;
 	void showEvent(QShowEvent *event) override;
@@ -63,6 +64,8 @@ private:
 
 	std::vector<Note*> notesToShowMessageForNotify;
 	void InitMessageForNotifyTimer();
+
+	INotesOwner *notesOwner;
 
 protected:
 	void resizeEvent(QResizeEvent *event) override;

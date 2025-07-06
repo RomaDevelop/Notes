@@ -22,13 +22,11 @@
 #include "WidgetNoteEditor.h"
 #include "Resources.h"
 
-WidgetAlarms::WidgetAlarms(QFont fontForLabels,
-						   std::function<void()> crNewNoteFoo,
-						   std::function<void()> showMainWindow,
-						   QWidget * parent):
+WidgetAlarms::WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidget *parent):
 	QWidget(parent),
 	fontForLabels{fontForLabels},
-	fontMetrixForLabels(fontForLabels)
+	fontMetrixForLabels(fontForLabels),
+	notesOwner {aNotesOwner}
 {
 	settingsFile = MyQDifferent::PathToExe() + "/files/settings_widget_alarms.ini";
 
@@ -50,36 +48,7 @@ WidgetAlarms::WidgetAlarms(QFont fontForLabels,
 		WidgetNoteEditor::MakeOrShowNoteEditor(*notes[r]->note);
 	});
 
-	auto btnShowMainWindow = new QToolButton();
-	btnShowMainWindow->setIcon(QIcon(Resources::list().GetPathName()));
-	hlo2->addWidget(btnShowMainWindow);
-	connect(btnShowMainWindow, &QPushButton::clicked, showMainWindow);
-
-	auto btnAdd = new QToolButton();
-	btnAdd->setIcon(QIcon(Resources::add().GetPathName()));
-	hlo2->addWidget(btnAdd);
-	connect(btnAdd, &QPushButton::clicked, crNewNoteFoo);
-
-	auto btnFastActions = new QToolButton();
-	btnFastActions->setIcon(QIcon(Resources::action().GetPathName()));
-	hlo2->addWidget(btnFastActions);
-	connect(btnFastActions, &QPushButton::clicked, [this, btnFastActions](){
-		int index = table->currentRow();
-		notes[index]->note->ShowDialogFastActions(btnFastActions);
-	});
-
-	hlo2->addStretch();
-	auto btnReschedule = new QPushButton(" Перенести все на ... ");
-	auto btnPostpone = new QPushButton(" Отложить все на ... ");
-	hlo2->addWidget(btnReschedule);
-	hlo2->addWidget(btnPostpone);
-	connect(btnReschedule, &QPushButton::clicked, [this, btnReschedule](){
-		ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, NoteForPostponeAll());
-	});
-
-	connect(btnPostpone, &QPushButton::clicked, [this, btnPostpone](){
-		ShowMenuPostpone(btnPostpone->mapToGlobal(QPoint(0, btnPostpone->height())), setPostpone, NoteForPostponeAll());
-	});
+	CreateBottomRow(hlo2);
 
 	auto timerGeoSaver = new QTimer(this);
 	connect(timerGeoSaver, &QTimer::timeout, [this](){
@@ -147,6 +116,66 @@ void WidgetAlarms::GiveNotes(const std::vector<Note *> & givingNotes)
 		}
 	}
 	else hide();
+}
+
+void WidgetAlarms::CreateBottomRow(QHBoxLayout *hlo)
+{
+	auto btnShowMainWindow = new QToolButton();
+	btnShowMainWindow->setIcon(QIcon(Resources::list().GetPathName()));
+	hlo->addWidget(btnShowMainWindow);
+	connect(btnShowMainWindow, &QPushButton::clicked, this, [this](){ notesOwner->ShowMainWindow(); });
+
+	auto btnAdd = new QToolButton();
+	btnAdd->setIcon(QIcon(Resources::add().GetPathName()));
+	hlo->addWidget(btnAdd);
+	connect(btnAdd, &QPushButton::clicked, this, [this](){ notesOwner->CreateNewNote(); });
+
+	auto btnFastActions = new QToolButton();
+	btnFastActions->setIcon(QIcon(Resources::action().GetPathName()));
+	hlo->addWidget(btnFastActions);
+	connect(btnFastActions, &QPushButton::clicked, [this, btnFastActions](){
+		int index = table->currentRow();
+		notes[index]->note->ShowDialogFastActions(btnFastActions);
+	});
+
+	hlo->addStretch();
+
+	auto btnRescheduleSelected = new QPushButton(" Перенести выбранные на ... ");
+	auto btnPostponeSelected = new QPushButton(" Отложить выбранные на ... ");
+	btnRescheduleSelected->hide();
+	btnPostponeSelected->hide();
+	hlo->addWidget(btnRescheduleSelected);
+	hlo->addWidget(btnPostponeSelected);
+	connect(btnRescheduleSelected, &QPushButton::clicked, [this, btnRescheduleSelected](){
+		ShowMenuPostpone(btnRescheduleSelected->mapToGlobal(QPoint(0, btnRescheduleSelected->height())),
+						 changeDtNotify, NoteForPostponeSelected());
+	});
+
+	connect(btnPostponeSelected, &QPushButton::clicked, [this, btnPostponeSelected](){
+		ShowMenuPostpone(btnPostponeSelected->mapToGlobal(QPoint(0, btnPostponeSelected->height())),
+						 setPostpone, NoteForPostponeSelected());
+	});
+	connect(table, &QTableWidget::itemSelectionChanged, this, [this, btnRescheduleSelected, btnPostponeSelected](){
+		if(GetSelectedNotes().size() > 1)
+			{ btnRescheduleSelected->show(); btnPostponeSelected->show(); }
+		else { btnRescheduleSelected->hide(); btnPostponeSelected->hide(); }
+	});
+
+	hlo->addSpacing(30);
+
+	auto btnRescheduleAll = new QPushButton(" Перенести все на ... ");
+	auto btnPostponeAll = new QPushButton(" Отложить все на ... ");
+	hlo->addWidget(btnRescheduleAll);
+	hlo->addWidget(btnPostponeAll);
+	connect(btnRescheduleAll, &QPushButton::clicked, [this, btnRescheduleAll](){
+		ShowMenuPostpone(btnRescheduleAll->mapToGlobal(QPoint(0, btnRescheduleAll->height())),
+						 changeDtNotify, NoteForPostponeAll());
+	});
+
+	connect(btnPostponeAll, &QPushButton::clicked, [this, btnPostponeAll](){
+		ShowMenuPostpone(btnPostponeAll->mapToGlobal(QPoint(0, btnPostponeAll->height())),
+						 setPostpone, NoteForPostponeAll());
+	});
 }
 
 NoteInAlarms * WidgetAlarms::FindNote(Note * noteToFind)
@@ -340,11 +369,15 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 						 {"Ввести вручную", ForPostpone_ns::handInput}};
 	else QMbError("wrong menuPostponeCaseValue");
 
-	std::vector<Note*> notesToDo { note };
+	std::set<Note*> notesToDo { note };
 	if(note == NoteForPostponeAll())
 	{
 		notesToDo.clear();
-		for(auto &note:notes) notesToDo.emplace_back(note->note);
+		for(auto &note:notes) notesToDo.emplace(note->note);
+	}
+	else if(note == NoteForPostponeSelected())
+	{
+		notesToDo = GetSelectedNotes();
 	}
 
 	for(auto &delay:delays)
@@ -367,11 +400,11 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 			{
 				if(notesToDo.size() == 1) // если обрабатываеся одна зазача
 				{
-					delay.text = AddSecsFromToday(notesToDo[0]->DTNotify(), delaySecs).toString("dd MMM yyyy hh:mm::ss (ddd)");
+					delay.text = AddSecsFromToday((*notesToDo.begin())->DTNotify(), delaySecs).toString("dd MMM yyyy hh:mm::ss (ddd)");
 					if(delaySecs == secondsInDay)
-						delay.text = AddSecsFromToday(notesToDo[0]->DTNotify(), delaySecs).toString("завтра hh:mm::ss (ddd)");
+						delay.text = AddSecsFromToday((*notesToDo.begin())->DTNotify(), delaySecs).toString("завтра hh:mm::ss (ddd)");
 					if(delaySecs == secondsInDay*2)
-						delay.text = AddSecsFromToday(notesToDo[0]->DTNotify(), delaySecs).toString("послезавтра hh:mm::ss (ddd)");
+						delay.text = AddSecsFromToday((*notesToDo.begin())->DTNotify(), delaySecs).toString("послезавтра hh:mm::ss (ddd)");
 				}
 				else // если обрабатываеся много зазач
 				{
@@ -397,7 +430,7 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 	menu->exec(pos);
 }
 
-void WidgetAlarms::SlotPostpone(std::vector<Note*> notesToPostpone, int delaySecs, menuPostponeCase caseCurrent)
+void WidgetAlarms::SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, menuPostponeCase caseCurrent)
 {
 	int itogDelaySecs = delaySecs; // почему то не давал изменять значение delaySecs внутри лямбды
 	if(itogDelaySecs == ForPostpone_ns::handInput)
@@ -416,19 +449,31 @@ void WidgetAlarms::SlotPostpone(std::vector<Note*> notesToPostpone, int delaySec
 		else QMbError("Error button name " + res.button);
 	}
 
-	for(uint i=0; i<notesToPostpone.size(); i++)
+	for(auto &noteToPospone:notesToPostpone)
 	{
 		if(caseCurrent == menuPostponeCase::setPostpone)
 		{
-			notesToPostpone[i]->SetDT(notesToPostpone[i]->DTNotify(), AddSecsFromNow(itogDelaySecs));
+			noteToPospone->SetDT(noteToPospone->DTNotify(), AddSecsFromNow(itogDelaySecs));
 		}
 		else if(caseCurrent == menuPostponeCase::changeDtNotify)
 		{
-			notesToPostpone[i]->SetDT(AddSecsFromToday(notesToPostpone[i]->DTNotify(), itogDelaySecs), notesToPostpone[i]->DTNotify());
+			noteToPospone->SetDT(AddSecsFromToday(noteToPospone->DTNotify(), itogDelaySecs), noteToPospone->DTNotify());
 		}
 
 		if(notes.empty()) hide();
 	}
+}
+
+std::set<Note *> WidgetAlarms::GetSelectedNotes()
+{
+	std::set<Note*> notesSet;
+	auto ranges = table->selectedRanges();
+	for(auto &range:ranges)
+	{
+		for(int r = range.topRow(); r<=range.bottomRow(); r++)
+			notesSet.emplace(notes[r]->note);
+	}
+	return notesSet;
 }
 
 void WidgetAlarms::showEvent(QShowEvent * event)
