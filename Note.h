@@ -112,4 +112,13 @@ private:
 // cbs end
 };
 
+class INotesOwner
+{
+public:
+	virtual ~INotesOwner() = default;
+
+	virtual void CreateNewNote() = 0;
+	virtual void ShowMainWindow() = 0;
+};
+
 #endif // NOTE_H

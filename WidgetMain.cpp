@@ -177,13 +177,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	vlo_main->addWidget(labelToGetFont);
 
 	QTimer::singleShot(0,[this, labelToGetFont]{
-
-		auto showMainWindow = [this](){
-			this->showNormal();
-			PlatformDependent::SetTopMostFlash(this);
-		};
-
-		widgetAlarms = std::make_unique<WidgetAlarms>(labelToGetFont->font(), [this](){ SlotCreationNewNote(); }, showMainWindow);
+		widgetAlarms = std::make_unique<WidgetAlarms>(this, labelToGetFont->font());
 		delete labelToGetFont;
 
 		LoadSettings();
@@ -221,7 +215,7 @@ void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 	QToolButton *btnPlus = new QToolButton();
 	btnPlus->setIcon(QIcon(Resources::add().GetPathName()));
 	hlo1->addWidget(btnPlus);
-	connect(btnPlus,&QPushButton::clicked, this, &WidgetMain::SlotCreationNewNote);
+	connect(btnPlus,&QPushButton::clicked, this, [this](){ CreateNewNote(); });
 
 // Remove
 	QToolButton *btnRemove = new QToolButton();
@@ -334,20 +328,14 @@ void WidgetMain::CreateTrayIcon()
 	QMenu *menu = new QMenu(this);
 	icon->setContextMenu(menu);
 
-	auto showFoo = [this](){
-		showNormal();
-		PlatformDependent::SetTopMost(this,true);
-		PlatformDependent::SetTopMost(this,false);
-	};
-
-	connect(icon, &QSystemTrayIcon::activated, [icon, showFoo](QSystemTrayIcon::ActivationReason reason){
-		if(reason == QSystemTrayIcon::Trigger) showFoo();
+	connect(icon, &QSystemTrayIcon::activated, [icon, this](QSystemTrayIcon::ActivationReason reason){
+		if(reason == QSystemTrayIcon::Trigger) ShowMainWindow();
 		if(reason == QSystemTrayIcon::Context) icon->contextMenu()->exec();
 	});
 
 	menu->addAction("Show main window");
 	MyQWidget::SetFontBold(menu->actions().back(), true);
-	connect(menu->actions().back(), &QAction::triggered, showFoo);
+	connect(menu->actions().back(), &QAction::triggered, this, [this](){ ShowMainWindow(); });
 
 	menu->addAction("Hide main window");
 	connect(menu->actions().back(), &QAction::triggered, this, &QWidget::hide);
@@ -355,7 +343,7 @@ void WidgetMain::CreateTrayIcon()
 	menu->addSeparator();
 
 	menu->addAction("Create new note");
-	connect(menu->actions().back(), &QAction::triggered, [this](){ SlotCreationNewNote(); });
+	connect(menu->actions().back(), &QAction::triggered, this, [this](){ CreateNewNote(); });
 
 	menu->addSeparator();
 
@@ -372,7 +360,7 @@ void WidgetMain::CreateTrayIcon()
 
 	auto addIcon = new AdditionalTrayIcon(QApplication::style()->standardIcon(QStyle::SP_ArrowForward), globalPosForIcon, this);
 	addIcon->setContextMenu(menu);
-	connect(addIcon, &ClickableQWidget::clicked, showFoo);
+	connect(addIcon, &ClickableQWidget::clicked, this, [this](){ ShowMainWindow(); });
 }
 
 void WidgetMain::CreateNotesAlarmChecker()
@@ -474,6 +462,28 @@ void WidgetMain::closeEvent(QCloseEvent * event)
 	SaveSettings();
 	event->accept();
 	QApplication::exit();
+}
+
+void WidgetMain::CreateNewNote()
+{
+	QString newName = MyQDialogs::InputLine("Создание заметки", "Введите название новой заметки", "").text;
+	if(newName.isEmpty()) return;
+
+	auto dt = QDateTime::currentDateTime();
+
+	Note tmpNote(newName, false, dt, dt.addSecs(3600), Note::StartText());
+
+	auto &newNote = MakeNewNote(tmpNote, created);
+
+	table->setCurrentCell(RowOfNote(&newNote), 0);
+
+	WidgetNoteEditor::MakeOrShowNoteEditor(newNote, true);
+}
+
+void WidgetMain::ShowMainWindow()
+{
+	this->showNormal();
+	PlatformDependent::SetTopMostFlash(this);
 }
 
 void WidgetMain::SaveSettings()
@@ -610,21 +620,7 @@ int WidgetMain::NoteIndexInWidgetMainNotes(Note * note, bool showError)
 	return -1;
 }
 
-void WidgetMain::SlotCreationNewNote()
-{
-	QString newName = MyQDialogs::InputLine("Создание заметки", "Введите название новой заметки", "").text;
-	if(newName.isEmpty()) return;
 
-	auto dt = QDateTime::currentDateTime();
-
-	Note tmpNote(newName, false, dt, dt.addSecs(3600), Note::StartText());
-
-	auto &newNote = MakeNewNote(tmpNote, created);
-
-	table->setCurrentCell(RowOfNote(&newNote), 0);
-
-	WidgetNoteEditor::MakeOrShowNoteEditor(newNote, true);
-}
 
 Note & WidgetMain::MakeNewNote(Note noteSrc, newNoteReason reason)
 {

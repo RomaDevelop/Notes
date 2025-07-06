@@ -23,7 +23,7 @@ declare_struct_5_fields_no_move(RowView, QTableWidgetItem*, itemName, QTableWidg
 											QDateTimeEdit*, dteNotify, QDateTimeEdit*, dtePostpone);
 declare_struct_3_fields_move(NoteInMain, RowView, rowView, std::unique_ptr<Note>, note, int, cbCounter);
 
-class WidgetMain : public QWidget
+class WidgetMain : public QWidget, public INotesOwner
 {
 	Q_OBJECT
 public:
@@ -39,6 +39,9 @@ public:
 	explicit WidgetMain(QWidget *parent = nullptr);
 	~WidgetMain();
 	void closeEvent (QCloseEvent *event) override;
+
+	virtual void CreateNewNote() override;
+	virtual void ShowMainWindow() override;
 
 private:
 	void CreateRow1(QHBoxLayout *hlo1);
@@ -67,7 +70,6 @@ private:
 	NoteInMain* NoteById(qint64 id);
 	int NoteIndexInWidgetMainNotes(Note* note, bool showError);
 
-	void SlotCreationNewNote();
 	enum newNoteReason { loaded, created };
 	Note& MakeNewNote(Note noteSrc, newNoteReason reason);
 	int MakeWidgetsForMainTable(NoteInMain &newNote); // returns index
