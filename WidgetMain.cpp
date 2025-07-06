@@ -621,6 +621,8 @@ void WidgetMain::SlotCreationNewNote()
 
 	auto &newNote = MakeNewNote(tmpNote, created);
 
+	table->setCurrentCell(RowOfNote(&newNote), 0);
+
 	WidgetNoteEditor::MakeOrShowNoteEditor(newNote, true);
 }
 
