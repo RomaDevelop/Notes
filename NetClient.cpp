@@ -557,7 +557,7 @@ void NetClient::command_update_note_worker(QString && commandContent)
 	}
 
 	note->id = rec[Fields::idNoteInd].toLongLong();
-#error
+
 	if(note->id <= 0)
 	{
 		Error("can't define local note id " + note->Name());
