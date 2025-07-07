@@ -74,7 +74,10 @@ public:
 	std::unique_ptr<QWidget> widget;
 	QLineEdit *leArg;
 	QTextEdit *textEditSocket;
-	qint64 sessionId = 0;
+	inline static const char undefinedSessionId = 0;
+	static const QString& undefinedSessionIdStr() { static QString str = QSn(undefinedSessionId); return str; }
+	qint64 sessionId = undefinedSessionId;
+	static bool IsSessionIdValid(qint64 sessionId) { return sessionId > undefinedSessionId; }
 
 	QNetworkAccessManager *manager {};
 	QTimer *timerPolly {};

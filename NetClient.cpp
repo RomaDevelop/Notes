@@ -137,7 +137,11 @@ void NetClient::CreateSocket()
 #endif
 	connect(manager, &QNetworkAccessManager::finished, this, &NetClient::SlotReadyRead);
 
-	RequestGetSessionId();
+	if(sessionId == undefinedSessionId)
+		RequestGetSessionId();
+	else Log("Using existing session id: " + QSn(sessionId));
+
+	if(0) CodeMarkers::to_do("сделать запрос валидизации id сессии");
 
 	InitPollyCloserTimer();
 }
@@ -429,7 +433,7 @@ void NetClient::RequestGetSessionId()
 		else Log("Get session id: " + QSn(sessionId));
 	};
 
-	sessionId = 0;
+	sessionId = undefinedSessionId;
 	RequestInSock(this, NetConstants::request_get_session_id(), NetConstants::nothing(), answ);
 }
 
