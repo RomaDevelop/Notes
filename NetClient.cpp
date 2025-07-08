@@ -552,21 +552,23 @@ void NetClient::command_update_note_worker(QString && commandContent)
 		return;
 	}
 
-	auto rec = DataBase::NoteByIdOnServer(QSn(note->idOnServer));
-	if(rec.isEmpty())
+	auto [ok, rec] = DataBase::NoteByIdOnServerWithCheck(QSn(note->idOnServer));
+
+	// заметка на клиенте отсуствует
+	if(!ok || rec.isEmpty())
 	{
 		note->id = DataBase::InsertNoteInClientDB(note.get());
+		if(note->id == DataBase::BadInsertNoteResult())
+		{
+			MsgToServer(NetConstants::msg_error(), "command_update_note_worker: cant insert note from data: " + commandContent);
+			return;
+		}
 		emit SignalNewNoteAppeared(note->id);
 		return;
 	}
 
+	// заметка на клиенте уже существует
 	note->id = rec[Fields::idNoteInd].toLongLong();
-
-	if(note->id <= 0)
-	{
-		Error("can't define local note id " + note->Name());
-		return;
-	}
 
 	auto res = DataBase::SaveNoteOnClient(note.get());
 	if(res.isEmpty()) emit SignalNoteUpdated(note->id);
