@@ -77,6 +77,7 @@ public:
 	inline static const char undefinedSessionId = 0;
 	static const QString& undefinedSessionIdStr() { static QString str = QSn(undefinedSessionId); return str; }
 	qint64 sessionId = undefinedSessionId;
+	QString sessionDt = "undefined";
 	static bool IsSessionIdValid(qint64 sessionId) { return sessionId > undefinedSessionId; }
 
 	QNetworkAccessManager *manager {};
@@ -123,10 +124,12 @@ public:
 	void CommandsToClientWorker(QString text);
 	static QString PrepareCommandToClient(const QString &commandName, const QString &content);
 	static CommandData DecodeCommandToClient(QString command);
+	void command_your_session_id_worker(QString && commandContent);
 	void command_remove_note_worker(QString && commandContent);
 	void command_update_note_worker(QString && commandContent);
 
 	std::map<QStringRefWr_const, std::function<void(QString && commandContent)>> commandsWorkersMap {
+		{ std::cref(NetConstants::command_your_session_id()), [this](QString && commandContent){ command_your_session_id_worker(std::move(commandContent)); } },
 		{ std::cref(NetConstants::command_remove_note()), [this](QString && commandContent){ command_remove_note_worker(std::move(commandContent)); } },
 		{ std::cref(NetConstants::command_update_note()), [this](QString && commandContent){ command_update_note_worker(std::move(commandContent)); } },
 	};
@@ -140,8 +143,9 @@ public:
 	{ return requestWorkersMap; }
 
 	QString& PrepareTarget();
-	declare_struct_3_fields_move(TargetContent, QStringRef, dtStrRef, QStringRef, hmac, QStringRef, sessionId);
+	declare_struct_4_fields_move(TargetContent, QStringRef, dtStrRef, QStringRef, hmac, QStringRef, sessionId, QStringRef, sessionDt);
 	static TargetContent DecodeTarget(const QString &targetOnServerSide);
+	static bool CheckTargetContent(const TargetContent &targetContent);
 	static bool ChekAuth(const TargetContent &targetContent);
 };
 

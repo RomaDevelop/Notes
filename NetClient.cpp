@@ -146,8 +146,6 @@ void NetClient::CreateSocket()
 	InitPollyCloserTimer();
 }
 
-
-
 void NetClient::CreateWidgets(bool show)
 {
 	widget = std::make_unique<QWidget>();
@@ -427,14 +425,16 @@ void NetClient::SynchFromQueue()
 void NetClient::RequestGetSessionId()
 {
 	auto answ = [this](QString &&answContent){
-		sessionId = answContent.toULongLong();
+		auto decodedAnsw = NetConstants::GetIdAndDtFromAnswGetSession(answContent);
+		sessionId = decodedAnsw.first.toULongLong();
+		sessionDt = decodedAnsw.second;
 
 		if(sessionId <= 0) Error("Get bad session id: " + QSn(sessionId));
 		else Log("Get session id: " + QSn(sessionId));
 	};
 
 	sessionId = undefinedSessionId;
-	RequestInSock(this, NetConstants::request_get_session_id(), NetConstants::nothing(), answ);
+	RequestInSock(this, NetConstants::request_get_session(), NetConstants::nothing(), answ);
 }
 
 void NetClient::CommandsToClientWorker(QString text)
@@ -483,6 +483,16 @@ NetClient::CommandData NetClient::DecodeCommandToClient(QString command)
 	data.content = std::move(command);
 
 	return data;
+}
+
+void NetClient::command_your_session_id_worker(QString &&commandContent)
+{
+	auto decodedAnsw = NetConstants::GetIdAndDtFromAnswGetSession(commandContent);
+	sessionId = decodedAnsw.first.toULongLong();
+	sessionDt = decodedAnsw.second;
+
+	if(sessionId <= 0) Error("Get bad session id: " + QSn(sessionId));
+	else Log("Get session id: " + QSn(sessionId));
 }
 
 void NetClient::command_remove_note_worker(QString && commandContent)
@@ -600,11 +610,14 @@ QString &NetClient::PrepareTarget()
 	QString dtStr = QDateTime::currentDateTime()/*.addMSecs(-14980)*/.toString(NetConstants::auth_date_time_format());
 												// 14980 - проходит, 14990 не проходит
 
-	QByteArray hmac = QMessageAuthenticationCode::hash(dtStr.toUtf8(), NetConstants::test_passwd().toUtf8(), QCryptographicHash::Sha256);
+	QByteArray hmac = QMessageAuthenticationCode::hash(dtStr.toUtf8(),
+													   //NetConstants::test_passwd().toUtf8(),
+													   QString(NetConstants::test_passwd()).replace(0,1,'f').toUtf8(),
+													   QCryptographicHash::Sha256);
 	
 	bufForTarget = adress;
 	bufForTarget.append("/").append(dtStr).append("&").append(hmac.toHex());
-	bufForTarget.append("&").append(QSn(sessionId));
+	bufForTarget.append("&").append(QSn(sessionId).append("&").append(sessionDt));
 	
 	return bufForTarget;
 }
@@ -613,9 +626,18 @@ NetClient::TargetContent NetClient::DecodeTarget(const QString &targetOnServerSi
 {
 	QStringRef payload = targetOnServerSide.midRef(1);
 	auto parts = payload.split('&');
-	if (parts.size() < 3) return {};
+	if (parts.size() < 4) return {};
 
-	return TargetContent(parts[0], parts[1], parts[2]);
+	return TargetContent(parts[0], parts[1], parts[2], parts[3]);
+}
+
+bool NetClient::CheckTargetContent(const TargetContent &targetContent)
+{
+	if(targetContent.dtStrRef.isEmpty()) return false;
+	if(targetContent.hmac.isEmpty()) return false;
+	if(targetContent.sessionId.isEmpty()) return false;
+	if(targetContent.sessionDt.isEmpty()) return false;
+	return true;
 }
 
 bool NetClient::ChekAuth(const TargetContent &targetContent)

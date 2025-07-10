@@ -756,6 +756,9 @@ void WidgetMain::RemoveNote(Note* note, bool execSqlRemove)
 
 bool WidgetMain::RemoveNoteSQLOnClient(Note * note)
 {
+	if(0) CodeMarkers::to_do("нужно добавить возможность удалять заметки на клиенте без связи с сервером, "
+							 "тогда потребуется как-то хранить удалённые, "
+							 "чтобы при связи с сервером передать ему сообщить о том что они были удалены");
 	if(DataBase::IsGroupLocalByName(note->group)) {
 		DataBase::RemoveNoteOnClient(QSn(note->id), true);
 		return true;
