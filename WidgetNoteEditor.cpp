@@ -15,6 +15,7 @@
 
 #include "PlatformDependent.h"
 #include "MyQDifferent.h"
+#include "MyQString.h"
 #include "MyQDialogs.h"
 
 #include "FastActions.h"
@@ -213,6 +214,38 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, bool aNewNote, QWidget *parent):
 
 		format.setFontPointSize(format.fontPointSize()-1);
 		cursor.setCharFormat(format);
+		textEdit->setFocus();
+	});
+
+	QPushButton *btnUpeerFirstLetter = new QPushButton("Aa");
+	btnUpeerFirstLetter->setFixedWidth(30);
+	hloButtons->addWidget(btnUpeerFirstLetter);
+	connect(btnUpeerFirstLetter,&QPushButton::clicked,[this](){
+		auto cursor = textEdit->textCursor();
+		if(!cursor.hasSelection()) return;
+
+		QString selectedText = cursor.selectedText();
+		selectedText = MyQString::ToUpperWordStartLetter(selectedText);
+		cursor.insertText(selectedText);
+
+		cursor.setPosition(cursor.position() - selectedText.length(), QTextCursor::KeepAnchor);
+		textEdit->setTextCursor(cursor);
+		textEdit->setFocus();
+	});
+
+	QPushButton *btnSentenceCase = new QPushButton("Aa.");
+	btnSentenceCase->setFixedWidth(30);
+	hloButtons->addWidget(btnSentenceCase);
+	connect(btnSentenceCase,&QPushButton::clicked,[this](){
+		auto cursor = textEdit->textCursor();
+		if(!cursor.hasSelection()) return;
+
+		QString selectedText = cursor.selectedText();
+		selectedText = MyQString::ToSentenceCase(selectedText);
+		cursor.insertText(selectedText);
+
+		cursor.setPosition(cursor.position() - selectedText.length(), QTextCursor::KeepAnchor);
+		textEdit->setTextCursor(cursor);
 		textEdit->setFocus();
 	});
 
