@@ -106,6 +106,7 @@ public: signals:
 public:
 	declare_struct_3_fields_move(MsgData, QString, type, QString, content, QString, errors);
 	void MsgToServer(const QString &msgType, QString content);
+	void MsgToServer_Error(QString content);
 	static MsgData DecodeMsg(QString msg);
 
 	void RequestToServerWithWait(const QString &requestType, QString content, AnswerWorkerFunction answWorker);
@@ -119,6 +120,8 @@ private:
 
 public:
 	void RequestGetSessionId();
+
+	void request_group_check_notes_sending(QString idGroup);
 
 	declare_struct_3_fields_move(CommandData, QString, commandName, QString, content, QString, errors);
 	void CommandsToClientWorker(QString text);

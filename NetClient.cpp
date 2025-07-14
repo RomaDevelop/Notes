@@ -278,6 +278,11 @@ void NetClient::MsgToServer(const QString &msgType, QString content)
 	SendInSock(this, std::move(content), true);
 }
 
+void NetClient::MsgToServer_Error(QString content)
+{
+	MsgToServer(NetConstants::msg_error(), std::move(content));
+}
+
 NetClient::MsgData NetClient::DecodeMsg(QString msg)
 {
 	CodeMarkers::can_be_optimized("can be faster, no remove+LeftRef, but take MidRef");
@@ -435,6 +440,23 @@ void NetClient::RequestGetSessionId()
 
 	sessionId = undefinedSessionId;
 	RequestInSock(this, NetConstants::request_get_session(), NetConstants::nothing(), answ);
+}
+
+void NetClient::request_group_check_notes_sending(QString idGroup)
+{
+	auto answ = [this](QString &&answContent){
+		if(answContent != NetConstants::success())
+		{
+			Error("get bad answ for request_group_check_notes_sending: " + answContent);
+			MsgToServer_Error("get bad answ for request_group_check_notes_sending: " + answContent);
+		}
+	};
+
+	auto ids_dtsUpdated = DataBase::NotesFromGroup_id_dtUpdated(idGroup);
+	RequestInSock(this,
+				  NetConstants::request_group_check_notes(),
+				  NetConstants::request_group_check_notes_prepare(std::move(idGroup), ids_dtsUpdated),
+				  answ);
 }
 
 void NetClient::CommandsToClientWorker(QString text)
