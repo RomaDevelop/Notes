@@ -15,10 +15,11 @@ class WidgetNoteEditor : public QWidget
 	Q_OBJECT
 
 public:
-	static void MakeOrShowNoteEditor(Note &note, bool aNewNote = false);
+	static void MakeOrShowNoteEditor(Note &note);
 
 private:
-	explicit WidgetNoteEditor(Note &note, bool aNewNote = false, QWidget *parent = nullptr);
+	explicit WidgetNoteEditor(Note &note, QWidget *parent = nullptr);
+	void InitTimerNoteSaver();
 public:
 	~WidgetNoteEditor();
 private:
@@ -33,15 +34,22 @@ private:
 
 	Note &note;
 	int cbCounter = 0;
-	bool newNote = false;
-	bool dtChanged = false;
+
+	bool notChagesNow = false;
+	bool haveChanges = false;
+	void SetHaveChangesTrue(QString widget);
+	QDateTime lastChagesDid;
+	QDateTime lastSaveDid;
+	int savedCount = 0;
+
 	QLineEdit *leName;
 	QDateTimeEdit *dtEditNotify;
 	QDateTimeEdit *dtEditPostpone;
 	MyQTextEdit *textEdit;
-	bool textEditChanged = false;
 
-	void SaveNoteFromWidgets();
+	QLabel *labelStatus;
+
+	void SaveNoteFromEditor(bool forceSave = false);
 
 	inline static std::map<Note*,WidgetNoteEditor*> existingEditors;
 };

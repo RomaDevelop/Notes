@@ -477,7 +477,7 @@ void WidgetMain::CreateNewNote()
 
 	table->setCurrentCell(RowOfNote(&newNote), 0);
 
-	WidgetNoteEditor::MakeOrShowNoteEditor(newNote, true);
+	WidgetNoteEditor::MakeOrShowNoteEditor(newNote);
 }
 
 void WidgetMain::ShowMainWindow()

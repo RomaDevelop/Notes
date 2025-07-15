@@ -12,7 +12,9 @@
 #include <QPushButton>
 #include <QDateTimeEdit>
 #include <QShortcut>
+#include <QStatusBar>
 
+#include "MyCppDifferent.h"
 #include "PlatformDependent.h"
 #include "MyQDifferent.h"
 #include "MyQString.h"
@@ -20,11 +22,11 @@
 
 #include "FastActions.h"
 
-void WidgetNoteEditor::MakeOrShowNoteEditor(Note &note, bool aNewNote)
+void WidgetNoteEditor::MakeOrShowNoteEditor(Note &note)
 {
 	if(auto existingEditor = existingEditors.find(&note); existingEditor == existingEditors.end())
 	{
-		auto editor = new WidgetNoteEditor(note, aNewNote);
+		auto editor = new WidgetNoteEditor(note);
 		editor->show();
 		existingEditors[&note] = editor;
 	}
@@ -43,10 +45,9 @@ void WidgetNoteEditor::MakeOrShowNoteEditor(Note &note, bool aNewNote)
 	}
 }
 
-WidgetNoteEditor::WidgetNoteEditor(Note &note, bool aNewNote, QWidget *parent):
+WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	QWidget(parent),
-	note {note},
-	newNote {aNewNote}
+	note {note}
 {
 	qdbg << "Редактирующие шрифт кнопки если выделен текст разных форматов делаею его весь одинаковым";
 
@@ -63,6 +64,7 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, bool aNewNote, QWidget *parent):
 	leName = new QLineEdit(note.Name());
 	MyQWidget::SetFontPointSize(leName, 12);
 	MyQWidget::SetFontBold(leName, true);
+	connect(leName, &QLineEdit::textChanged, this, [this](){ SetHaveChangesTrue("leName"); });
 
 	dtEditNotify = new QDateTimeEdit(note.DTNotify());
 	MyQWidget::SetFontPointSize(dtEditNotify, 12);
@@ -98,21 +100,12 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, bool aNewNote, QWidget *parent):
 	MyQWidget::SetFontBold(dtEditPostpone, true);
 	dtEditPostpone->setDisplayFormat("dd.MM.yyyy HH:mm:ss");
 
-	if(newNote)
-	{
-		auto curDt = QDateTime::currentDateTime();
-		curDt.setTime({9,0,0});
-
-		dtEditNotify->setDateTime(curDt);
-		dtEditPostpone->setDateTime(curDt);
-	}
-
 	connect(dtEditNotify, &QDateTimeEdit::dateTimeChanged, [this](const QDateTime &datetime){
 		dtEditPostpone->setDateTime(datetime);
-		dtChanged = true;
+		SetHaveChangesTrue("dtEditNotify");
 	});
 	connect(dtEditPostpone, &QDateTimeEdit::dateTimeChanged, [this](const QDateTime &){
-		dtChanged = true;
+		SetHaveChangesTrue("dtEditPostpone");
 	});
 
 	hloNameAndDates->addWidget(leName);
@@ -299,26 +292,28 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, bool aNewNote, QWidget *parent):
 //		qdbg << btnDtEditNotifyAdd->height() << dtEditNotify->height();
 //	});
 
-	QPushButton *btnSave = new QPushButton(" Save ");
-	hloButtons->addWidget(btnSave);
-	connect(btnSave,&QPushButton::clicked, this, &WidgetNoteEditor::SaveNoteFromWidgets);
-
 	textEdit = new MyQTextEdit;
 	textEdit->richTextPaste = false;
 	textEdit->setTabStopDistance(40);
 	hloTextEdit->addWidget(textEdit);
-	connect(textEdit, &QTextEdit::textChanged, [this](){ textEditChanged=true; });
-
 	if(note.Content() == Note::StartText()) note.SetContent("<span style='font-size: 14pt;'>"+Note::StartText()+"</span>");
 	textEdit->document()->setDefaultStyleSheet("p { font-size: 14pt; }");
 	textEdit->setHtml(note.Content());
+	connect(textEdit, &QTextEdit::textChanged, [this](){
+		SetHaveChangesTrue("textEdit");
+	});
 
 	auto dtUpdateFoo = [this](void *){
-		static int i =0;
-		qdbg << i++ << "ConnectDTUpdated in WidgetNoteEditor" << this->note.DTNotify().toString() << this->note.DTPostpone().toString();
+		MyCppDifferent::any_guard(notChagesNow, true, false);
 		dtEditNotify->setDateTime(this->note.DTNotify());
 		dtEditPostpone->setDateTime(this->note.DTPostpone());
 	};
+
+	QStatusBar *statusBar = new QStatusBar(this);
+	qdbg << statusBar->contentsMargins();
+	vlo_main->addWidget(statusBar);
+	labelStatus = new QLabel;
+	statusBar->addWidget(labelStatus);
 
 	note.AddCBDTUpdated(dtUpdateFoo, this, cbCounter);
 
@@ -330,6 +325,15 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, bool aNewNote, QWidget *parent):
 		postShowFunctions.clear();
 		LoadSettings();
 	});
+
+	InitTimerNoteSaver();
+}
+
+void WidgetNoteEditor::InitTimerNoteSaver()
+{
+	auto timer = new QTimer(this);
+	connect(timer, &QTimer::timeout, this, [this](){ SaveNoteFromEditor(); });
+	timer->start(1000);
 }
 
 WidgetNoteEditor::~WidgetNoteEditor()
@@ -338,7 +342,7 @@ WidgetNoteEditor::~WidgetNoteEditor()
 
 	note.RemoveCbs(this, cbCounter);
 
-	SaveNoteFromWidgets();
+	SaveNoteFromEditor(true);
 
 	if(auto thisEditor = existingEditors.find(&note); thisEditor != existingEditors.end())
 	{
@@ -349,18 +353,6 @@ WidgetNoteEditor::~WidgetNoteEditor()
 
 void WidgetNoteEditor::closeEvent(QCloseEvent * event)
 {
-	if(newNote && !dtChanged)
-	{
-		auto answ = MyQDialogs::CustomDialog("Сохранение","Завершить редактирование и сохранить заметку с автоназначенным уведомлением на "
-											 + dtEditNotify->dateTime().toString(DateTimeFormat) + " ?",
-											 {"Да, завершить и сохранить", "Нет, продолжить редактирование"});
-		if(answ == "Да, завершить и сохранить") { }
-		else if(answ == "Нет, продолжить редактирование") { event->ignore(); return; }
-		else { QMbError("not realesed button " + answ); return; }
-	}
-
-	newNote = false;
-
 	SaveSettings();
 	event->accept();
 }
@@ -383,15 +375,37 @@ void WidgetNoteEditor::LoadSettings()
 	this->restoreGeometry(settings.value("geoNoteEditor").toByteArray());
 }
 
-void WidgetNoteEditor::SaveNoteFromWidgets()
+void WidgetNoteEditor::SetHaveChangesTrue(QString widget)
 {
-	if(textEditChanged) note.SetContent(textEdit->toHtml());
+	if(notChagesNow) return;
+
+	qdbg << "SetHaveChangesTrue: " + widget;
+
+	haveChanges = true;
+	lastChagesDid = QDateTime::currentDateTime();
+}
+
+void WidgetNoteEditor::SaveNoteFromEditor(bool forceSave)
+{
+	if(!haveChanges) return;
+
+	if(!forceSave)
+	{
+		if(lastSaveDid.isValid() && lastSaveDid.secsTo(QDateTime::currentDateTime()) < 5) return;
+		if(lastChagesDid.isValid() && lastChagesDid.secsTo(QDateTime::currentDateTime()) < 5) return;
+	}
+
+	note.SetContent(textEdit->toHtml());
 
 	QString newName = leName->text();
 	if(note.Name() != newName) note.SetName(newName);
 
 	auto dtN = dtEditNotify->dateTime(), dtP = dtEditPostpone->dateTime();
-	if(!note.CmpDTs(dtN, dtP))note.SetDT(dtN, dtP);
+	if(!note.CmpDTs(dtN, dtP)) note.SetDT(dtN, dtP);
+
+	haveChanges = false;
+	lastSaveDid = QDateTime::currentDateTime();
+	labelStatus->setText("Saved at " + lastSaveDid.toString(DateTimeFormat) + " saved index ("+QSn(++savedCount)+")");
 }
 
 
