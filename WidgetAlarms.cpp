@@ -22,6 +22,12 @@
 #include "WidgetNoteEditor.h"
 #include "Resources.h"
 
+const QString& RescheduleCaption() { static QString str = " Перенести на ... "; return str; }
+const QString& RostponeCaption() { static QString str = " Отложить на ... "; return str; }
+const QString& RemoveCaption() { static QString str = " Удалить "; return str; }
+const QString& AllButtonsCaptions() {
+	static QString str = QString(RescheduleCaption()).append(RostponeCaption()).append(RemoveCaption()); return str; }
+
 WidgetAlarms::WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidget *parent):
 	QWidget(parent),
 	fontForLabels{fontForLabels},
@@ -219,9 +225,9 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 
 	auto labelCaption2 = new QLabel;
 	labelCaption2->setFont(fontForLabels);
-	auto btnReschedule = new QPushButton(" Перенести на ... ");
-	auto btnPostpone = new QPushButton(" Отложить на ... ");
-	auto btnRemove = new QPushButton(" Удалить ");
+	auto btnReschedule = new QPushButton(RescheduleCaption());
+	auto btnPostpone = new QPushButton(RostponeCaption());
+	auto btnRemove = new QPushButton(RemoveCaption());
 
 	hlo->addWidget(labelCaption1);
 	hlo->addWidget(labelCaption2);
@@ -289,7 +295,11 @@ void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 	QString text2 = "("+note.note->DTNotify().toString("dd MMM yyyy hh:mm:ss")+")";
 
 	int maxWidth = table->width() - fontMetrixForLabels.horizontalAdvance(text2);
-	maxWidth -= note.widgetAllExeptLabels->width() + table->width() * 0.12;
+	maxWidth -= fontMetrixForLabels.horizontalAdvance(AllButtonsCaptions());
+	maxWidth -= 16*3; // пространство в кнопке
+	maxWidth -= 22*3; // от правого края кнопки до сл элемента
+
+	//maxWidth -= note.widgetAllExeptLabels->width() + table->width() * 0.12;
 	/// костыль < + table->width() * 0.12 > вычислен дома экспериментальным путем. Будет ли работать на работе???
 	/// Можно покопать в сторону разделения строки на разные ячейки, потому что у ячеек всё четко
 	///		Скрыть разделяющие ячейки линии только вертикальные невозможно.
@@ -355,8 +365,10 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 		delays = 		{{"1 день", secondsInDay}, {"2 дня", secondsInDay*2}, {"3 дня", secondsInDay*3}, {"4 дня", secondsInDay*4},
 						 {"5 дней", secondsInDay*5}, {"6 дней", secondsInDay*6}, {"7 дней", secondsInDay*7}, {"8 дней", secondsInDay*8},
 						 {"9 дней", secondsInDay*9}, {"10 дней", secondsInDay*10}, {"11 дней", secondsInDay*11}, {"12 дней", secondsInDay*12},
-						 {"13 дней", secondsInDay*13}, {"14 дней", secondsInDay*14}, {"15 дней", secondsInDay*15}, {"", ForPostpone_ns::separator}, {"18 дней", secondsInDay*18},
-						 {"21 дней", secondsInDay*21}, {"25 дней", secondsInDay*25}, {"Месяц", secondsInDay*daysInMonth}, {"", ForPostpone_ns::separator},
+						 {"13 дней", secondsInDay*13}, {"14 дней", secondsInDay*14}, {"15 дней", secondsInDay*15},
+						 {"", ForPostpone_ns::separator}, {"18 дней", secondsInDay*18},
+						 {"21 дней", secondsInDay*21}, {"25 дней", secondsInDay*25}, {"Месяц", secondsInDay*daysInMonth},
+						 {"", ForPostpone_ns::separator},
 						 {"40 дней", secondsInDay*40}, {"50 дней", secondsInDay*50}, {"Два месяца", secondsInDay*daysInMonth*2},
 						 {"Ввести вручную", ForPostpone_ns::handInput}};
 	else if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)

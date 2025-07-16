@@ -78,6 +78,7 @@ public:
 	static std::unique_ptr<Note> LoadNote(const QString &text);
 	static Note FromStr_v1(const QString &text);
 	QString ToStr_v1() const;
+	static QString ToStrToShowForDeleteRequest(const QStringList &record);
 	static std::vector<Note> LoadNotes();
 	static void LoadNotesFromFilesAndSaveInBd();
 

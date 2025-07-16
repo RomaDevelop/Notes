@@ -444,7 +444,7 @@ void NetClient::RequestGetSessionId()
 
 void NetClient::request_group_check_notes_sending(QString idGroup)
 {
-	auto answ = [this](QString &&answContent){
+	auto answFoo = [this](QString &&answContent){
 		if(answContent != NetConstants::success())
 		{
 			Error("get bad answ for request_group_check_notes_sending: " + answContent);
@@ -456,7 +456,82 @@ void NetClient::request_group_check_notes_sending(QString idGroup)
 	RequestInSock(this,
 				  NetConstants::request_group_check_notes(),
 				  NetConstants::request_group_check_notes_prepare(std::move(idGroup), ids_dtsUpdated),
-				  answ);
+				  answFoo);
+}
+
+void NetClient::request_all_notes_sending()
+{
+	auto answFoo = [this](QString &&answContent){
+		if(answContent.size() > 1'800'000) QMbWarning("request_all_notes_sending: answContent.size() > 1'800'000");
+
+		std::set<QString> notesIdsOnServer = DataBase::NotesIdsOnServer();
+
+		auto notesAsStrs = NetConstants::request_all_notes_decode_answ(answContent);
+		for(auto &noteAsStr:notesAsStrs)
+		{
+			QString idOnServer;
+			UpdateNoteFromGetedNote(noteAsStr, &idOnServer);
+			notesIdsOnServer.erase(idOnServer);
+		}
+
+		QString removedNotesToShow;
+		for(auto &noteIdOnServer:notesIdsOnServer)
+		{
+			auto [ok, noteRec] = DataBase::NoteByIdOnServerWithCheck(noteIdOnServer);
+			if(!ok) { QMbError("NoteByIdOnServerWithCheck err 2 !ok"); return; }
+			auto answ = MyQDialogs::CustomDialog("Removing note", "Note\n\n" + noteRec[Fields::nameNoteInd]
+					+ "\n\ndoesn't exist on server. It will be removed. You can show note data ans save it to create it again.\n\n"
+					  "Show note data after removing?",
+					{"Yes", "No"});
+			if(answ == "Yes")
+			{
+				removedNotesToShow += Note::ToStrToShowForDeleteRequest(noteRec);
+			}
+		}
+
+		if(!removedNotesToShow.isEmpty()) MyQDialogs::ShowText(removedNotesToShow, 1400, 900);
+	};
+
+	RequestInSock(this, NetConstants::request_all_notes(), "", answFoo);
+}
+
+void NetClient::UpdateNoteFromGetedNote(const QString &noteAsStr, QString *out_noteIdOnServer)
+{
+	auto note = Note::LoadNote(noteAsStr);
+	if(!note) {
+		Error("UpdateNoteFromGetedNote: cant load note from data: " + noteAsStr);
+		MsgToServer(NetConstants::msg_error(), "UpdateNoteFromGetedNote: cant load note from data: " + noteAsStr);
+		return;
+	}
+
+	if(out_noteIdOnServer) *out_noteIdOnServer = QSn(note->idOnServer);
+
+	auto [ok, rec] = DataBase::NoteByIdOnServerWithCheck(out_noteIdOnServer ? *out_noteIdOnServer : QSn(note->idOnServer));
+
+	// заметка на клиенте отсуствует
+	if(!ok || rec.isEmpty())
+	{
+		note->id = DataBase::InsertNoteInClientDB(note.get());
+		if(note->id == DataBase::BadInsertNoteResult())
+		{
+			Error("UpdateNoteFromGetedNote: cant insert note from data: " + noteAsStr);
+			MsgToServer(NetConstants::msg_error(), "UpdateNoteFromGetedNote: cant insert note from data: " + noteAsStr);
+			return;
+		}
+		emit SignalNewNoteAppeared(note->id);
+		return;
+	}
+
+	// заметка на клиенте уже существует
+	note->id = rec[Fields::idNoteInd].toLongLong();
+
+	auto res = DataBase::SaveNoteOnClient(note.get());
+	if(res.isEmpty()) emit SignalNoteUpdated(note->id);
+	else
+	{
+		Error("UpdateNoteFromGetedNote: saving note error: " + res);
+		MsgToServer(NetConstants::msg_error(), "UpdateNoteFromGetedNote: saving note error: " + res);
+	}
 }
 
 void NetClient::CommandsToClientWorker(QString text)
@@ -577,38 +652,7 @@ void NetClient::command_remove_note_worker(QString && commandContent)
 
 void NetClient::command_update_note_worker(QString && commandContent)
 {
-	auto note = Note::LoadNote(commandContent);
-	if(!note) {
-		Error("command_update_note_worker: cant load note from data: " + commandContent);
-		MsgToServer(NetConstants::msg_error(), "command_update_note_worker: cant load note from data: " + commandContent);
-		return;
-	}
-
-	auto [ok, rec] = DataBase::NoteByIdOnServerWithCheck(QSn(note->idOnServer));
-
-	// заметка на клиенте отсуствует
-	if(!ok || rec.isEmpty())
-	{
-		note->id = DataBase::InsertNoteInClientDB(note.get());
-		if(note->id == DataBase::BadInsertNoteResult())
-		{
-			MsgToServer(NetConstants::msg_error(), "command_update_note_worker: cant insert note from data: " + commandContent);
-			return;
-		}
-		emit SignalNewNoteAppeared(note->id);
-		return;
-	}
-
-	// заметка на клиенте уже существует
-	note->id = rec[Fields::idNoteInd].toLongLong();
-
-	auto res = DataBase::SaveNoteOnClient(note.get());
-	if(res.isEmpty()) emit SignalNoteUpdated(note->id);
-	else
-	{
-		Error("command_update_note_worker: saving note error: " + res);
-		MsgToServer(NetConstants::msg_error(), "command_update_note_worker: saving note error: " + res);
-	}
+	UpdateNoteFromGetedNote(commandContent, nullptr);
 }
 
 void NetClient::request_get_note_worker(ISocket * sock, NetClient::RequestData && requestData)

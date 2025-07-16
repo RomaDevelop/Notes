@@ -122,6 +122,9 @@ public:
 	void RequestGetSessionId();
 
 	void request_group_check_notes_sending(QString idGroup);
+	void request_all_notes_sending();
+
+	void UpdateNoteFromGetedNote(const QString &noteAsStr, QString *out_noteIdOnServer); // can take nullptr
 
 	declare_struct_3_fields_move(CommandData, QString, commandName, QString, content, QString, errors);
 	void CommandsToClientWorker(QString text);

@@ -232,6 +232,7 @@ QString Note::InitFromRecordAndSaveToStr(QStringList &record)
 {
 	Note n;
 	n.InitFromRecord(record);
+	if(0) CodeMarkers::can_be_optimized("can do this without InitFromRecord and ToStr_v1");
 	return n.ToStr_v1();
 }
 
@@ -363,11 +364,24 @@ QString Note::ToStr_v1() const
 	return noteText;
 }
 
+QString Note::ToStrToShowForDeleteRequest(const QStringList &record)
+{
+	QString str;
+	str += record[Fields::nameNoteInd] + "\n";
+	str += "group: " + record[Fields::idGroupIndInNotes]
+								+ "("+DataBase::GroupName(record[Fields::idGroupIndInNotes])+")\n";
+	str += record[Fields::dtNotifyInd] + "\n";
+	str += record[Fields::dtPostponeInd] + "\n";
+	str += record[Fields::contentInd] + "\n";
+	str += "==============================================================================================\n";
+	return str;
+}
+
 std::vector<Note> Note::LoadNotes()
 {
 	LoadNotesFromFilesAndSaveInBd();
 
-	auto notes = DataBase::NotesFromBD();
+	auto notes = DataBase::NotesFromBD(true);
 	return notes;
 }
 

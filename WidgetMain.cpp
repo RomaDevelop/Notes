@@ -425,7 +425,17 @@ bool WidgetMain::DialogGroupsSubscribes()
 
 void WidgetMain::SlotTest()
 {
-	//netClient->Log(DataBase::DoSqlQueryGetFirstRec("select * from Notes where idNote=60").join(" "));
+	qdbg << "test";
+
+	auto notesTable = DataBase::DoSqlQueryGetTable("select * from " + Fields::Notes());
+	int size = 0;
+	for(auto &row:notesTable)
+	{
+		QString newNote = Note::InitFromRecordAndSaveToStr(row);
+		size += newNote.size();
+		qdbg << size;
+	}
+	qdbg << "toatal" << size;
 }
 
 void WidgetMain::SlotMenu(QPushButton *btn)
