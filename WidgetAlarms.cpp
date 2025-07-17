@@ -141,7 +141,7 @@ void WidgetAlarms::CreateBottomRow(QHBoxLayout *hlo)
 	hlo->addWidget(btnFastActions);
 	connect(btnFastActions, &QPushButton::clicked, [this, btnFastActions](){
 		int index = table->currentRow();
-		notes[index]->note->ShowDialogFastActions(btnFastActions);
+		notes[index]->note->ShowMenuFastActions(btnFastActions);
 	});
 
 	hlo->addStretch();
@@ -167,7 +167,7 @@ void WidgetAlarms::CreateBottomRow(QHBoxLayout *hlo)
 		else { btnRescheduleSelected->hide(); btnPostponeSelected->hide(); }
 	});
 
-	hlo->addSpacing(30);
+	hlo->addSpacing(10);
 
 	auto btnRescheduleAll = new QPushButton(" Перенести все на ... ");
 	auto btnPostponeAll = new QPushButton(" Отложить все на ... ");
@@ -202,6 +202,7 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 		int row = table->rowCount();
 		table->setRowCount(row+1);
 		table->setCellWidget(row, 0, widget);
+		table->scrollToBottom();
 		newNoteInAlarmsPtr = notes.emplace_back(std::make_unique<NoteInAlarms>()).get();
 	}
 	else
@@ -209,6 +210,7 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 		int row = 0;
 		table->insertRow(row);
 		table->setCellWidget(row, 0, widget);
+		table->scrollToTop();
 		notes.insert(notes.begin(), std::make_unique<NoteInAlarms>());
 		newNoteInAlarmsPtr = notes.front().get();
 	}

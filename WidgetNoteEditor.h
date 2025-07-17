@@ -15,7 +15,12 @@ class WidgetNoteEditor : public QWidget
 	Q_OBJECT
 
 public:
-	static void MakeOrShowNoteEditor(Note &note);
+	static WidgetNoteEditor* MakeOrShowNoteEditor(Note &note);
+	static WidgetNoteEditor* MakeOrShowNoteEditorTmpNote(Note &note);
+	static WidgetNoteEditor* MakeOrShowNoteEditorTmpNote(QStringList &noteRecord);
+
+	void StoreTmpNote(std::shared_ptr<Note> tmpNote) { this->tmpNote = tmpNote; }
+	void SetReadOnly();
 
 private:
 	explicit WidgetNoteEditor(Note &note, QWidget *parent = nullptr);
@@ -33,6 +38,7 @@ private:
 	std::vector<std::function<void()>> postShowFunctions;
 
 	Note &note;
+	std::shared_ptr<Note> tmpNote;
 	int cbCounter = 0;
 
 	bool notChagesNow = false;

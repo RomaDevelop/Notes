@@ -29,14 +29,8 @@ private:
 
 public:
 	Note() = default;
-	Note(QString name_, bool activeNotify_, QDateTime dtNotify_, QDateTime dtPostpone_, QString content_):
-		activeNotify{activeNotify_},
-		name {std::move(name_)},
-		dtNotify {std::move(dtNotify_)},
-		dtPostpone {std::move(dtPostpone_)}
-	{
-		content = std::move(content_);
-	}
+	Note(QString name_, bool activeNotify_, QDateTime dtNotify_, QDateTime dtPostpone_, QString content_);
+	~Note();
 
 	qint64 id = -1;
 	qint64 idOnServer = -1;
@@ -53,6 +47,7 @@ public:
 	void MoveToGroup(QString newGroupName);
 	void MoveToGroupOnClient(const QString &newGroupId, const QString &newGroupName);
 
+	Note Clone() const;
 	void InitFromTmpNote(Note &note);
 	void InitFromRecord(QStringList &record);
 	static Note CreateFromRecord(QStringList &record);
@@ -71,6 +66,8 @@ public:
 	void SetDT(QDateTime dtNotify, QDateTime dtPostpone);
 
 	QString DtLastUpdatedStr() { return dtLastUpdated.toString(Fields::dtFormatLastUpated()); }
+	QDateTime DtLastUpdated() { return dtLastUpdated; }
+	void SetDtLastUpdated(QDateTime dt) { dtLastUpdated = std::move(dt); }
 
 	static const QString& StartText() { static QString str = "Введите текст"; return str; }
 
@@ -78,7 +75,6 @@ public:
 	static std::unique_ptr<Note> LoadNote(const QString &text);
 	static Note FromStr_v1(const QString &text);
 	QString ToStr_v1() const;
-	static QString ToStrToShowForDeleteRequest(const QStringList &record);
 	static std::vector<Note> LoadNotes();
 	static void LoadNotesFromFilesAndSaveInBd();
 
@@ -94,9 +90,12 @@ public:
 
 	bool CheckAlarm(const QDateTime &dateToCompare);
 
-	void ShowDialogFastActions(QWidget *widgetToShowUnder);
+	void ShowMenuFastActions(QWidget *widgetToShowUnder);
 
 	inline static NetClient *netClient = nullptr;
+	inline static std::set<Note*> notSavedNotes;
+	inline static QTimer *timerResaver = nullptr;
+	static void InitTimerResaverNotSavedNotes(QWidget *parent);
 
 // cbs
 	void AddCBNameUpdated(std::function<void(void *handler)> aUpdatedCb, void *handler, int &localCbCounter);

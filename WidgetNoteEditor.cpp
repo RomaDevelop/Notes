@@ -22,13 +22,14 @@
 
 #include "FastActions.h"
 
-void WidgetNoteEditor::MakeOrShowNoteEditor(Note &note)
+WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditor(Note &note)
 {
 	if(auto existingEditor = existingEditors.find(&note); existingEditor == existingEditors.end())
 	{
 		auto editor = new WidgetNoteEditor(note);
 		editor->show();
 		existingEditors[&note] = editor;
+		return editor;
 	}
 	else
 	{
@@ -41,6 +42,44 @@ void WidgetNoteEditor::MakeOrShowNoteEditor(Note &note)
 			existingEditor->second->show();
 			PlatformDependent::SetTopMost(existingEditor->second,true);
 			PlatformDependent::SetTopMost(existingEditor->second,false);
+		}
+		return existingEditor->second;
+	}
+}
+
+WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(Note &note)
+{
+	std::shared_ptr<Note> tmpNote = std::make_shared<Note>(note.Name(), note.activeNotify,
+														   note.DTNotify(), note.DTPostpone(), note.Content());
+
+	auto editor = MakeOrShowNoteEditor(*tmpNote.get());
+	editor->StoreTmpNote(tmpNote);
+	editor->SetReadOnly();
+	return editor;
+}
+
+WidgetNoteEditor *WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(QStringList &noteRecord)
+{
+	Note note = Note::CreateFromRecord(noteRecord);
+	return MakeOrShowNoteEditorTmpNote(note);
+}
+
+void WidgetNoteEditor::SetReadOnly()
+{
+	auto children = this->findChildren<QWidget*>();
+	for(auto &obj:children)
+	{
+		if(auto castedW = dynamic_cast<QLineEdit*>(obj)) castedW->setReadOnly(true);
+		else if(auto castedW = dynamic_cast<QDateTimeEdit*>(obj)) castedW->setReadOnly(true);
+		else if(auto castedW = dynamic_cast<MyQTextEdit*>(obj)) castedW->setReadOnly(true);
+		else if(auto castedW = dynamic_cast<QPushButton*>(obj)) castedW->setEnabled(false);
+		else
+		{
+			static std::set<QString> ignoreTypes
+				{ "QWidget", "QLabel", "QScrollBar", "QStatusBar", "QSizeGrip" };
+
+			if(ignoreTypes.count(obj->metaObject()->className()) != 0) continue;
+			QMbError("Unrealesed type to SetReadOnly " + QString(obj->metaObject()->className()));
 		}
 	}
 }
@@ -310,7 +349,6 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	};
 
 	QStatusBar *statusBar = new QStatusBar(this);
-	qdbg << statusBar->contentsMargins();
 	vlo_main->addWidget(statusBar);
 	labelStatus = new QLabel;
 	statusBar->addWidget(labelStatus);
@@ -372,7 +410,10 @@ void WidgetNoteEditor::LoadSettings()
 
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
-	this->restoreGeometry(settings.value("geoNoteEditor").toByteArray());
+	restoreGeometry(settings.value("geoNoteEditor").toByteArray());
+	static QPoint previousPos;
+	if(previousPos == pos()) move(pos()+QPoint(75,75));
+	previousPos = pos();
 }
 
 void WidgetNoteEditor::SetHaveChangesTrue(QString widget)

@@ -18,6 +18,8 @@
 
 #include "NetConstants.h"
 
+class WidgetMain;
+
 class ISocket
 {
 public:
@@ -62,7 +64,7 @@ class NetClient : public QObject, public ISocket, public Requester
 {
 	Q_OBJECT
 public:
-	explicit NetClient(QObject *parent = nullptr);
+	explicit NetClient(WidgetMain *aWidgetMain, QObject *parent = nullptr);
 	~NetClient();
 	void SlotTest();
 	void SlotTestSend();
@@ -70,6 +72,8 @@ public:
 	virtual void Log(const QString &str, bool appendInLastRow = false) override;
 	virtual void Error(const QString &str) override;
 	virtual void Warning(const QString &str) override;
+
+	WidgetMain *widgetMain;
 
 	std::unique_ptr<QWidget> widget;
 	QLineEdit *leArg;
@@ -125,6 +129,7 @@ public:
 	void request_all_notes_sending();
 
 	void UpdateNoteFromGetedNote(const QString &noteAsStr, QString *out_noteIdOnServer); // can take nullptr
+	void RemoveNoteByServerCommand(const QString &idOnServer);
 
 	declare_struct_3_fields_move(CommandData, QString, commandName, QString, content, QString, errors);
 	void CommandsToClientWorker(QString text);

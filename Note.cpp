@@ -14,6 +14,19 @@
 
 #include "DataBase.h"
 
+Note::Note(QString name_, bool activeNotify_, QDateTime dtNotify_, QDateTime dtPostpone_, QString content_):
+	activeNotify{activeNotify_},
+	name {std::move(name_)},
+	content {std::move(content_)},
+	dtNotify {std::move(dtNotify_)},
+	dtPostpone {std::move(dtPostpone_)}
+{}
+
+Note::~Note()
+{
+	notSavedNotes.erase(this);
+}
+
 QString Note::ToStrForLog()
 {
 	QString str;
@@ -195,6 +208,21 @@ void Note::MoveToGroupOnClient(const QString &newGroupId, const QString &newGrou
 	EmitCbs(cbsGroupChanged);
 }
 
+Note Note::Clone() const
+{
+	Note note;
+	note.name = name;
+	note.activeNotify = activeNotify;
+	note.dtNotify = dtNotify;
+	note.dtPostpone = dtPostpone;
+	note.group = group;
+	note.id = id;
+	note.idOnServer = idOnServer;
+	note.content = content;
+	note.dtLastUpdated = dtLastUpdated;
+	return note;
+}
+
 void Note::InitFromTmpNote(Note &note)
 {
 	name = std::move(note.name);
@@ -286,15 +314,19 @@ void Note::SaveNoteOnClient(const QString &reason)
 
 	if(!DataBase::IsGroupLocalByName(group))
 	{
-		NetClient::AnswerWorkerFunction answFoo = [](QString &&answContent){
-			if(answContent != NetConstants::success())
-				QMbWarning("Server can't save note, it saved local");
+		notSavedNotes.insert(this);
+
+		NetClient::AnswerWorkerFunction answFoo = [this](QString &&answContent){
+			if(answContent == NetConstants::success()) notSavedNotes.erase(this);
+			else QMbWarning("Server can't save note, it saved local and will try send to server later");
 		};
 
 		if(netClient->sessionId > 0)
 			netClient->RequestToServerWithWait(NetConstants::request_note_saved(), ToStr_v1(), answFoo);
-		else QMbWarning("Server not connected, note saved local");
+		else QMbWarning("Server not connected, note saved local, it saved local and will try send to server later");
 	}
+
+	if(!timerResaver) QMbError("invalid timerResaver");
 }
 
 std::unique_ptr<Note> Note::LoadNote(const QString &text)
@@ -364,19 +396,6 @@ QString Note::ToStr_v1() const
 	return noteText;
 }
 
-QString Note::ToStrToShowForDeleteRequest(const QStringList &record)
-{
-	QString str;
-	str += record[Fields::nameNoteInd] + "\n";
-	str += "group: " + record[Fields::idGroupIndInNotes]
-								+ "("+DataBase::GroupName(record[Fields::idGroupIndInNotes])+")\n";
-	str += record[Fields::dtNotifyInd] + "\n";
-	str += record[Fields::dtPostponeInd] + "\n";
-	str += record[Fields::contentInd] + "\n";
-	str += "==============================================================================================\n";
-	return str;
-}
-
 std::vector<Note> Note::LoadNotes()
 {
 	LoadNotesFromFilesAndSaveInBd();
@@ -443,7 +462,7 @@ bool Note::CheckAlarm(const QDateTime & dateToCompare)
 	return dateToCompare >= dtPostpone;
 }
 
-void Note::ShowDialogFastActions(QWidget *widgetToShowUnder)
+void Note::ShowMenuFastActions(QWidget *widgetToShowUnder)
 {
 	if(0) CodeMarkers::to_do("сделать нормально извлечение текста, а не через костыль QTextEdit");
 	QTextEdit te;
@@ -454,6 +473,22 @@ void Note::ShowDialogFastActions(QWidget *widgetToShowUnder)
 	if(!actions.actionsVals.isEmpty())
 		MyQDialogs::MenuUnderWidget(widgetToShowUnder, actions.actionsVals, actions.GetVectFunctions());
 	else MyQDialogs::MenuUnderWidget(widgetToShowUnder, { MyQDialogs::DisabledItem("Actions not found") });
+}
+
+void Note::InitTimerResaverNotSavedNotes(QWidget *parent)
+{
+	if(!timerResaver)
+	{
+		timerResaver = new QTimer(parent);
+		QObject::connect(timerResaver, &QTimer::timeout, parent, [](){
+			while(!notSavedNotes.empty())
+			{
+				Note *note = *notSavedNotes.begin();
+				note->SaveNoteOnClient("ResaveNotSavedNotes");
+			}
+		});
+		timerResaver->start(5000);
+	}
 }
 
 void Note::AddCBNameUpdated(std::function<void (void *)> aUpdatedCb, void *handler, int &localCbCounter)

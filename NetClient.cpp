@@ -24,8 +24,12 @@
 
 #include "DataBase.h"
 #include "Note.h"
+#include "WidgetMain.h"
+#include "WidgetNoteEditor.h"
 
-NetClient::NetClient(QObject *parent) : QObject(parent)
+NetClient::NetClient(WidgetMain *aWidgetMain, QObject *parent) :
+	QObject(parent),
+	widgetMain {aWidgetMain}
 {
 	CreateWidgets(true);
 
@@ -474,7 +478,6 @@ void NetClient::request_all_notes_sending()
 			notesIdsOnServer.erase(idOnServer);
 		}
 
-		QString removedNotesToShow;
 		for(auto &noteIdOnServer:notesIdsOnServer)
 		{
 			auto [ok, noteRec] = DataBase::NoteByIdOnServerWithCheck(noteIdOnServer);
@@ -485,11 +488,11 @@ void NetClient::request_all_notes_sending()
 					{"Yes", "No"});
 			if(answ == "Yes")
 			{
-				removedNotesToShow += Note::ToStrToShowForDeleteRequest(noteRec);
+				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(noteRec);
 			}
-		}
 
-		if(!removedNotesToShow.isEmpty()) MyQDialogs::ShowText(removedNotesToShow, 1400, 900);
+#error
+		}
 	};
 
 	RequestInSock(this, NetConstants::request_all_notes(), "", answFoo);
@@ -497,40 +500,132 @@ void NetClient::request_all_notes_sending()
 
 void NetClient::UpdateNoteFromGetedNote(const QString &noteAsStr, QString *out_noteIdOnServer)
 {
-	auto note = Note::LoadNote(noteAsStr);
-	if(!note) {
+	auto noteFromServer = Note::LoadNote(noteAsStr);
+	if(!noteFromServer) {
 		Error("UpdateNoteFromGetedNote: cant load note from data: " + noteAsStr);
 		MsgToServer(NetConstants::msg_error(), "UpdateNoteFromGetedNote: cant load note from data: " + noteAsStr);
 		return;
 	}
 
-	if(out_noteIdOnServer) *out_noteIdOnServer = QSn(note->idOnServer);
+	if(out_noteIdOnServer) *out_noteIdOnServer = QSn(noteFromServer->idOnServer);
 
-	auto [ok, rec] = DataBase::NoteByIdOnServerWithCheck(out_noteIdOnServer ? *out_noteIdOnServer : QSn(note->idOnServer));
+	auto [ok, rec] = DataBase::NoteByIdOnServerWithCheck(out_noteIdOnServer ? *out_noteIdOnServer : QSn(noteFromServer->idOnServer));
 
 	// заметка на клиенте отсуствует
 	if(!ok || rec.isEmpty())
 	{
-		note->id = DataBase::InsertNoteInClientDB(note.get());
-		if(note->id == DataBase::BadInsertNoteResult())
+		noteFromServer->id = DataBase::InsertNoteInClientDB(noteFromServer.get());
+		Log("Create new note geted from server: " + noteFromServer->Name());
+		if(noteFromServer->id == DataBase::BadInsertNoteResult())
 		{
 			Error("UpdateNoteFromGetedNote: cant insert note from data: " + noteAsStr);
 			MsgToServer(NetConstants::msg_error(), "UpdateNoteFromGetedNote: cant insert note from data: " + noteAsStr);
 			return;
 		}
-		emit SignalNewNoteAppeared(note->id);
-		return;
+		emit SignalNewNoteAppeared(noteFromServer->id);
 	}
-
 	// заметка на клиенте уже существует
-	note->id = rec[Fields::idNoteInd].toLongLong();
-
-	auto res = DataBase::SaveNoteOnClient(note.get());
-	if(res.isEmpty()) emit SignalNoteUpdated(note->id);
 	else
 	{
-		Error("UpdateNoteFromGetedNote: saving note error: " + res);
-		MsgToServer(NetConstants::msg_error(), "UpdateNoteFromGetedNote: saving note error: " + res);
+		bool doUpdate = false;
+		if(noteFromServer->DtLastUpdatedStr() == rec[Fields::lastUpdatedInd])
+		{
+			Log("Note from server " + noteFromServer->Name() + " has same dtLastUpdated");
+		}
+		else if(noteFromServer->DtLastUpdatedStr() > rec[Fields::lastUpdatedInd]) doUpdate = true;
+		else
+		{
+			auto answ = MyQDialogs::CustomDialog("Notes conflict",
+												 "Geted from server note to update is older than local version. Choose action",
+												 {"Update", "Abort update", "Abort update and show notes"});
+			if(answ == "Update") doUpdate = true;
+			else if(answ == "Abort update") {}
+			else if(answ == "Abort update and show notes")
+			{
+				noteFromServer->SetName(noteFromServer->Name() + " (version from server)");
+				auto origNote = widgetMain->FindOriginalNote(noteFromServer->idOnServer);
+				if(!origNote) { QMbError("UpdateNoteFromGetedNote: !origNote"); return; }
+
+				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(*noteFromServer.get());
+				WidgetNoteEditor::MakeOrShowNoteEditor(*origNote);
+			}
+		}
+
+		if(doUpdate)
+		{
+			Log("Updating from server with newer edition of note " + noteFromServer->Name());
+			noteFromServer->id = rec[Fields::idNoteInd].toLongLong();
+			auto res = DataBase::SaveNoteOnClient(noteFromServer.get());
+			if(res.isEmpty()) emit SignalNoteUpdated(noteFromServer->id);
+			else
+			{
+				Error("UpdateNoteFromGetedNote: saving note error: " + res);
+				MsgToServer(NetConstants::msg_error(), "UpdateNoteFromGetedNote: saving note error: " + res);
+			}
+		}
+	}
+}
+
+void NetClient::RemoveNoteByServerCommand(const QString &idOnServer)
+{
+	/// на клиенте пока нет корзины - выводить сообщение, какие заметки предлагается удалить
+	if(!IsUInt(idOnServer))
+	{
+		Error("RemoveNoteByServerCommand get bad idOnServer: " + idOnServer);
+		MsgToServer(NetConstants::msg_error(), "command_remove_note_worker get bad idOnServer: " + idOnServer);
+		return;
+	}
+	auto record = DataBase::NoteByIdOnServer(idOnServer);
+	if(record.isEmpty())
+	{
+		CodeMarkers::to_do("если пришло сообщение удалить заметку, а она уже была удалена,"
+						   "все норм, но если пришло говно - нужно сигнализировать. "
+						   "но тогда нужно хранить ранее удалённые заметки");
+	}
+	else
+	{
+		Note note;
+		note.InitFromRecord(record);
+		auto answ = MyQDialogs::CustomDialog("Command from server", "Get command from server to remove note " + note.Name()
+											 + "\n\nWhat should to do?",
+											 {"Remove", "Remove and show after", "Move to default group"});
+		if(0) CodeMarkers::to_do("can add action show note, but need make cykle choose actoion cdialog");
+		if(answ == "Remove" || answ == "Show note after removing")
+		{
+			Note tmpNote = note.Clone();
+			if(DataBase::RemoveNoteOnClient(QSn(note.id), true))
+			{
+				emit SignalNoteRemoved(note.id);
+			}
+			else
+			{
+				QMbError("This doesn't works now, check updates");
+				MsgToServer(NetConstants::msg_error(), "client can't remove note");
+			}
+
+			if(answ == "Show note after removing")
+				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(tmpNote);
+
+			#error
+		}
+		else if(answ == "Move to default group")
+		{
+			if(DataBase::MoveNoteToGroupOnClient(QSn(note.id), DataBase::DefaultGroupId2(),
+												 QDateTime::currentDateTime().toString(Fields::dtFormatLastUpated())))
+			{
+				emit SignalNoteChangedGgroup(note.id);
+			}
+			else
+			{
+				QMbError("This doesn't works now, check updates");
+				MsgToServer(NetConstants::msg_error(), "client can't move note to default group");
+			}
+		}
+		else
+		{
+			QMbError("This doesn't works now, check updates");
+			MsgToServer(NetConstants::msg_error(), "wrong answ in removindg action");
+		}
 	}
 }
 
@@ -594,60 +689,7 @@ void NetClient::command_your_session_id_worker(QString &&commandContent)
 
 void NetClient::command_remove_note_worker(QString && commandContent)
 {
-	/// на клиенте пока нет корзины - выводить сообщение, какие заметки предлагается удалить
-	QString &idOnServer = commandContent;
-	if(!IsUInt(idOnServer))
-	{
-		Error("command_remove_note_worker get bad idOnServer: " + idOnServer);
-		MsgToServer(NetConstants::msg_error(), "command_remove_note_worker get bad idOnServer: " + idOnServer);
-		return;
-	}
-	auto record = DataBase::NoteByIdOnServer(idOnServer);
-	if(record.isEmpty())
-	{
-		CodeMarkers::to_do("если пришло сообщение удалить заметку, а она уже была удалена,"
-						   "все норм, но если пришло говно - нужно сигнализировать. "
-						   "но тогда нужно хранить ранее удалённые заметки");
-	}
-	else
-	{
-		Note note;
-		note.InitFromRecord(record);
-		auto answ = MyQDialogs::CustomDialog("Command from server", "Get command from server to remove note " + note.Name()
-											 + "\n\nWhat should to do?",
-											 {"Remove", "Move to default group"});
-		if(0) CodeMarkers::to_do("can add action show note, but need make cykle choose actoion cdialog");
-		if(answ == "Remove")
-		{
-			if(DataBase::RemoveNoteOnClient(QSn(note.id), true))
-			{
-				emit SignalNoteRemoved(note.id);
-			}
-			else
-			{
-				QMbError("This doesn't works now, check updates");
-				MsgToServer(NetConstants::msg_error(), "client can't remove note");
-			}
-		}
-		else if(answ == "Move to default group")
-		{
-			if(DataBase::MoveNoteToGroupOnClient(QSn(note.id), DataBase::DefaultGroupId2(),
-												 QDateTime::currentDateTime().toString(Fields::dtFormatLastUpated())))
-			{
-				emit SignalNoteChangedGgroup(note.id);
-			}
-			else
-			{
-				QMbError("This doesn't works now, check updates");
-				MsgToServer(NetConstants::msg_error(), "client can't move note to default group");
-			}
-		}
-		else
-		{
-			QMbError("This doesn't works now, check updates");
-			MsgToServer(NetConstants::msg_error(), "wrong answ in removindg action");
-		}
-	}
+	RemoveNoteByServerCommand(commandContent);
 }
 
 void NetClient::command_update_note_worker(QString && commandContent)

@@ -194,6 +194,8 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	CreateTrayIcon();
 	CreateNotesAlarmChecker();
 
+	Note::InitTimerResaverNotSavedNotes(this);
+
 	netClient = new NetClient(this);
 	Note::netClient = netClient;
 	connect(netClient, &NetClient::SignalNoteRemoved, this, &WidgetMain::SlotForNetClientNoteRemoved);
@@ -236,21 +238,21 @@ void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 	connect(btnFastActions, &QPushButton::clicked, [this, btnFastActions](){
 		if(table->currentRow() == -1) return;
 		if(auto note = NoteOfRow(table->currentRow()); note)
-			note->ShowDialogFastActions(btnFastActions);
+			note->ShowMenuFastActions(btnFastActions);
 		else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
 	});
 
-// Menu
 	hlo1->addSpacing(20);
 
+// Menu
 	QPushButton *btnMenu = new QPushButton("Menu");
 	btnMenu->setFixedWidth(QFontMetrics(btnMenu->font()).horizontalAdvance(btnMenu->text()) + 20);
 	hlo1->addWidget(btnMenu);
-	connect(btnMenu,&QPushButton::clicked, [this, btnMenu]() { SlotMenu(btnMenu); });
+	connect(btnMenu, &QPushButton::clicked, [this, btnMenu]() { SlotMenu(btnMenu); });
 
-// Search
 	hlo1->addSpacing(20);
 
+// Search
 	auto hloSearch = new QHBoxLayout;
 	hloSearch->setContentsMargins(0,0,0,0);
 	hloSearch->setSpacing(0);
@@ -425,22 +427,19 @@ bool WidgetMain::DialogGroupsSubscribes()
 
 void WidgetMain::SlotTest()
 {
-	qdbg << "test";
-
-	auto notesTable = DataBase::DoSqlQueryGetTable("select * from " + Fields::Notes());
-	int size = 0;
-	for(auto &row:notesTable)
-	{
-		QString newNote = Note::InitFromRecordAndSaveToStr(row);
-		size += newNote.size();
-		qdbg << size;
-	}
-	qdbg << "toatal" << size;
+	//auto clone = notes[0]->note->Clone();
+	//clone.SetName("123 new name " + QDateTime::currentDateTime().toString());
+	//clone.SetDtLastUpdated(clone.DtLastUpdated().addSecs(+10));
+	//netClient->UpdateNoteFromGetedNote(clone.ToStr_v1(), nullptr);
 }
 
 void WidgetMain::SlotMenu(QPushButton *btn)
 {
 	std::vector<MyQDialogs::MenuItem> items;
+	items.emplace_back("Net client", [this](){ netClient->widget->showNormal(); netClient->widget->activateWindow(); });
+	items.emplace_back(MyQDialogs::SeparatorMenuItem());
+	items.emplace_back("Resave not saved notes", [](){  });
+	items.emplace_back(MyQDialogs::SeparatorMenuItem());
 	items.emplace_back("Open DB", [](){ MyQExecute::Execute(DataBase::baseDataCurrent->baseFilePathName); });
 	items.emplace_back("Show DB in explorer", [](){ MyQExecute::ShowInExplorer(DataBase::baseDataCurrent->baseFilePathName); });
 	items.emplace_back(MyQDialogs::SeparatorMenuItem());
@@ -494,6 +493,13 @@ void WidgetMain::ShowMainWindow()
 {
 	this->showNormal();
 	PlatformDependent::SetTopMostFlash(this);
+}
+
+Note *WidgetMain::FindOriginalNote(qint64 idNoteOnServer)
+{
+	for(auto &note:notes)
+		if(note->note->idOnServer == idNoteOnServer) return note->note.get();
+	return nullptr;
 }
 
 void WidgetMain::SaveSettings()
@@ -769,10 +775,13 @@ bool WidgetMain::RemoveNoteSQLOnClient(Note * note)
 	if(0) CodeMarkers::to_do("нужно добавить возможность удалять заметки на клиенте без связи с сервером, "
 							 "тогда потребуется как-то хранить удалённые, "
 							 "чтобы при связи с сервером передать ему сообщить о том что они были удалены");
+
+	// если локальная заметка
 	if(DataBase::IsGroupLocalByName(note->group)) {
 		DataBase::RemoveNoteOnClient(QSn(note->id), true);
 		return true;
 	}
+	// если сетевая
 	else
 	{
 		auto answFoo = [this, note](QString &&answContent){

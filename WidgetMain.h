@@ -27,14 +27,10 @@ class WidgetMain : public QWidget, public INotesOwner
 {
 	Q_OBJECT
 public:
-	QTableWidget *table;
-
 	std::vector<std::unique_ptr<NoteInMain>> notes;
 	std::vector<Note*> AllNotesVect() { std::vector<Note*> v; for(auto &n:notes) v.push_back(n->note.get()); return v; }
 
 	std::unique_ptr<WidgetAlarms> widgetAlarms;
-
-	NetClient *netClient;
 
 	explicit WidgetMain(QWidget *parent = nullptr);
 	~WidgetMain();
@@ -43,7 +39,12 @@ public:
 	virtual void CreateNewNote() override;
 	virtual void ShowMainWindow() override;
 
+	Note* FindOriginalNote(qint64 idNoteOnServer);
+
 private:
+	NetClient *netClient;
+	QTableWidget *table;
+
 	void CreateRow1(QHBoxLayout *hlo1);
 	void CreateTableContextMenu();
 	void CreateTrayIcon();
