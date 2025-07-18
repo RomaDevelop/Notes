@@ -104,7 +104,7 @@ void WidgetAlarms::GiveNotes(const std::vector<Note *> & givingNotes)
 	{
 		if(NoteInAlarms *findedNote = FindNote(newNote); findedNote == nullptr)
 		{
-			AddNote(newNote);
+			AddNote(newNote, true);
 			added = true;
 		}
 	}
@@ -197,15 +197,7 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 	auto widgetAllExeptLabels = new QWidget;
 	NoteInAlarms *newNoteInAlarmsPtr = nullptr;
 
-	if(addInTop == false)
-	{
-		int row = table->rowCount();
-		table->setRowCount(row+1);
-		table->setCellWidget(row, 0, widget);
-		table->scrollToBottom();
-		newNoteInAlarmsPtr = notes.emplace_back(std::make_unique<NoteInAlarms>()).get();
-	}
-	else
+	if(addInTop)
 	{
 		int row = 0;
 		table->insertRow(row);
@@ -213,6 +205,14 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 		table->scrollToTop();
 		notes.insert(notes.begin(), std::make_unique<NoteInAlarms>());
 		newNoteInAlarmsPtr = notes.front().get();
+	}
+	else
+	{
+		int row = table->rowCount();
+		table->setRowCount(row+1);
+		table->setCellWidget(row, 0, widget);
+		table->scrollToBottom();
+		newNoteInAlarmsPtr = notes.emplace_back(std::make_unique<NoteInAlarms>()).get();
 	}
 
 	if(!newNoteInAlarmsPtr) { QMbError("invalid newNoteInAlarmsPtr"); return; }

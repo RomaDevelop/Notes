@@ -38,7 +38,7 @@ private:
 
 	std::vector<std::unique_ptr<NoteInAlarms>> notes;
 	NoteInAlarms* FindNote(Note *noteToFind);
-	void AddNote(Note* note, bool addInTop = false, bool disableFeatureMessage = false);
+	void AddNote(Note* note, bool addInTop, bool disableFeatureMessage = false);
 	void MoveNoteUp(Note& note);
 	void SetLabelText(NoteInAlarms & note);
 	void RemoveNoteFromWidgetAlarms(int index);

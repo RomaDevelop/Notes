@@ -468,30 +468,22 @@ void NetClient::request_all_notes_sending()
 	auto answFoo = [this](QString &&answContent){
 		if(answContent.size() > 1'800'000) QMbWarning("request_all_notes_sending: answContent.size() > 1'800'000");
 
-		std::set<QString> notesIdsOnServer = DataBase::NotesIdsOnServer();
+		std::set<QString> notesIdsOnServerToRemove = DataBase::NotesIdsOnServer();
+		// все заметки с клиента попали в список на удаление
 
 		auto notesAsStrs = NetConstants::request_all_notes_decode_answ(answContent);
 		for(auto &noteAsStr:notesAsStrs)
 		{
 			QString idOnServer;
 			UpdateNoteFromGetedNote(noteAsStr, &idOnServer);
-			notesIdsOnServer.erase(idOnServer);
+			notesIdsOnServerToRemove.erase(idOnServer);
+			// или заметка есть на сервере - она удаляется из списка на удаление
 		}
 
-		for(auto &noteIdOnServer:notesIdsOnServer)
+		// удаление заметок из списка на удаление
+		for(auto &noteIdOnServer:notesIdsOnServerToRemove)
 		{
-			auto [ok, noteRec] = DataBase::NoteByIdOnServerWithCheck(noteIdOnServer);
-			if(!ok) { QMbError("NoteByIdOnServerWithCheck err 2 !ok"); return; }
-			auto answ = MyQDialogs::CustomDialog("Removing note", "Note\n\n" + noteRec[Fields::nameNoteInd]
-					+ "\n\ndoesn't exist on server. It will be removed. You can show note data ans save it to create it again.\n\n"
-					  "Show note data after removing?",
-					{"Yes", "No"});
-			if(answ == "Yes")
-			{
-				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(noteRec);
-			}
-
-#error
+			RemoveNoteByServerCommand(noteIdOnServer);
 		}
 	};
 
@@ -605,8 +597,6 @@ void NetClient::RemoveNoteByServerCommand(const QString &idOnServer)
 
 			if(answ == "Show note after removing")
 				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(tmpNote);
-
-			#error
 		}
 		else if(answ == "Move to default group")
 		{
