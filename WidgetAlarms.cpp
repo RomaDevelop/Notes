@@ -300,14 +300,9 @@ void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 	maxWidth -= fontMetrixForLabels.horizontalAdvance(AllButtonsCaptions());
 	maxWidth -= 16*3; // пространство в кнопке
 	maxWidth -= 22*3; // от правого края кнопки до сл элемента
+	maxWidth -= (text1.size() - 30) / 2; // вычислено на работе экспериментальным путем
 
-	//maxWidth -= note.widgetAllExeptLabels->width() + table->width() * 0.12;
-	/// костыль < + table->width() * 0.12 > вычислен дома экспериментальным путем. Будет ли работать на работе???
-	/// Можно покопать в сторону разделения строки на разные ячейки, потому что у ячеек всё четко
-	///		Скрыть разделяющие ячейки линии только вертикальные невозможно.
-	///		Можно скрыть все и попробовать отрисовать горизонтальные. Возможно через QStyledItemDelegate или ещё как-то
-
-	text1 = fontMetrixForLabels.elidedText("   " + note.note->Name(), Qt::ElideRight, maxWidth);
+	text1 = fontMetrixForLabels.elidedText(text1, Qt::ElideRight, maxWidth);
 
 	note.labelCaption1->setText(text1);
 	note.labelCaption2->setText(text2);
