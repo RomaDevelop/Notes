@@ -16,8 +16,9 @@ struct NoteInAlarms
 	Note* note;
 	QWidget *widgetAll;
 	QWidget *widgetAllExeptLabels;
-	QLabel* labelCaption1;
-	QLabel* labelCaption2;
+	QLabel* labelName;
+	QLabel* labelDots;
+	QLabel* labelDate;
 	int cbCounter = 0;
 };
 
