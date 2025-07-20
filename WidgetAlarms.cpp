@@ -298,18 +298,23 @@ void WidgetAlarms::MoveNoteUp(Note& note)
 void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 {
 	QString text1 = "   " + note.note->Name();
-	QString text2 = "("+note.note->DTNotify().toString("dd MMM yyyy hh:mm:ss")+")";
+	QString text2 = "  ("+note.note->DTNotify().toString("dd MMM yyyy hh:mm:ss")+")";
+	note.labelName->setText(text1);
+	note.labelDate->setText(text2);
+	note.labelDots->hide();
 
-	int maxWidth = table->width() - fontMetrixForLabels.horizontalAdvance(text2);
-	maxWidth -= fontMetrixForLabels.horizontalAdvance(AllButtonsCaptions());
-	maxWidth -= 16*3; // пространство в кнопке
-	maxWidth -= 22*3; // от правого края кнопки до сл элемента
-	maxWidth -= (text1.size() - 30) / 2; // вычислено на работе экспериментальным путем
+	int labelNameWidth = table->width() - note.widgetAllExeptLabels->width();
+	if(table->verticalScrollBar()->isVisible()) labelNameWidth -= table->verticalScrollBar()->width();
+	labelNameWidth -= note.labelDate->width() + 20;
 
-	text1 = fontMetrixForLabels.elidedText(text1, Qt::ElideRight, maxWidth);
+	if(labelNameWidth > note.labelName->sizeHint().width()) labelNameWidth = note.labelName->sizeHint().width();
+	if(labelNameWidth < note.labelName->sizeHint().width())
+	{
+		note.labelDots->show();
+		labelNameWidth -= note.labelDots->sizeHint().width();
+	}
 
-	note.labelCaption1->setText(text1);
-	note.labelCaption2->setText(text2);
+	note.labelName->setFixedWidth(labelNameWidth);
 }
 
 void WidgetAlarms::RemoveNoteFromWidgetAlarms(int index)
