@@ -194,7 +194,7 @@ NoteInAlarms * WidgetAlarms::FindNote(Note * noteToFind)
 void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessage)
 {
 	auto widget = new QWidget;
-	auto widgetAllExeptLabels = new QWidget;
+
 	NoteInAlarms *newNoteInAlarmsPtr = nullptr;
 
 	if(addInTop)
@@ -217,39 +217,43 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 
 	if(!newNoteInAlarmsPtr) { QMbError("invalid newNoteInAlarmsPtr"); return; }
 
+	newNoteInAlarmsPtr->note = note;
+	newNoteInAlarmsPtr->widgetAll = widget;
+	newNoteInAlarmsPtr->widgetAllExeptLabels = new QWidget;
+
 	auto hlo = new QHBoxLayout(widget);
 	hlo->setContentsMargins(0,0,0,0);
-	auto hlo2 = new QHBoxLayout(widgetAllExeptLabels);
+	hlo->setSpacing(0);
+	auto hlo2 = new QHBoxLayout(newNoteInAlarmsPtr->widgetAllExeptLabels);
 	hlo2->setContentsMargins(0,0,0,0);
 
-	auto labelCaption1 = new QLabel;
-	labelCaption1->setFont(fontForLabels);
+	newNoteInAlarmsPtr->labelName = new QLabel;
+	newNoteInAlarmsPtr->labelName->setFont(fontForLabels);
 
-	auto labelCaption2 = new QLabel;
-	labelCaption2->setFont(fontForLabels);
+	newNoteInAlarmsPtr->labelDots = new QLabel("...");
+	newNoteInAlarmsPtr->labelDots->setFont(fontForLabels);
+	newNoteInAlarmsPtr->labelDots->hide();
+
+	newNoteInAlarmsPtr->labelDate = new QLabel;
+	newNoteInAlarmsPtr->labelDate->setFont(fontForLabels);
+
 	auto btnReschedule = new QPushButton(RescheduleCaption());
 	auto btnPostpone = new QPushButton(RostponeCaption());
 	auto btnRemove = new QPushButton(RemoveCaption());
 
-	hlo->addWidget(labelCaption1);
-	hlo->addWidget(labelCaption2);
+	hlo->addWidget(newNoteInAlarmsPtr->labelName);
+	hlo->addWidget(newNoteInAlarmsPtr->labelDots);
+	hlo->addWidget(newNoteInAlarmsPtr->labelDate);
 	hlo->addStretch();
 
-	hlo->addWidget(widgetAllExeptLabels);
+	hlo->addWidget(newNoteInAlarmsPtr->widgetAllExeptLabels);
 
 	hlo2->addWidget(btnReschedule);
 	hlo2->addWidget(btnPostpone);
 	hlo2->addWidget(btnRemove);
 	hlo2->addSpacing(4);
 
-	NoteInAlarms &newNoteInAlarmsRef = *newNoteInAlarmsPtr;
-	newNoteInAlarmsRef.note = note;
-	newNoteInAlarmsRef.widgetAll = widget;
-	newNoteInAlarmsRef.widgetAllExeptLabels = widgetAllExeptLabels;
-	newNoteInAlarmsRef.labelCaption1 = labelCaption1;
-	newNoteInAlarmsRef.labelCaption2 = labelCaption2;
-
-	SetLabelText(newNoteInAlarmsRef);
+	SetLabelText(*newNoteInAlarmsPtr);
 
 	auto cb = [this, newNoteInAlarmsPtr](void*){
 		if(!newNoteInAlarmsPtr->note->CheckAlarm(QDateTime::currentDateTime()))
