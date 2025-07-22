@@ -107,18 +107,23 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 		QString fetchRes;
 		while(fetchRes != "finish")
 		{
-			QProcess process;
-			process.setWorkingDirectory(LaunchParams::CurrentDeveloper()->sourcesPath);
-			process.start("git", QStringList() << "fetch" << "github");
-			if(!process.waitForStarted(5000))
+			for(int i=0; i<3; i++)
 			{
-				fetchRes = "error waitForStarted " + (QStringList() << "fetch" << "github").join(" ");
+				QProcess process;
+				process.setWorkingDirectory(LaunchParams::CurrentDeveloper()->sourcesPath);
+				process.start("git", QStringList() << "fetch" << "github");
+				if(!process.waitForStarted(3000))
+				{
+					fetchRes = "error waitForStarted " + (QStringList() << "fetch" << "github").join(" ");
+				}
+				else if(!process.waitForFinished(3000))
+				{
+					fetchRes = "error waitForFinished " + (QStringList() << "fetch" << "github").join(" ");
+				}
+				else fetchRes = process.readAllStandardError();
+
+				if(fetchRes.isEmpty()) break;
 			}
-			else if(!process.waitForFinished(10000))
-			{
-				fetchRes = "error waitForFinished " + (QStringList() << "fetch" << "github").join(" ");
-			}
-			else fetchRes = process.readAllStandardError();
 
 			if(!fetchRes.isEmpty())
 			{
