@@ -63,6 +63,7 @@ WidgetAlarms::WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidge
 	timerGeoSaver->start(200);
 
 	InitFitColWidthTimer();
+	InitTimerSetterLabels();
 	InitMessageForNotifyTimer();
 }
 
@@ -229,6 +230,7 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 
 	newNoteInAlarmsPtr->labelName = new QLabel;
 	newNoteInAlarmsPtr->labelName->setFont(fontForLabels);
+	newNoteInAlarmsPtr->labelName->setMinimumWidth(30);
 
 	newNoteInAlarmsPtr->labelDots = new QLabel("...");
 	newNoteInAlarmsPtr->labelDots->setFont(fontForLabels);
@@ -252,8 +254,6 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 	hlo2->addWidget(btnPostpone);
 	hlo2->addWidget(btnRemove);
 	hlo2->addSpacing(4);
-
-	SetLabelText(*newNoteInAlarmsPtr);
 
 	auto cb = [this, newNoteInAlarmsPtr](void*){
 		if(!newNoteInAlarmsPtr->note->CheckAlarm(QDateTime::currentDateTime()))
@@ -280,13 +280,16 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 		}
 	});
 
-	fitColWidthRequest = true;
-
 	if(!disableFeatureMessage)
 	{
 		bool featureMsgForNotify = Features::CheckFeature(note->Content(), Features::messageForNotify());
 		if(featureMsgForNotify) notesToShowMessageForNotify.push_back(note);
 	}
+
+	fitColWidthRequest = true;
+
+	notesToSetLabel.push_back(newNoteInAlarmsPtr);
+	setLabelRequestDt = QDateTime::currentDateTime();
 }
 
 void WidgetAlarms::MoveNoteUp(Note& note)
@@ -314,7 +317,8 @@ void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 		labelNameWidth -= note.labelDots->sizeHint().width();
 	}
 
-	note.labelName->setFixedWidth(labelNameWidth);
+	if(labelNameWidth < 30) labelNameWidth = 30;
+	note.labelName->setMaximumWidth(labelNameWidth);
 }
 
 void WidgetAlarms::RemoveNoteFromWidgetAlarms(int index)
@@ -544,7 +548,7 @@ void WidgetAlarms::FitColWidth()
 	if(table->verticalScrollBar()->isVisible()) columnWidth -= table->verticalScrollBar()->width();
 	table->setColumnWidth(0, columnWidth);
 
-	for(auto &note:notes) SetLabelText(*note.get());
+	//for(auto &note:notes) SetLabelText(*note.get());
 }
 
 void WidgetAlarms::InitFitColWidthTimer()
@@ -556,6 +560,26 @@ void WidgetAlarms::InitFitColWidthTimer()
 		{
 			FitColWidth();
 			fitColWidthRequest = false;
+		}
+	});
+}
+
+void WidgetAlarms::InitTimerSetterLabels()
+{
+	static bool inited = false;
+	if(inited) { QMbError("multiple call InitThreadSetterLabes"); return; }
+
+	QTimer *timer = new QTimer(this);
+	timer->start(10);
+	connect(timer, &QTimer::timeout, this, [this](){
+		if(!notesToSetLabel.empty() and setLabelRequestDt.msecsTo(QDateTime::currentDateTime()) > 30)
+		{
+			for(auto &note:notesToSetLabel)
+			{
+				if(NoteInAlarms::validNotesInAlarms.count(note) > 0)
+					SetLabelText(*note);
+			}
+			notesToSetLabel.clear();
 		}
 	});
 }
@@ -585,5 +609,7 @@ void WidgetAlarms::resizeEvent(QResizeEvent * event)
 {
 	QWidget::resizeEvent(event);
 	FitColWidth();
+	for(auto &note:notes) notesToSetLabel.push_back(note.get());
+	setLabelRequestDt = QDateTime::currentDateTime();
 }
 

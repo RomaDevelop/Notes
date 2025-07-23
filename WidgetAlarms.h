@@ -20,6 +20,11 @@ struct NoteInAlarms
 	QLabel* labelDots;
 	QLabel* labelDate;
 	int cbCounter = 0;
+
+	NoteInAlarms() { validNotesInAlarms.insert(this); }
+	~NoteInAlarms() { validNotesInAlarms.erase(this); }
+
+	inline static std::set<NoteInAlarms*> validNotesInAlarms;
 };
 
 class WidgetAlarms : public QWidget
@@ -62,6 +67,10 @@ private:
 	void FitColWidth();
 	void InitFitColWidthTimer();
 	bool fitColWidthRequest = false;
+
+	std::vector<NoteInAlarms*> notesToSetLabel;
+	QDateTime setLabelRequestDt;
+	void InitTimerSetterLabels();
 
 	std::vector<Note*> notesToShowMessageForNotify;
 	void InitMessageForNotifyTimer();
