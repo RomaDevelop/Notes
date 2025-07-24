@@ -58,6 +58,7 @@ private:
 	void SaveNoteFromEditor(bool forceSave = false);
 
 	inline static std::map<Note*,WidgetNoteEditor*> existingEditors;
+
 };
 
 #endif

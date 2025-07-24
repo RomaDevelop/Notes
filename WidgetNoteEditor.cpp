@@ -18,6 +18,7 @@
 #include "PlatformDependent.h"
 #include "MyQDifferent.h"
 #include "MyQString.h"
+#include "MyQWidget.h"
 #include "MyQDialogs.h"
 
 #include "FastActions.h"
@@ -414,9 +415,29 @@ void WidgetNoteEditor::LoadSettings()
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
 	restoreGeometry(settings.value("geoNoteEditor").toByteArray());
-	static QPoint previousPos;
-	if(previousPos == pos()) move(pos()+QPoint(75,75));
-	previousPos = pos();
+	static Note *previousNote = nullptr;
+	static WidgetNoteEditor *previousEditor = nullptr;
+	if(previousNote && existingEditors.count(previousNote) > 0)
+	{
+		QScreen* editorScreen = MyQWidget::WidgetScreen(this);
+		if(!editorScreen) { QMbError("!editorScreen"); }
+		else
+		{
+			QPoint newPos = previousEditor->pos() + QPoint(75,75);
+			auto editorScreenGeo = editorScreen->geometry();
+			if(editorScreenGeo.x() + editorScreenGeo.width() < newPos.x() + this->width() + 15
+					|| editorScreenGeo.y() + editorScreenGeo.height() < newPos.y() + this->height() + 30)
+			{
+				static int addX = 0;
+				addX += 30;
+				if(addX > editorScreen->geometry().width()*0.8) addX = 30;
+				newPos = editorScreen->geometry().topLeft() + QPoint(addX,30);
+			}
+			move(newPos);
+		}
+	}
+	previousNote = &this->note;
+	previousEditor = this;
 }
 
 void WidgetNoteEditor::SetHaveChangesTrue(QString widget)
