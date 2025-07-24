@@ -302,15 +302,18 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	hloButtons->addWidget(btnAddAction);
 	connect(btnAddAction,&QPushButton::clicked,[this, btnAddAction](){
 
-		auto addFoo = [this](){
-			this->textEdit->textCursor().insertText(FastActions_ns::execute());
-			textEdit->setFocus();
-		};
+		std::vector<MyQDialogs::MenuItem> items;
+		for(auto &fastAction:FastActions_ns::all_adder_texts())
+		{
+			items.emplace_back();
+			items.back().text = fastAction;
+			items.back().worker = [this, &fastAction](){
+				this->textEdit->textCursor().insertText(fastAction);
+				textEdit->setFocus();
+			};
+		}
 
-		MyQDialogs::MenuUnderWidget(btnAddAction,
-									{
-										{ FastActions_ns::execute(), addFoo },
-									});
+		MyQDialogs::MenuUnderWidget(btnAddAction, std::move(items));
 	});
 
 	QPushButton *btnDoActions = new QPushButton(" Do actions ");

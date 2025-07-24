@@ -133,11 +133,10 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 			else fetchRes = "finish";
 		}
 
-		if(MyQExecute::Execute(ReadAndGetGitExtensionsExe(GitExtensionsExe, true), {base.pathDataBase}))
-		{
+		;
+		if(GitExtensionsTool::ExecuteGitExtensions(base.pathDataBase, true, filesPath))
 			QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
-		}
-		else QMbError("Error launching GitExtensions");
+		//else QMbError("Error launching GitExtensions"); // ExecuteGitExtensions выводит ошибку сам
 	}
 	else if(answ == "Abort launch")
 	{
@@ -451,8 +450,9 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 	items.emplace_back("Settings.ini", [this](){ MyQExecute::Execute(settingsFile); });
 	items.emplace_back("Show Settings.ini in explorer", [this](){ MyQExecute::ShowInExplorer(settingsFile); });
 	items.emplace_back(MyQDialogs::SeparatorMenuItem());
-	items.emplace_back("GitExtesions: open repo", [this](){
-		MyQExecute::Execute(ReadAndGetGitExtensionsExe(GitExtensionsExe, true), {DataBase::baseDataCurrent->pathDataBase}); });
+	items.emplace_back("GitExtesions: open repo with DB", [this](){
+		GitExtensionsTool::ExecuteGitExtensions(DataBase::baseDataCurrent->pathDataBase, true, filesPath);
+	});
 
 	MyQDialogs::MenuUnderWidget(btn, std::move(items));
 }
@@ -869,20 +869,7 @@ void WidgetMain::SlotForNetClientNewNoteAppeared(qint64 id)
 	else MakeNewNote(Note::CreateFromRecord(rec), loaded);
 }
 
-QString WidgetMain::ReadAndGetGitExtensionsExe(QString dir, bool showInfoMessageBox)
-{
-	if(GitExtensionsExe.isEmpty() && QFile::exists(filesPath+"/git_extensions_exe.txt"))
-		GitExtensionsExe = MyQFileDir::ReadFile1(filesPath+"/git_extensions_exe.txt");
 
-	if(GitExtensionsExe.isEmpty() || !QFileInfo(GitExtensionsExe).isFile())
-	{
-		if(showInfoMessageBox) QMbInfo("Укажите программу для работы с репозиториями");
-		GitExtensionsExe = QFileDialog::getOpenFileName(nullptr, "Укажите программу для работы с репозиториями",
-														dir, "*.exe");
-		MyQFileDir::WriteFile(filesPath+"/git_extensions_exe.txt", GitExtensionsExe);
-	}
-	return GitExtensionsExe;
-}
 
 
 

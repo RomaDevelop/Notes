@@ -88,9 +88,6 @@ private:
 	void SlotForNetClientNoteRemoved(qint64 id);
 	void SlotForNetClientNoteChangedGroupOrUpdated(qint64 id);
 	void SlotForNetClientNewNoteAppeared(qint64 id);
-
-	QString GitExtensionsExe;
-	QString ReadAndGetGitExtensionsExe(QString dir, bool showInfoMessageBox);
 };
 
 

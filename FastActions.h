@@ -16,8 +16,10 @@ using QStringRefWr_const_set = std::set<QStringRefWr_const>;
 
 namespace FastActions_ns {
 	inline const QString& execute() { static QString str = "[execute]"; return str; }
+	inline const QString& git_extensions() { static QString str = "[git_extensions]"; return str; }
 
-	inline const QStringList& all() { static QStringList list { execute() }; return list; };
+	inline const QStringList& all() { static QStringList list { execute(), git_extensions() }; return list; };
+	inline const QStringList& all_adder_texts() { static QStringList list { execute(), git_extensions() }; return list; };
 }
 
 struct Features
@@ -29,6 +31,13 @@ struct Features
 	static QStringRef HeadForCheckFeature(const QString &content);
 	static bool CheckFeature(const QString &content, const QString &feature);
 	static QStringRefWr_const_set ScanForFeatures(const QString &content);
+};
+
+struct GitExtensionsTool
+{
+	inline static QString GitExtensionsExe;
+	static QString SetAndGetGitExtensionsExe(QString filesPath);
+	static bool ExecuteGitExtensions(QString repoDirToOpen, bool chooseGitExensionsExeIfNeed, QString filesPath);
 };
 
 struct FastAction

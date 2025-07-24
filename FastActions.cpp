@@ -1,5 +1,8 @@
 #include "FastActions.h"
 
+#include <QFileDialog>
+
+#include "MyQDifferent.h"
 #include "MyQFileDir.h"
 #include "MyQExecute.h"
 
@@ -7,8 +10,10 @@ QString FastAction::DoAction() const
 {
 	QString res;
 
-	if(QString curKeyWordCommand = FastActions_ns::execute(); command.startsWith(curKeyWordCommand))
+	if(command.startsWith(FastActions_ns::execute()))
 	{
+		auto &curKeyWordCommand = FastActions_ns::execute();
+
 		QString subj(command);
 		subj.remove(0, curKeyWordCommand.size());
 		while(subj.startsWith(' ')) subj.remove(0,1);
@@ -20,9 +25,22 @@ QString FastAction::DoAction() const
 				return "for command " + curKeyWordCommand + " path ["+fiSubg.path()+"] doesn't exists";
 			else return "for command " + curKeyWordCommand + " bad file name ["+subj+"]";
 		}
-		qdbg << "MyQExecute::Execute(subj)" << subj;
+
 		if(!MyQExecute::Execute(subj))
 			return "MyQExecute::Execute("+subj+") result false";
+	}
+	else if(command.startsWith(FastActions_ns::git_extensions()))
+	{
+		auto &curKeyWordCommand = FastActions_ns::git_extensions();
+
+		QString subj(command);
+		subj.remove(0, curKeyWordCommand.size());
+		while(subj.startsWith(' ')) subj.remove(0,1);
+
+		if(!QFileInfo(subj).isDir())
+			return "for command " + curKeyWordCommand + " path ["+subj+"] doesn't exists";
+
+		GitExtensionsTool::ExecuteGitExtensions(subj, true, MyQDifferent::PathToExe()+"/files");
 	}
 	else res += "unknown command " + command;
 
@@ -77,4 +95,33 @@ QStringRefWr_const_set Features::ScanForFeatures(const QString &content)
 			result.insert(feature);
 	}
 	return result;
+}
+
+QString GitExtensionsTool::SetAndGetGitExtensionsExe(QString filesPath)
+{
+	if(GitExtensionsExe.isEmpty() && QFile::exists(filesPath+"/git_extensions_exe.txt"))
+		GitExtensionsExe = MyQFileDir::ReadFile1(filesPath+"/git_extensions_exe.txt");
+
+	if(GitExtensionsExe.isEmpty() || !QFileInfo(GitExtensionsExe).isFile())
+	{
+		QMbInfo("Программа для работы с репозиториями не обнаружена. Укажите её далее, иначе операция не возможна.");
+		GitExtensionsExe = QFileDialog::getOpenFileName(nullptr, "Укажите программу для работы с репозиториями",
+														"", "*.exe");
+		MyQFileDir::WriteFile(filesPath+"/git_extensions_exe.txt", GitExtensionsExe);
+	}
+	return GitExtensionsExe;
+}
+
+bool GitExtensionsTool::ExecuteGitExtensions(QString repoDirToOpen, bool chooseGitExensionsExeIfNeed, QString filesPath)
+{
+	auto gitExtensions = GitExtensionsExe;
+	if(chooseGitExensionsExeIfNeed)
+	{
+		gitExtensions = SetAndGetGitExtensionsExe(filesPath);
+		if(gitExtensions.isEmpty()) { QMbError("Git extensions not set"); return false; }
+	}
+
+	auto execRes = MyQExecute::Execute(gitExtensions, {repoDirToOpen});
+	if(!execRes) QMbError("Error executing gitExtensions ["+gitExtensions+"] with param ["+repoDirToOpen+"]" );
+	return execRes;
 }
