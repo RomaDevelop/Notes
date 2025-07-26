@@ -29,7 +29,6 @@ WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditor(Note &note)
 	{
 		auto editor = new WidgetNoteEditor(note);
 		editor->show();
-		existingEditors[&note] = editor;
 		return editor;
 	}
 	else
@@ -89,8 +88,6 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	QWidget(parent),
 	note {note}
 {
-	qdbg << "Редактирующие шрифт кнопки если выделен текст разных форматов делаею его весь одинаковым";
-
 	setWindowTitle(note.Name() + " - NoteEditor");
 	setAttribute(Qt::WA_DeleteOnClose);
 
@@ -369,6 +366,8 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	});
 
 	InitTimerNoteSaver();
+
+	existingEditors[&note] = this;
 }
 
 void WidgetNoteEditor::InitTimerNoteSaver()
@@ -415,29 +414,44 @@ void WidgetNoteEditor::LoadSettings()
 	QSettings settings(settingsFile, QSettings::IniFormat);
 
 	restoreGeometry(settings.value("geoNoteEditor").toByteArray());
-	static Note *previousNote = nullptr;
-	static WidgetNoteEditor *previousEditor = nullptr;
-	if(previousNote && existingEditors.count(previousNote) > 0)
+	std::vector<QPoint> existingsEditorsPoses;
+	for(auto &pair:existingEditors) if(pair.second != this and pair.second->isVisible()) existingsEditorsPoses.push_back(pair.second->pos());
+
+	auto checkPos = [&existingsEditorsPoses](const QPoint& pos) -> bool
+	{
+		for(auto &existingPos:existingsEditorsPoses)
+		{
+			if(abs(abs(existingPos.x()) - abs(pos.x())) < 10 and abs(abs(existingPos.y()) - abs(pos.y())) < 10)
+				return false;
+		}
+		return true;
+	};
+
+	if(!checkPos(pos()))
 	{
 		QScreen* editorScreen = MyQWidget::WidgetScreen(this);
-		if(!editorScreen) { QMbError("!editorScreen"); }
-		else
+		if(!editorScreen) { QMbError("!editorScreen"); return; }
+		auto screenGeo = editorScreen->geometry();
+
+		auto curPos = pos();
+		int poses = 0;
+		while(!checkPos(curPos))
 		{
-			QPoint newPos = previousEditor->pos() + QPoint(75,75);
-			auto editorScreenGeo = editorScreen->geometry();
-			if(editorScreenGeo.x() + editorScreenGeo.width() < newPos.x() + this->width() + 15
-					|| editorScreenGeo.y() + editorScreenGeo.height() < newPos.y() + this->height() + 30)
+			curPos += QPoint(75,75);
+			if(screenGeo.x() + screenGeo.width() < curPos.x() + this->width() + 20
+					|| screenGeo.y() + screenGeo.height() < curPos.y() + this->height() + 40)
 			{
-				static int addX = 0;
-				addX += 30;
-				if(addX > editorScreen->geometry().width()*0.8) addX = 30;
-				newPos = editorScreen->geometry().topLeft() + QPoint(addX,30);
+				while(curPos.y() - screenGeo.y() > 30)
+				{
+					curPos -= QPoint(1,1);
+				}
+				curPos += QPoint(30,0);
 			}
-			move(newPos);
+			poses++;
+			if(poses > 100) break;
 		}
+		move(curPos);
 	}
-	previousNote = &this->note;
-	previousEditor = this;
 }
 
 void WidgetNoteEditor::SetHaveChangesTrue(QString widget)
