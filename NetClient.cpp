@@ -175,11 +175,10 @@ void NetClient::CreateWidgets(bool show)
 	hlo1->addWidget(btnDisconnect);
 	connect(btnDisconnect,&QPushButton::clicked,[this](){ manager->deleteLater(); manager = {}; });
 
-	QPushButton *btnSqlClearNotes = new QPushButton(" clear notes ");
+	QPushButton *btnSqlClearNotes = new QPushButton(" synch ");
 	hlo1->addWidget(btnSqlClearNotes);
-	connect(btnSqlClearNotes,&QPushButton::clicked,[](){
-		QMbError("disabled");
-		//DataBase::DoSqlQuery("delete from " + Fields::Notes());
+	connect(btnSqlClearNotes,&QPushButton::clicked,[this](){
+		request_all_notes_sending();
 	});
 
 	QPushButton *btnTestSend = new QPushButton("test send");
@@ -246,7 +245,7 @@ void NetClient::WorkReaded(const QString &readed)
 
 		if(msg == NetConstants::auth_failed())
 		{
-			sessionId = 0;
+			sessionId = undefinedSessionId;
 			Error(NetConstants::auth_failed());
 		}
 		else if(msg.startsWith(NetConstants::request()))
@@ -468,16 +467,16 @@ void NetClient::request_all_notes_sending()
 	auto answFoo = [this](QString &&answContent){
 		if(answContent.size() > 1'800'000) QMbWarning("request_all_notes_sending: answContent.size() > 1'800'000");
 
-		std::set<QString> notesIdsOnServerToRemove = DataBase::NotesIdsOnServer();
-		// все заметки с клиента попали в список на удаление
+		std::set<QString> notesIdsOnServerToRemove = DataBase::NotesIdsOnServer(true);
+		// все глобальные заметки с клиента попали в список на удаление
 
 		auto notesAsStrs = NetConstants::request_all_notes_decode_answ(answContent);
 		for(auto &noteAsStr:notesAsStrs)
 		{
 			QString idOnServer;
-			UpdateNoteFromGetedNote(noteAsStr, &idOnServer);
+			CreateOrUpdateNoteFromGetedNote(noteAsStr, &idOnServer);
 			notesIdsOnServerToRemove.erase(idOnServer);
-			// или заметка есть на сервере - она удаляется из списка на удаление
+			// если заметка есть на сервере - она удаляется из списка на удаление
 		}
 
 		// удаление заметок из списка на удаление
@@ -487,17 +486,31 @@ void NetClient::request_all_notes_sending()
 		}
 	};
 
-	RequestInSock(this, NetConstants::request_all_notes(), "", answFoo);
+	RequestInSock(this, NetConstants::request_all_notes(), NetConstants::nothing(), answFoo);
 }
 
-void NetClient::UpdateNoteFromGetedNote(const QString &noteAsStr, QString *out_noteIdOnServer)
+void NetClient::CreateOrUpdateNoteFromGetedNote(const QString &noteAsStr, QString *out_noteIdOnServer)
 {
 	auto noteFromServer = Note::LoadNote(noteAsStr);
 	if(!noteFromServer) {
-		Error("UpdateNoteFromGetedNote: cant load note from data: " + noteAsStr);
+		Error("CreateOrUpdateNoteFromGetedNote: can't load note from data: " + noteAsStr);
 		MsgToServer(NetConstants::msg_error(), "UpdateNoteFromGetedNote: cant load note from data: " + noteAsStr);
 		return;
 	}
+
+	if(auto countGroups = DataBase::CountGroupsWithId(noteFromServer->groupId); countGroups == "1") {}
+	else if(countGroups == "0")
+	{
+		auto res = DataBase::TryCreateNewGlobalGroup(noteFromServer->group, noteFromServer->groupId);
+		if(res != noteFromServer->groupId.toLongLong())
+		{
+			QMbError("CreateOrUpdateNoteFromGetedNote: can't create group for note, res = " + QSn(res));
+			MsgToServer_Error("CreateOrUpdateNoteFromGetedNote: can't create group for note, res = " + QSn(res));
+			return;
+		}
+		// else все ок, ничего делать не надо
+	}
+	else QMbWarning("CreateOrUpdateNoteFromGetedNote countGroups is not 0 and not 1");
 
 	if(out_noteIdOnServer) *out_noteIdOnServer = QSn(noteFromServer->idOnServer);
 
@@ -528,12 +541,15 @@ void NetClient::UpdateNoteFromGetedNote(const QString &noteAsStr, QString *out_n
 		else
 		{
 			auto answ = MyQDialogs::CustomDialog("Notes conflict",
-												 "Geted from server note to update is older than local version. Choose action",
+												 "Note\n\n"+noteFromServer->Name()+"\n\nconflicts. Geted data from server"
+																				   " is older than local version. Choose action",
 												 {"Update", "Abort update", "Abort update and show notes"});
 			if(answ == "Update") doUpdate = true;
-			else if(answ == "Abort update") {}
+			else if(answ == "Abort update") { Note::SendNoteSavedToServer(QSn(noteFromServer->idOnServer), false); }
 			else if(answ == "Abort update and show notes")
 			{
+				Note::SendNoteSavedToServer(QSn(noteFromServer->idOnServer), false);
+
 				noteFromServer->SetName(noteFromServer->Name() + " (version from server)");
 				auto origNote = widgetMain->FindOriginalNote(noteFromServer->idOnServer);
 				if(!origNote) { QMbError("UpdateNoteFromGetedNote: !origNote"); return; }
@@ -548,6 +564,7 @@ void NetClient::UpdateNoteFromGetedNote(const QString &noteAsStr, QString *out_n
 			Log("Updating from server with newer edition of note " + noteFromServer->Name());
 			noteFromServer->id = rec[Fields::idNoteInd].toLongLong();
 			auto res = DataBase::SaveNoteOnClient(noteFromServer.get());
+			Log(noteFromServer->group + " " + noteFromServer->groupId);
 			if(res.isEmpty()) emit SignalNoteUpdated(noteFromServer->id);
 			else
 			{
@@ -582,21 +599,20 @@ void NetClient::RemoveNoteByServerCommand(const QString &idOnServer)
 											 + "\n\nWhat should to do?",
 											 {"Remove", "Remove and show after", "Move to default group"});
 		if(0) CodeMarkers::to_do("can add action show note, but need make cykle choose actoion cdialog");
-		if(answ == "Remove" || answ == "Show note after removing")
+		if(answ == "Remove" || answ == "Remove and show after")
 		{
-			Note tmpNote = note.Clone();
 			if(DataBase::RemoveNoteOnClient(QSn(note.id), true))
 			{
 				emit SignalNoteRemoved(note.id);
 			}
 			else
 			{
-				QMbError("This doesn't works now, check updates");
+				QMbError("This doesn't works now, check updates (client can't remove note)");
 				MsgToServer(NetConstants::msg_error(), "client can't remove note");
 			}
 
-			if(answ == "Show note after removing")
-				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(tmpNote);
+			if(answ == "Remove and show after")
+				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(note);
 		}
 		else if(answ == "Move to default group")
 		{
@@ -607,13 +623,13 @@ void NetClient::RemoveNoteByServerCommand(const QString &idOnServer)
 			}
 			else
 			{
-				QMbError("This doesn't works now, check updates");
+				QMbError("This doesn't works now, check updates (client can't move note to default group)");
 				MsgToServer(NetConstants::msg_error(), "client can't move note to default group");
 			}
 		}
 		else
 		{
-			QMbError("This doesn't works now, check updates");
+			QMbError("This doesn't works now, check updates (wrong answ in removindg action)");
 			MsgToServer(NetConstants::msg_error(), "wrong answ in removindg action");
 		}
 	}
@@ -684,7 +700,7 @@ void NetClient::command_remove_note_worker(QString && commandContent)
 
 void NetClient::command_update_note_worker(QString && commandContent)
 {
-	UpdateNoteFromGetedNote(commandContent, nullptr);
+	CreateOrUpdateNoteFromGetedNote(commandContent, nullptr);
 }
 
 void NetClient::request_get_note_worker(ISocket * sock, NetClient::RequestData && requestData)
@@ -709,14 +725,14 @@ QString &NetClient::PrepareTarget()
 												// 14980 - проходит, 14990 не проходит
 
 	QByteArray hmac = QMessageAuthenticationCode::hash(dtStr.toUtf8(),
-													   //NetConstants::test_passwd().toUtf8(),
-													   QString(NetConstants::test_passwd()).replace(0,1,'f').toUtf8(),
+													   NetConstants::test_passwd().toUtf8(),
+													   //QString(NetConstants::test_passwd()).replace(0,1,'f').toUtf8(),
 													   QCryptographicHash::Sha256);
-	
+
 	bufForTarget = adress;
 	bufForTarget.append("/").append(dtStr).append("&").append(hmac.toHex());
 	bufForTarget.append("&").append(QSn(sessionId).append("&").append(sessionDt));
-	
+
 	return bufForTarget;
 }
 
@@ -742,7 +758,9 @@ bool NetClient::ChekAuth(const TargetContent &targetContent)
 {
 	if(QDateTime::fromString(targetContent.dtStrRef.toString(), NetConstants::auth_date_time_format()).msecsTo(QDateTime::currentDateTime())
 			> 15000)
+	{
 		return false;
+	}
 
 	QByteArray hmacEtalon = QMessageAuthenticationCode::hash(targetContent.dtStrRef.toUtf8(),
 															 NetConstants::test_passwd().toUtf8(),
@@ -754,9 +772,9 @@ bool NetClient::ChekAuth(const TargetContent &targetContent)
 void Requester::SendInSock(ISocket * sock, QString str, bool sendEndMarker)
 {
 	CodeMarkers::can_be_optimized("takes copy, than make other copy");
-	
+
 	Log("SendInSock: sending: " + (str == " " ? "_space_" : sendEndMarker ? str + NetConstants::end_marker() : str));
-	
+
 	PrepareStringToSend(str, sendEndMarker);
 
 	Write(sock, str);
@@ -771,7 +789,7 @@ void Requester::PrepareStringToSend(QString &str, bool addEndMarker)
 void Requester::RequestInSock(ISocket *sock, const QString & requestType, QString content, Requester::AnswerWorkerFunction answWorker)
 {
 	CodeMarkers::can_be_optimized("takes copy, than make other copy");
-	
+
 	CodeMarkers::to_do("нужно удалять из requestAswerWorkers спустя время если не пришло");
 
 	if(content.isEmpty())

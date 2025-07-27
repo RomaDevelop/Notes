@@ -128,7 +128,7 @@ public:
 	void request_group_check_notes_sending(QString idGroup);
 	void request_all_notes_sending();
 
-	void UpdateNoteFromGetedNote(const QString &noteAsStr, QString *out_noteIdOnServer); // can take nullptr
+	void CreateOrUpdateNoteFromGetedNote(const QString &noteAsStr, QString *out_noteIdOnServer); // can take nullptr
 	void RemoveNoteByServerCommand(const QString &idOnServer);
 
 	declare_struct_3_fields_move(CommandData, QString, commandName, QString, content, QString, errors);

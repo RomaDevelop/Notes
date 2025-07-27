@@ -283,7 +283,8 @@ void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 	btnSynch->setFixedWidth(QFontMetrics(btnSynch->font()).horizontalAdvance(btnSynch->text()) + 20);
 	hlo1->addWidget(btnSynch);
 	connect(btnSynch, &QPushButton::clicked, [this](){
-		netClient->SynchronizeAllNotes(AllNotesVect());
+		netClient->request_all_notes_sending();
+		//netClient->SynchronizeAllNotes(AllNotesVect());
 	});
 
 	QPushButton *btnToTray = new QPushButton("To tray");
@@ -309,7 +310,7 @@ void WidgetMain::CreateTableContextMenu()
 		auto actionGroupsSubscribes = menu->addAction("Подписки на группы");
 
 		actionEditGroup->setEnabled(true);
-		if(note->group == Note::defaultGroupName2()) actionEditGroup->setEnabled(false);
+		if(note->group == Note::defaultGroupName()) actionEditGroup->setEnabled(false);
 
 		connect(actionMoveToGroup, &QAction::triggered, [note](){ note->DialogMoveToGroup(); });
 		connect(actionEditGroup, &QAction::triggered, [note](){ note->DialogEditCurrentGroup(); });
@@ -585,7 +586,6 @@ void WidgetMain::LoadNotes()
 	{
 		MakeNewNote(note, loaded);
 	}
-	netClient->SynchronizeAllNotes(AllNotesVect());
 }
 
 int WidgetMain::RowOfNote(Note * note)

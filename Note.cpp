@@ -22,10 +22,7 @@ Note::Note(QString name_, bool activeNotify_, QDateTime dtNotify_, QDateTime dtP
 	dtPostpone {std::move(dtPostpone_)}
 {}
 
-Note::~Note()
-{
-	notSavedNotes.erase(this);
-}
+
 
 QString Note::ToStrForLog()
 {
@@ -170,12 +167,14 @@ void Note::MoveToGroup(QString newGroupName)
 			}
 
 			group = std::move(newGroupName);
+			groupId = std::move(newGroupId);
 			EmitCbs(cbsGroupChanged);
 		};
 
 		this->dtLastUpdated = QDateTime::currentDateTime();
 		Note tmpNote(*this);
 		tmpNote.group = newGroupName;
+		tmpNote.groupId = newGroupId;
 		netClient->RequestToServerWithWait(NetConstants::request_create_note_on_server(), tmpNote.ToStr_v1(), std::move(answFoo));
 
 		return;
@@ -204,7 +203,8 @@ void Note::MoveToGroupOnClient(const QString &newGroupId, const QString &newGrou
 		return;
 	}
 
-	group = std::move(newGroupName);
+	group = newGroupName;
+	groupId = newGroupId;
 	EmitCbs(cbsGroupChanged);
 }
 
@@ -216,6 +216,7 @@ Note Note::Clone() const
 	note.dtNotify = dtNotify;
 	note.dtPostpone = dtPostpone;
 	note.group = group;
+	note.groupId = groupId;
 	note.id = id;
 	note.idOnServer = idOnServer;
 	note.content = content;
@@ -230,6 +231,7 @@ void Note::InitFromTmpNote(Note &note)
 	dtNotify = std::move(note.dtNotify);
 	dtPostpone = std::move(note.dtPostpone);
 	group = note.group;
+	groupId = note.groupId;
 	id = note.id;
 	idOnServer = note.idOnServer;
 	content = std::move(note.content);
@@ -243,6 +245,7 @@ void Note::InitFromRecord(QStringList &row)
 	dtNotify = QDateTime::fromString(row[Fields::dtNotifyInd], Fields::dtFormat());
 	dtPostpone = QDateTime::fromString(row[Fields::dtPostponeInd], Fields::dtFormat());
 	group = DataBase::GroupName(row[Fields::idGroupIndInNotes]);
+	groupId = row[Fields::idGroupIndInNotes];
 	id = row[Fields::idNoteInd].toInt();
 	idOnServer = row[Fields::idNoteOnServerInd].toInt();
 	content = std::move(row[Fields::contentInd]);
@@ -312,21 +315,39 @@ void Note::SaveNoteOnClient(const QString &reason)
 		return;
 	}
 
-	if(!DataBase::IsGroupLocalByName(group))
+	if(!DataBase::IsGroupLocalById(groupId))
 	{
-		notSavedNotes.insert(this);
-
-		NetClient::AnswerWorkerFunction answFoo = [this](QString &&answContent){
-			if(answContent == NetConstants::success()) notSavedNotes.erase(this);
-			else QMbWarning("Server can't save note, it saved local and will try send to server later");
-		};
-
-		if(netClient->sessionId > 0)
-			netClient->RequestToServerWithWait(NetConstants::request_note_saved(), ToStr_v1(), answFoo);
-		else QMbWarning("Server not connected, note saved local, it saved local and will try send to server later");
+		SendNoteSavedToServer(QSn(idOnServer), true);
 	}
 
 	if(!timerResaver) QMbError("invalid timerResaver");
+}
+
+void Note::SendNoteSavedToServer(QString idOnServer, bool showWarningIfServerNotConnected)
+{
+	notSendedToServerNotesIdsOnServer.insert(idOnServer);
+
+	NetClient::AnswerWorkerFunction answFoo = [idOnServer](QString &&answContent){
+		if(answContent == NetConstants::success()) notSendedToServerNotesIdsOnServer.erase(idOnServer);
+		else QMbWarning("Server can't save note, it saved local and will try send to server later");
+	};
+
+	if(!DataBase::CheckNoteIdOnServer(idOnServer))
+	{
+		// заметка была удалена, отправлять на сервер её больше не нужно
+		notSendedToServerNotesIdsOnServer.erase(idOnServer);
+		return;
+	}
+
+	Note note = DataBase::NoteByIdOnServer_make_note(idOnServer);
+
+	if(netClient->sessionId > 0)
+		netClient->RequestToServerWithWait(NetConstants::request_note_saved(), note.ToStr_v1(), answFoo);
+	else
+	{
+		if(showWarningIfServerNotConnected)
+			QMbWarning("Server not connected, note saved local, it saved local and will try send to server later");
+	}
 }
 
 std::unique_ptr<Note> Note::LoadNote(const QString &text)
@@ -375,8 +396,9 @@ Note Note::FromStr_v1(const QString &text)
 	newNote.dtNotify = QDateTime().fromString(fileParts[5], Fields::dtFormat());
 	newNote.dtPostpone = QDateTime().fromString(fileParts[6], Fields::dtFormat());
 	newNote.group = std::move(fileParts[7]);
-	newNote.content = std::move(fileParts[8]);
-	newNote.dtLastUpdated = QDateTime().fromString(fileParts[9], Fields::dtFormatLastUpated());
+	newNote.groupId = std::move(fileParts[8]);
+	newNote.content = std::move(fileParts[9]);
+	newNote.dtLastUpdated = QDateTime().fromString(fileParts[10], Fields::dtFormatLastUpated());
 	return newNote;
 }
 
@@ -391,6 +413,7 @@ QString Note::ToStr_v1() const
 	noteText.append(dtNotify.toString(Fields::dtFormat())).append(SaveKeyWods::endValue());
 	noteText.append(dtPostpone.toString(Fields::dtFormat())).append(SaveKeyWods::endValue());
 	noteText.append(group).append(SaveKeyWods::endValue());
+	noteText.append(groupId).append(SaveKeyWods::endValue());
 	noteText.append(content).append(SaveKeyWods::endValue());
 	noteText.append(dtLastUpdated.toString(Fields::dtFormatLastUpated())).append(SaveKeyWods::endValue());
 	return noteText;
@@ -427,10 +450,11 @@ void Note::LoadNotesFromFilesAndSaveInBd()
 			Note &noteRef = *note_uptr.get();
 			notes.emplace_back(std::move(noteRef));
 
-			if(notes.back().group != notes.back().defaultGroupName2())
+			if(notes.back().group != notes.back().defaultGroupName())
 			{
 				QMbWarning("note->group != note->defaultGroupName()");
-				notes.back().group = notes.back().defaultGroupName2();
+				notes.back().group = notes.back().defaultGroupName();
+				notes.back().groupId = notes.back().defaultGroupId();
 			}
 
 			DataBase::InsertNoteInClientDB(&notes.back());
@@ -480,14 +504,21 @@ void Note::InitTimerResaverNotSavedNotes(QWidget *parent)
 	if(!timerResaver)
 	{
 		timerResaver = new QTimer(parent);
+		static auto timerSender = new QTimer(parent);
+
+		static std::queue<QString> toSend;
 		QObject::connect(timerResaver, &QTimer::timeout, parent, [](){
-			while(!notSavedNotes.empty())
-			{
-				Note *note = *notSavedNotes.begin();
-				note->SaveNoteOnClient("ResaveNotSavedNotes");
-			}
+			for(auto &idOnServer:notSendedToServerNotesIdsOnServer) toSend.push(idOnServer);
 		});
 		timerResaver->start(5000);
+
+		QObject::connect(timerSender, &QTimer::timeout, parent, [](){
+			if(toSend.empty()) return;
+
+			SendNoteSavedToServer(std::move(toSend.front()), false);
+			toSend.pop();
+		});
+		timerSender->start(300);
 	}
 }
 

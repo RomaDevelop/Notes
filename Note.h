@@ -30,7 +30,7 @@ private:
 public:
 	Note() = default;
 	Note(QString name_, bool activeNotify_, QDateTime dtNotify_, QDateTime dtPostpone_, QString content_);
-	~Note();
+	~Note() {}
 
 	qint64 id = -1;
 	qint64 idOnServer = -1;
@@ -38,12 +38,14 @@ public:
 
 	QString ToStrForLog();
 
-	inline static const QString& defaultGroupName2() { static QString str = "defaultGroup"; return str; }
+	inline static const QString& defaultGroupName() { static QString str = "defaultGroup"; return str; }
+	inline static const QString& defaultGroupId() { static QString str = "0"; return str; }
 	void DialogMoveToGroup();
 	void DialogEditCurrentGroup();
 	void DialogCreateNewGroup();
 
-	QString group = defaultGroupName2();
+	QString group = defaultGroupName();
+	QString groupId = defaultGroupId();
 	void MoveToGroup(QString newGroupName);
 	void MoveToGroupOnClient(const QString &newGroupId, const QString &newGroupName);
 
@@ -72,6 +74,7 @@ public:
 	static const QString& StartText() { static QString str = "Введите текст"; return str; }
 
 	void SaveNoteOnClient(const QString &reason);
+	static void SendNoteSavedToServer(QString idOnServer, bool showWarningIfServerNotConnected);
 	static std::unique_ptr<Note> LoadNote(const QString &text);
 	static Note FromStr_v1(const QString &text);
 	QString ToStr_v1() const;
@@ -93,7 +96,7 @@ public:
 	void ShowMenuFastActions(QWidget *widgetToShowUnder);
 
 	inline static NetClient *netClient = nullptr;
-	inline static std::set<Note*> notSavedNotes;
+	inline static std::set<QString> notSendedToServerNotesIdsOnServer;
 	inline static QTimer *timerResaver = nullptr;
 	static void InitTimerResaverNotSavedNotes(QWidget *parent);
 
