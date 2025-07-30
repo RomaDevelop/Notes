@@ -96,8 +96,8 @@ public:
 	void ShowMenuFastActions(QWidget *widgetToShowUnder);
 
 	inline static NetClient *netClient = nullptr;
-	inline static std::set<QString> notSendedToServerNotesIdsOnServer;
-	inline static QTimer *timerResaver = nullptr;
+
+	inline static QTimer *timerResaverChecker = nullptr;
 	static void InitTimerResaverNotSavedNotes(QWidget *parent);
 
 // cbs

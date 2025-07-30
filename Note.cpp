@@ -320,24 +320,30 @@ void Note::SaveNoteOnClient(const QString &reason)
 		SendNoteSavedToServer(QSn(idOnServer), true);
 	}
 
-	if(!timerResaver) QMbError("invalid timerResaver");
+	if(!timerResaverChecker) QMbError("invalid timerResaver");
 }
 
 void Note::SendNoteSavedToServer(QString idOnServer, bool showWarningIfServerNotConnected)
 {
-	notSendedToServerNotesIdsOnServer.insert(idOnServer);
-
-	NetClient::AnswerWorkerFunction answFoo = [idOnServer](QString &&answContent){
-		if(answContent == NetConstants::success()) notSendedToServerNotesIdsOnServer.erase(idOnServer);
-		else QMbWarning("Server can't save note, it saved local and will try send to server later");
-	};
-
-	if(!DataBase::CheckNoteIdOnServer(idOnServer))
+	if(auto count = DataBase::CountNoteIdOnServer(idOnServer); count == 0)
 	{
 		// заметка была удалена, отправлять на сервер её больше не нужно
-		notSendedToServerNotesIdsOnServer.erase(idOnServer);
 		return;
 	}
+	else if(count == 1) {}
+	else { QMbError("SendNoteSavedToServer bad idOnServer count " + QSn(count)); return; }
+
+	DataBase::SetNoteNotSendedToServer(idOnServer, true);
+
+	NetClient::AnswerWorkerFunction answFoo = [idOnServer](QString &&answContent){
+		if(answContent == NetConstants::success())
+		{
+			if(DataBase::CountNoteIdOnServer(idOnServer) == 1)
+				DataBase::SetNoteNotSendedToServer(idOnServer, false);
+			//else note now not exists, nothing to do
+		}
+		else QMbWarning("Server can't save note, it saved local and will try send to server later");
+	};
 
 	Note note = DataBase::NoteByIdOnServer_make_note(idOnServer);
 
@@ -501,22 +507,25 @@ void Note::ShowMenuFastActions(QWidget *widgetToShowUnder)
 
 void Note::InitTimerResaverNotSavedNotes(QWidget *parent)
 {
-	if(!timerResaver)
+	if(!timerResaverChecker)
 	{
-		timerResaver = new QTimer(parent);
-		static auto timerSender = new QTimer(parent);
+		timerResaverChecker = new QTimer(parent);
 
-		static std::queue<QString> toSend;
-		QObject::connect(timerResaver, &QTimer::timeout, parent, [](){
-			for(auto &idOnServer:notSendedToServerNotesIdsOnServer) toSend.push(idOnServer);
+		static QStringList toSendIds;
+		QObject::connect(timerResaverChecker, &QTimer::timeout, parent, [](){
+			if(!netClient or netClient->sessionId == NetClient::undefinedSessionId) return;
+
+			toSendIds = DataBase::NotesNotSendedToServer();
 		});
-		timerResaver->start(5000);
+		timerResaverChecker->start(5000);
 
+		static auto timerSender = new QTimer(parent);
 		QObject::connect(timerSender, &QTimer::timeout, parent, [](){
-			if(toSend.empty()) return;
+			if(!netClient or netClient->sessionId == NetClient::undefinedSessionId) return;
+			if(toSendIds.isEmpty()) return;
 
-			SendNoteSavedToServer(std::move(toSend.front()), false);
-			toSend.pop();
+			SendNoteSavedToServer(std::move(toSendIds.back()), false);
+			toSendIds.removeLast();
 		});
 		timerSender->start(300);
 	}
