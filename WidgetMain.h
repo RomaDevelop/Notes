@@ -38,6 +38,7 @@ public:
 
 	virtual void CreateNewNote() override;
 	virtual void ShowMainWindow() override;
+	virtual void MostOpenedNotes() override;
 
 	Note* FindOriginalNote(qint64 idNoteOnServer);
 
@@ -69,6 +70,7 @@ private:
 	Note* NoteOfRow(int row);
 	Note* NoteOfCurrentRow();
 	NoteInMain* NoteById(qint64 id);
+	NoteInMain* NoteByIdOnServer(qint64 idOnServer);
 	int NoteIndexInWidgetMainNotes(Note* note, bool showError);
 
 	enum newNoteReason { loaded, created };

@@ -132,6 +132,11 @@ void WidgetAlarms::CreateBottomRow(QHBoxLayout *hlo)
 	hlo->addWidget(btnShowMainWindow);
 	connect(btnShowMainWindow, &QPushButton::clicked, this, [this](){ notesOwner->ShowMainWindow(); });
 
+	auto btnMostOpenedNotes = new QToolButton();
+	btnMostOpenedNotes->setIcon(QIcon(Resources::list_mo().GetPathName()));
+	hlo->addWidget(btnMostOpenedNotes);
+	connect(btnMostOpenedNotes, &QPushButton::clicked, this, [this](){ notesOwner->MostOpenedNotes(); });
+
 	auto btnAdd = new QToolButton();
 	btnAdd->setIcon(QIcon(Resources::add().GetPathName()));
 	hlo->addWidget(btnAdd);

@@ -22,9 +22,12 @@
 #include "MyQDialogs.h"
 
 #include "FastActions.h"
+#include "DataBase.h"
 
 WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditor(Note &note)
 {
+	DataBase::AddOpensCount(QSn(note.id), 1);
+
 	if(auto existingEditor = existingEditors.find(&note); existingEditor == existingEditors.end())
 	{
 		auto editor = new WidgetNoteEditor(note);
@@ -47,7 +50,7 @@ WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditor(Note &note)
 	}
 }
 
-WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(Note &note)
+WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(Note note)
 {
 	std::shared_ptr<Note> tmpNote = std::make_shared<Note>(note.Name(), note.activeNotify,
 														   note.DTNotify(), note.DTPostpone(), note.Content());
@@ -422,8 +425,12 @@ void WidgetNoteEditor::LoadSettings()
 		for(auto &existingPos:existingsEditorsPoses)
 		{
 			if(abs(abs(existingPos.x()) - abs(pos.x())) < 10 and abs(abs(existingPos.y()) - abs(pos.y())) < 10)
+			{
+				//qdbg << "checkPos false";
 				return false;
+			}
 		}
+		//qdbg << "checkPos true";
 		return true;
 	};
 

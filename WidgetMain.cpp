@@ -217,6 +217,12 @@ WidgetMain::~WidgetMain()
 
 void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 {
+// Most opened notes
+	auto btnMostOpenedNotes = new QToolButton();
+	btnMostOpenedNotes->setIcon(QIcon(Resources::list_mo().GetPathName()));
+	hlo1->addWidget(btnMostOpenedNotes);
+	connect(btnMostOpenedNotes, &QPushButton::clicked, this, [this](){ MostOpenedNotes(); });
+
 // Add
 	QToolButton *btnPlus = new QToolButton();
 	btnPlus->setIcon(QIcon(Resources::add().GetPathName()));
@@ -458,6 +464,8 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 	MyQDialogs::MenuUnderWidget(btn, std::move(items));
 }
 
+
+
 void WidgetMain::closeEvent(QCloseEvent * event)
 {
 	auto answ = MyQDialogs::CustomDialog("Завершение работы приложения","Вы уверены, что хотите завершить работу приложения?"
@@ -499,6 +507,31 @@ void WidgetMain::ShowMainWindow()
 {
 	this->showNormal();
 	PlatformDependent::SetTopMostFlash(this);
+}
+
+void WidgetMain::MostOpenedNotes()
+{
+	auto ids = DataBase::NotesIdsOrderedByOpensCount();
+	std::vector<Note*> notes;
+	for(auto &id:ids)
+	{
+		auto noteInMain = NoteById(id.toLongLong());
+		if(noteInMain) notes.push_back(noteInMain->note.get());
+		if(notes.size() == 20) break;
+	}
+
+	QStringList names;
+	for(auto &note:notes)
+	{
+		names += note->Name();
+	}
+
+	auto answ = MyQDialogs::ListDialog("Most opened notes", names);
+	if(answ.accepted)
+	{
+		Note &noteRef = *notes[answ.index];
+		WidgetNoteEditor::MakeOrShowNoteEditor(noteRef);
+	}
 }
 
 Note *WidgetMain::FindOriginalNote(qint64 idNoteOnServer)
@@ -627,6 +660,16 @@ NoteInMain * WidgetMain::NoteById(qint64 id)
 	for(auto &note:notes)
 	{
 		if(note->note->id == id) return note.get();
+	}
+	return nullptr;
+}
+
+NoteInMain *WidgetMain::NoteByIdOnServer(qint64 idOnServer)
+{
+	qdbg << "NoteByIdOnServer!!! нельзя использщовать пока не откажусь от id on clinet!!!";
+	for(auto &note:notes)
+	{
+		if(note->note->idOnServer == idOnServer) return note.get();
 	}
 	return nullptr;
 }

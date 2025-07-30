@@ -123,6 +123,7 @@ public:
 
 	virtual void CreateNewNote() = 0;
 	virtual void ShowMainWindow() = 0;
+	virtual void MostOpenedNotes() = 0;
 };
 
 #endif // NOTE_H
