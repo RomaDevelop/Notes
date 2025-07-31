@@ -492,6 +492,8 @@ void WidgetNoteEditor::SaveNoteFromEditor(bool forceSave)
 	haveChanges = false;
 	lastSaveDid = QDateTime::currentDateTime();
 	labelStatus->setText("Saved at " + lastSaveDid.toString(DateTimeFormat) + " saved index ("+QSn(++savedCount)+")");
+
+	if(0) CodeMarkers::to_do("при вызове этой функции коллбеки обновления вызываются несколько раз, лишняя работа");
 }
 
 

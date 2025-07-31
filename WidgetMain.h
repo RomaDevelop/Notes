@@ -40,7 +40,7 @@ public:
 	virtual void ShowMainWindow() override;
 	virtual void MostOpenedNotes() override;
 
-	Note* FindOriginalNote(qint64 idNoteOnServer);
+	Note* FindOriginalNote(qint64 idNote);
 
 private:
 	NetClient *netClient;
@@ -70,11 +70,10 @@ private:
 	Note* NoteOfRow(int row);
 	Note* NoteOfCurrentRow();
 	NoteInMain* NoteById(qint64 id);
-	NoteInMain* NoteByIdOnServer(qint64 idOnServer);
 	int NoteIndexInWidgetMainNotes(Note* note, bool showError);
 
 	enum newNoteReason { loaded, created };
-	Note& MakeNewNote(Note noteSrc, newNoteReason reason);
+	Note& MakeNewNote(Note noteSrc);
 	int MakeWidgetsForMainTable(NoteInMain &newNote); // returns index
 	void UpdateWidgetsFromNote(NoteInMain &note);
 

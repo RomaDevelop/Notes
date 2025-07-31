@@ -23,6 +23,7 @@ struct Note
 private:
 	QString name;
 	QString content;
+	QDateTime dtCreated;
 	QDateTime dtNotify = QDateTime::currentDateTime();
 	QDateTime dtPostpone = QDateTime::currentDateTime();
 	QDateTime dtLastUpdated;
@@ -32,9 +33,7 @@ public:
 	Note(QString name_, bool activeNotify_, QDateTime dtNotify_, QDateTime dtPostpone_, QString content_);
 	~Note() {}
 
-	qint64 id = -1;
-	qint64 idOnServer = -1;
-	inline static const int idMarkerCreateNewNote = -2;
+	qint64 id = std::numeric_limits<qint64>::min();
 
 	QString ToStrForLog();
 
@@ -47,7 +46,8 @@ public:
 	QString group = defaultGroupName();
 	QString groupId = defaultGroupId();
 	void MoveToGroup(QString newGroupName);
-	void MoveToGroupOnClient(const QString &newGroupId, const QString &newGroupName);
+	void UpdateNote_group(const QString &newGroupId, const QString &newGroupName, QDateTime newDtLastUpdated);
+	void UpdateNote_id_group(qint64 newNoteId, QString newGroupId, QString newGroupName, QDateTime newDtLastUpdated);
 
 	Note Clone() const;
 	void InitFromTmpNote(Note &note);
@@ -62,24 +62,28 @@ public:
 	const QString& Content() { return content; }
 	void SetContent(QString content);
 
+	QDateTime DTCreated() const { return dtCreated; }
+	QString DTCreatedStr() const { return dtCreated.toString(Fields::dtFormat()); }
+	void SetDTCreated(QDateTime dtCreated) { this->dtCreated = std::move(dtCreated); }
+	void SetDTCreatedFromStr(QString dtCreated) { this->dtCreated = QDateTime::fromString(dtCreated, Fields::dtFormat()); }
+
 	QDateTime DTNotify() { return dtNotify; }
 	QDateTime DTPostpone() { return dtPostpone; }
 	bool CmpDTs(const QDateTime &dtNotify, const QDateTime &dtPostpone);
 	void SetDT(QDateTime dtNotify, QDateTime dtPostpone);
 
-	QString DtLastUpdatedStr() { return dtLastUpdated.toString(Fields::dtFormatLastUpated()); }
 	QDateTime DtLastUpdated() { return dtLastUpdated; }
+	QString DtLastUpdatedStr() { return dtLastUpdated.toString(Fields::dtFormatLastUpdated()); }
 	void SetDtLastUpdated(QDateTime dt) { dtLastUpdated = std::move(dt); }
 
 	static const QString& StartText() { static QString str = "Введите текст"; return str; }
 
 	void SaveNoteOnClient(const QString &reason);
-	static void SendNoteSavedToServer(QString idOnServer, bool showWarningIfServerNotConnected);
+	static void SendNoteSavedToServer(QString id, bool showWarningIfServerNotConnected);
 	static std::unique_ptr<Note> LoadNote(const QString &text);
 	static Note FromStr_v1(const QString &text);
 	QString ToStr_v1() const;
 	static std::vector<Note> LoadNotes();
-	static void LoadNotesFromFilesAndSaveInBd();
 
 	inline static std::map<int, std::function<Note(const QString &text)>> loadsFunctionsMap;
 	static void InitLoadsFooMap()

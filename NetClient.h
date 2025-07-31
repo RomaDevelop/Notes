@@ -95,7 +95,7 @@ public:
 	void CreateWidgets(bool show);
 	void CreateSocket();
 
-	virtual void Write(ISocket * /*sock*/, const QString &str) override;
+	virtual void Write(ISocket *sock, const QString &str) override;
 
 public slots:
 	void SlotReadyRead(QNetworkReply *reply);
@@ -115,21 +115,21 @@ public:
 
 	void RequestToServerWithWait(const QString &requestType, QString content, AnswerWorkerFunction answWorker);
 
-	void SynchronizeAllNotes(std::vector<Note*> allClientNotes);
-private:
-	std::queue<NetConstants::SynchData> synchQueue;
-	static const QString& EndAllNotesMarker() { static QString str = "EndAllNotesMarker"; return str; }
-	QTimer *timerSynch = nullptr;
-	void SynchFromQueue();
+	//void SynchronizeAllNotes(std::vector<Note*> allClientNotes);
+//private:
+//	std::queue<NetConstants::SynchData> synchQueue;
+//	static const QString& EndAllNotesMarker() { static QString str = "EndAllNotesMarker"; return str; }
+//	QTimer *timerSynch = nullptr;
+//	void SynchFromQueue();
 
 public:
 	void RequestGetSessionId();
 
-	void request_group_check_notes_sending(QString idGroup);
+	//void request_group_check_notes_sending(QString idGroup);
 	void request_all_notes_sending();
 
 	void CreateOrUpdateNoteFromGetedNote(const QString &noteAsStr, QString *out_noteIdOnServer); // can take nullptr
-	void RemoveNoteByServerCommand(const QString &idOnServer);
+	void RemoveNoteByServerCommand(const QString &idNote);
 
 	declare_struct_3_fields_move(CommandData, QString, commandName, QString, content, QString, errors);
 	void CommandsToClientWorker(QString text);

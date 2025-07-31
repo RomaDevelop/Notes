@@ -438,10 +438,25 @@ bool WidgetMain::DialogGroupsSubscribes()
 
 void WidgetMain::SlotTest()
 {
-	//auto clone = notes[0]->note->Clone();
-	//clone.SetName("123 new name " + QDateTime::currentDateTime().toString());
-	//clone.SetDtLastUpdated(clone.DtLastUpdated().addSecs(+10));
-	//netClient->UpdateNoteFromGetedNote(clone.ToStr_v1(), nullptr);
+//	auto ids = DataBase::DoSqlQueryGetFirstField("select "+Fields::idNote()+" from "+Fields::Notes()+" order by "+Fields::idNote());
+//	QDateTime dt = QDateTime::currentDateTime().addDays(-275);
+//	for(auto &id:ids)
+//	{
+
+//		auto r = DataBase::MakeUpdateRequestOneField(Fields::Notes(), Fields::dtCreated(), dt.toString(Fields::dtFormat()),
+//													 Fields::idNote(), id);
+//		DataBase::DoSqlQuery(r.first, r.second);
+
+//		dt = dt.addDays(1);
+//	}
+
+//	auto ids = DataBase::DoSqlQueryGetFirstField("select "+Fields::idNote()+" from "+Fields::Notes()+" order by "+Fields::dtCreated());
+//	int newid = -1;
+//	for(auto &id:ids)
+//	{
+//		DataBase::DoSqlQuery("UPDATE "+Fields::Notes()+" SET "+Fields::idNote()+" = "+QSn(newid--)
+//							 +" WHERE "+Fields::idNote()+" = " + id);
+//	}
 }
 
 void WidgetMain::SlotMenu(QPushButton *btn)
@@ -495,8 +510,12 @@ void WidgetMain::CreateNewNote()
 	auto dt = QDateTime::currentDateTime();
 
 	Note tmpNote(newName, false, dt, dt.addSecs(3600), Note::StartText());
+	tmpNote.SetDTCreated(QDateTime::currentDateTime());
 
-	auto &newNote = MakeNewNote(tmpNote, created);
+	auto insRes = DataBase::InsertNoteInDB(&tmpNote, true);
+	if(!insRes.isEmpty()) { QMbError("CreateNewNote error insert result: "+insRes); return; }
+
+	auto &newNote = MakeNewNote(tmpNote);
 
 	table->setCurrentCell(RowOfNote(&newNote), 0);
 
@@ -534,10 +553,10 @@ void WidgetMain::MostOpenedNotes()
 	}
 }
 
-Note *WidgetMain::FindOriginalNote(qint64 idNoteOnServer)
+Note *WidgetMain::FindOriginalNote(qint64 idNote)
 {
 	for(auto &note:notes)
-		if(note->note->idOnServer == idNoteOnServer) return note->note.get();
+		if(note->note->id == idNote) return note->note.get();
 	return nullptr;
 }
 
@@ -617,7 +636,7 @@ void WidgetMain::LoadNotes()
 	auto notes = Note::LoadNotes();
 	for(auto &note:notes)
 	{
-		MakeNewNote(note, loaded);
+		MakeNewNote(note);
 	}
 }
 
@@ -664,16 +683,6 @@ NoteInMain * WidgetMain::NoteById(qint64 id)
 	return nullptr;
 }
 
-NoteInMain *WidgetMain::NoteByIdOnServer(qint64 idOnServer)
-{
-	qdbg << "NoteByIdOnServer!!! нельзя использщовать пока не откажусь от id on clinet!!!";
-	for(auto &note:notes)
-	{
-		if(note->note->idOnServer == idOnServer) return note.get();
-	}
-	return nullptr;
-}
-
 int WidgetMain::NoteIndexInWidgetMainNotes(Note * note, bool showError)
 {
 	for(uint index=0; index<notes.size(); index++)
@@ -686,7 +695,7 @@ int WidgetMain::NoteIndexInWidgetMainNotes(Note * note, bool showError)
 
 
 
-Note & WidgetMain::MakeNewNote(Note noteSrc, newNoteReason reason)
+Note & WidgetMain::MakeNewNote(Note noteSrc)
 {
 	notes.emplace_back(std::unique_ptr<NoteInMain>(new NoteInMain));
 	NoteInMain &newNoteInMainRef = *notes.back().get();
@@ -697,17 +706,13 @@ Note & WidgetMain::MakeNewNote(Note noteSrc, newNoteReason reason)
 
 	MakeWidgetsForMainTable(newNoteInMainRef);
 
-	if(reason == created)
-	{
-		newNote->id = Note::idMarkerCreateNewNote;
-		newNote->SaveNoteOnClient("MakeNewNote-doSave");
-	}
+	auto makeSaveMoteFoo = [newNote](QString saveMsg){
+		return [newNote, saveMsg = std::move(saveMsg)](void*){ newNote->SaveNoteOnClient(saveMsg); };
+	};
 
-	auto saveNoteFoo = [newNote](void*){ newNote->SaveNoteOnClient("saveNoteFoo"); };
-
-	newNote->AddCBNameUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
-	newNote->AddCBContentUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
-	newNote->AddCBDTUpdated(saveNoteFoo, &newNoteInMainRef, newNoteInMainRef.cbCounter);
+	newNote->AddCBNameUpdated(makeSaveMoteFoo("name updated"), &newNoteInMainRef, newNoteInMainRef.cbCounter);
+	newNote->AddCBContentUpdated(makeSaveMoteFoo("content updated"), &newNoteInMainRef, newNoteInMainRef.cbCounter);
+	newNote->AddCBDTUpdated(makeSaveMoteFoo("dt updated"), &newNoteInMainRef, newNoteInMainRef.cbCounter);
 
 	newNote->removeNoteWorker = [this, newNote](){
 		RemoveNote(newNote, true);
@@ -826,7 +831,7 @@ bool WidgetMain::RemoveNoteSQLOnClient(Note * note)
 
 	// если локальная заметка
 	if(DataBase::IsGroupLocalByName(note->group)) {
-		DataBase::RemoveNoteOnClient(QSn(note->id), true);
+		DataBase::RemoveNote(QSn(note->id), true);
 		return true;
 	}
 	// если сетевая
@@ -835,7 +840,7 @@ bool WidgetMain::RemoveNoteSQLOnClient(Note * note)
 		auto answFoo = [this, note](QString &&answContent){
 			if(answContent == NetConstants::success())
 			{
-				if(DataBase::RemoveNoteOnClient(QSn(note->id), true))
+				if(DataBase::RemoveNote(QSn(note->id), true))
 					RemoveNoteInMainWidget(note);
 				else
 				{
@@ -845,7 +850,7 @@ bool WidgetMain::RemoveNoteSQLOnClient(Note * note)
 			else QMbError("Can't remove note, bad server answ");
 		};
 
-		netClient->RequestToServerWithWait(NetConstants::request_remove_note(), QSn(note->idOnServer), std::move(answFoo));
+		netClient->RequestToServerWithWait(NetConstants::request_remove_note(), QSn(note->id), std::move(answFoo));
 		return false;
 	}
 }
@@ -907,9 +912,9 @@ void WidgetMain::SlotForNetClientNoteChangedGroupOrUpdated(qint64 id)
 
 void WidgetMain::SlotForNetClientNewNoteAppeared(qint64 id)
 {
-	auto rec = DataBase::NoteByIdOnClient(QSn(id));
+	auto rec = DataBase::NoteById(QSn(id));
 	if(rec.isEmpty()) { QMbError("SlotForNetClientNewNoteAppeared note not found"); return; }
-	else MakeNewNote(Note::CreateFromRecord(rec), loaded);
+	else MakeNewNote(Note::CreateFromRecord(rec));
 }
 
 

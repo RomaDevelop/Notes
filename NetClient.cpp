@@ -47,9 +47,9 @@ NetClient::NetClient(WidgetMain *aWidgetMain, QObject *parent) :
 
 	CreateSocket();
 
-	timerSynch = new QTimer(this);
-	connect(timerSynch, &QTimer::timeout, [this](){ SynchFromQueue(); });
-	timerSynch->start(100);
+//	timerSynch = new QTimer(this);
+//	connect(timerSynch, &QTimer::timeout, [this](){ SynchFromQueue(); });
+//	timerSynch->start(100);
 }
 
 NetClient::~NetClient()
@@ -354,81 +354,81 @@ void NetClient::RequestToServerWithWait(const QString & requestType, QString con
 	RequestInSock(this, requestType, content, std::move(answFoo));
 }
 
-void NetClient::SynchronizeAllNotes(std::vector<Note*> allClientNotes)
-{
-	if(0) CodeMarkers:: to_do("склейку запросов на синхронизацию для одной заметки");
-	for(auto &note:allClientNotes)
-	{
-		if(DataBase::IsGroupLocalByName(note->group)) continue;
-		synchQueue.emplace(NetConstants::SynchData(QSn(note->idOnServer), note->DtLastUpdatedStr()));
-	}
-	if(!synchQueue.empty())
-		synchQueue.emplace(NetConstants::SynchData(EndAllNotesMarker(), {}));
-	else Log("SynchronizeAllNotes called. Nothing to synch");
-}
+//void NetClient::SynchronizeAllNotes(std::vector<Note*> allClientNotes)
+//{
+//	if(0) CodeMarkers:: to_do("склейку запросов на синхронизацию для одной заметки");
+//	for(auto &note:allClientNotes)
+//	{
+//		if(DataBase::IsGroupLocalByName(note->group)) continue;
+//		synchQueue.emplace(NetConstants::SynchData(QSn(note->idOnServer), note->DtLastUpdatedStr()));
+//	}
+//	if(!synchQueue.empty())
+//		synchQueue.emplace(NetConstants::SynchData(EndAllNotesMarker(), {}));
+//	else Log("SynchronizeAllNotes called. Nothing to synch");
+//}
 
-void NetClient::SynchFromQueue()
-{
-	if(sessionId <= 0) return;
-	if(synchQueue.empty()) return;
+//void NetClient::SynchFromQueue()
+//{
+//	if(sessionId <= 0) return;
+//	if(synchQueue.empty()) return;
 
-	bool endAllNotesMarkerFound = false;
-	std::vector<NetConstants::SynchData> datas;
-	for(int i=0; i<10 && !synchQueue.empty(); i++)
-	{
-		if(synchQueue.front().idOnServer == EndAllNotesMarker())
-		{
-			endAllNotesMarkerFound = true;
-		}
-		else
-		{
-			datas.push_back(std::move(synchQueue.front()));
-		}
+//	bool endAllNotesMarkerFound = false;
+//	std::vector<NetConstants::SynchData> datas;
+//	for(int i=0; i<10 && !synchQueue.empty(); i++)
+//	{
+//		if(synchQueue.front().idOnServer == EndAllNotesMarker())
+//		{
+//			endAllNotesMarkerFound = true;
+//		}
+//		else
+//		{
+//			datas.push_back(std::move(synchQueue.front()));
+//		}
 
-		synchQueue.pop();
-	}
-	QString request = NetConstants::MakeRequest_synch_note(datas);
-	if(request.isEmpty()) { Error("SynchFromQueue result MakeRequest_synch_note is empty"); return; }
+//		synchQueue.pop();
+//	}
+//	QString request = NetConstants::MakeRequest_synch_note(datas);
+//	if(request.isEmpty()) { Error("SynchFromQueue result MakeRequest_synch_note is empty"); return; }
 
-	AnswerWorkerFunction answFoo = [this, datas_ = std::move(datas)](QString &&answContent){
-		if(0) CodeMarkers::to_do("опасность, тут может быть обращение к уже уничтоженной заметке");
-		if(answContent == NetConstants::not_did())
-		{
-			Error("geted result not_did for synch");
-			return;
-		}
+//	AnswerWorkerFunction answFoo = [this, datas_ = std::move(datas)](QString &&answContent){
+//		if(0) CodeMarkers::to_do("опасность, тут может быть обращение к уже уничтоженной заметке");
+//		if(answContent == NetConstants::not_did())
+//		{
+//			Error("geted result not_did for synch");
+//			return;
+//		}
 
-		auto results = answContent.split(',');
-		if(results.size() != (int)datas_.size())
-		{
-			Error("synch result geted bad size: "+QSn(results.size())+"; in request were "+QSn(datas_.size()));
-			MsgToServer(NetConstants::msg_error(), "synch result geted bad size: "+QSn(results.size())+"; in request were "+QSn(datas_.size()));
-			return;
-		}
+//		auto results = answContent.split(',');
+//		if(results.size() != (int)datas_.size())
+//		{
+//			Error("synch result geted bad size: "+QSn(results.size())+"; in request were "+QSn(datas_.size()));
+//			MsgToServer(NetConstants::msg_error(), "synch result geted bad size: "+QSn(results.size())+"; in request were "+QSn(datas_.size()));
+//			return;
+//		}
 
-		for(int i=0; i<results.size(); i++)
-		{
-			if(results[i] == NetConstants::request_synch_res_success())
-				Log("получен ответ об успшной обработке запроса на синхронизацию заметки " + datas_[i].idOnServer);
-			else if(results[i] == NetConstants::request_synch_res_error())
-				Error("geted bad result for synch "+datas_[i].idOnServer);
-			else
-			{
-				Error("synch result unknown value: "+results[i]);
-				MsgToServer(NetConstants::msg_error(), "synch result unknown value: "+results[i]);
-			}
-		}
-	};
+//		for(int i=0; i<results.size(); i++)
+//		{
+//			if(results[i] == NetConstants::request_synch_res_success())
+//				Log("получен ответ об успшной обработке запроса на синхронизацию заметки " + datas_[i].idOnServer);
+//			else if(results[i] == NetConstants::request_synch_res_error())
+//				Error("geted bad result for synch "+datas_[i].idOnServer);
+//			else
+//			{
+//				Error("synch result unknown value: "+results[i]);
+//				MsgToServer(NetConstants::msg_error(), "synch result unknown value: "+results[i]);
+//			}
+//		}
+//	};
 
-	RequestInSock(this, NetConstants::request_synch_note(), request, std::move(answFoo));
+//	RequestInSock(this, NetConstants::request_synch_note(), request, std::move(answFoo));
 
-	if(endAllNotesMarkerFound)
-	{
-		MsgToServer(NetConstants::msg_all_client_notes_synch_sended(), {});
+//	if(endAllNotesMarkerFound)
+//	{
+//		MsgToServer(NetConstants::msg_all_client_notes_synch_sended(), {});
 
-		MsgToServer(NetConstants::msg_highest_idOnServer(), DataBase::HighestIdOnServer());
-	}
-}
+//		MsgToServer(NetConstants::msg_highest_idOnServer(), DataBase::HighestIdOnServer());
+//	}
+//}
 
 void NetClient::RequestGetSessionId()
 {
@@ -445,29 +445,29 @@ void NetClient::RequestGetSessionId()
 	RequestInSock(this, NetConstants::request_get_session(), NetConstants::nothing(), answ);
 }
 
-void NetClient::request_group_check_notes_sending(QString idGroup)
-{
-	auto answFoo = [this](QString &&answContent){
-		if(answContent != NetConstants::success())
-		{
-			Error("get bad answ for request_group_check_notes_sending: " + answContent);
-			MsgToServer_Error("get bad answ for request_group_check_notes_sending: " + answContent);
-		}
-	};
+//void NetClient::request_group_check_notes_sending(QString idGroup)
+//{
+//	auto answFoo = [this](QString &&answContent){
+//		if(answContent != NetConstants::success())
+//		{
+//			Error("get bad answ for request_group_check_notes_sending: " + answContent);
+//			MsgToServer_Error("get bad answ for request_group_check_notes_sending: " + answContent);
+//		}
+//	};
 
-	auto ids_dtsUpdated = DataBase::NotesFromGroup_id_dtUpdated(idGroup);
-	RequestInSock(this,
-				  NetConstants::request_group_check_notes(),
-				  NetConstants::request_group_check_notes_prepare(std::move(idGroup), ids_dtsUpdated),
-				  answFoo);
-}
+//	auto ids_dtsUpdated = DataBase::NotesFromGroup_id_dtUpdated(idGroup);
+//	RequestInSock(this,
+//				  NetConstants::request_group_check_notes(),
+//				  NetConstants::request_group_check_notes_prepare(std::move(idGroup), ids_dtsUpdated),
+//				  answFoo);
+//}
 
 void NetClient::request_all_notes_sending()
 {
 	auto answFoo = [this](QString &&answContent){
 		if(answContent.size() > 1'800'000) QMbWarning("request_all_notes_sending: answContent.size() > 1'800'000");
 
-		std::set<QString> notesIdsOnServerToRemove = DataBase::NotesIdsOnServer(true);
+		std::set<QString> notesIdsToRemove = DataBase::NotesIds(true);
 		// все глобальные заметки с клиента попали в список на удаление
 
 		auto notesAsStrs = NetConstants::request_all_notes_decode_answ(answContent);
@@ -475,14 +475,14 @@ void NetClient::request_all_notes_sending()
 		{
 			QString idOnServer;
 			CreateOrUpdateNoteFromGetedNote(noteAsStr, &idOnServer);
-			notesIdsOnServerToRemove.erase(idOnServer);
+			notesIdsToRemove.erase(idOnServer);
 			// если заметка есть на сервере - она удаляется из списка на удаление
 		}
 
 		// удаление заметок из списка на удаление
-		for(auto &noteIdOnServer:notesIdsOnServerToRemove)
+		for(auto &noteId:notesIdsToRemove)
 		{
-			RemoveNoteByServerCommand(noteIdOnServer);
+			RemoveNoteByServerCommand(noteId);
 		}
 	};
 
@@ -512,16 +512,16 @@ void NetClient::CreateOrUpdateNoteFromGetedNote(const QString &noteAsStr, QStrin
 	}
 	else QMbWarning("CreateOrUpdateNoteFromGetedNote countGroups is not 0 and not 1");
 
-	if(out_noteIdOnServer) *out_noteIdOnServer = QSn(noteFromServer->idOnServer);
+	if(out_noteIdOnServer) *out_noteIdOnServer = QSn(noteFromServer->id);
 
-	auto [ok, rec] = DataBase::NoteByIdOnServerWithCheck(out_noteIdOnServer ? *out_noteIdOnServer : QSn(noteFromServer->idOnServer));
+	auto [ok, rec] = DataBase::NoteByIdWithCheck(out_noteIdOnServer ? *out_noteIdOnServer : QSn(noteFromServer->id));
 
 	// заметка на клиенте отсуствует
 	if(!ok || rec.isEmpty())
 	{
-		noteFromServer->id = DataBase::InsertNoteInClientDB(noteFromServer.get());
-		Log("Create new note geted from server: " + noteFromServer->Name());
-		if(noteFromServer->id == DataBase::BadInsertNoteResult())
+		Log("Creating new note geted from server: " + noteFromServer->Name());
+		auto insRes = DataBase::InsertNoteInDB(noteFromServer.get(), false);
+		if(!insRes.isEmpty())
 		{
 			Error("UpdateNoteFromGetedNote: cant insert note from data: " + noteAsStr);
 			MsgToServer(NetConstants::msg_error(), "UpdateNoteFromGetedNote: cant insert note from data: " + noteAsStr);
@@ -545,13 +545,13 @@ void NetClient::CreateOrUpdateNoteFromGetedNote(const QString &noteAsStr, QStrin
 																				   " is older than local version. Choose action",
 												 {"Update", "Abort update", "Abort update and show notes"});
 			if(answ == "Update") doUpdate = true;
-			else if(answ == "Abort update") { Note::SendNoteSavedToServer(QSn(noteFromServer->idOnServer), false); }
+			else if(answ == "Abort update") { Note::SendNoteSavedToServer(QSn(noteFromServer->id), false); }
 			else if(answ == "Abort update and show notes")
 			{
-				Note::SendNoteSavedToServer(QSn(noteFromServer->idOnServer), false);
+				Note::SendNoteSavedToServer(QSn(noteFromServer->id), false);
 
 				noteFromServer->SetName(noteFromServer->Name() + " (version from server)");
-				auto origNote = widgetMain->FindOriginalNote(noteFromServer->idOnServer);
+				auto origNote = widgetMain->FindOriginalNote(noteFromServer->id);
 				if(!origNote) { QMbError("UpdateNoteFromGetedNote: !origNote"); return; }
 
 				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(*noteFromServer.get());
@@ -563,7 +563,7 @@ void NetClient::CreateOrUpdateNoteFromGetedNote(const QString &noteAsStr, QStrin
 		{
 			Log("Updating from server with newer edition of note " + noteFromServer->Name());
 			noteFromServer->id = rec[Fields::idNoteInd].toLongLong();
-			auto res = DataBase::SaveNoteOnClient(noteFromServer.get());
+			auto res = DataBase::UpdateRecordFromNote(noteFromServer.get());
 			Log(noteFromServer->group + " " + noteFromServer->groupId);
 			if(res.isEmpty()) emit SignalNoteUpdated(noteFromServer->id);
 			else
@@ -575,16 +575,16 @@ void NetClient::CreateOrUpdateNoteFromGetedNote(const QString &noteAsStr, QStrin
 	}
 }
 
-void NetClient::RemoveNoteByServerCommand(const QString &idOnServer)
+void NetClient::RemoveNoteByServerCommand(const QString &idNote)
 {
 	/// на клиенте пока нет корзины - выводить сообщение, какие заметки предлагается удалить
-	if(!IsUInt(idOnServer))
+	if(!IsUInt(idNote))
 	{
-		Error("RemoveNoteByServerCommand get bad idOnServer: " + idOnServer);
-		MsgToServer(NetConstants::msg_error(), "command_remove_note_worker get bad idOnServer: " + idOnServer);
+		Error("RemoveNoteByServerCommand get bad idOnServer: " + idNote);
+		MsgToServer(NetConstants::msg_error(), "command_remove_note_worker get bad idOnServer: " + idNote);
 		return;
 	}
-	auto record = DataBase::NoteByIdOnServer(idOnServer);
+	auto record = DataBase::NoteById(idNote);
 	if(record.isEmpty())
 	{
 		CodeMarkers::to_do("если пришло сообщение удалить заметку, а она уже была удалена,"
@@ -601,7 +601,7 @@ void NetClient::RemoveNoteByServerCommand(const QString &idOnServer)
 		if(0) CodeMarkers::to_do("can add action show note, but need make cykle choose actoion cdialog");
 		if(answ == "Remove" || answ == "Remove and show after")
 		{
-			if(DataBase::RemoveNoteOnClient(QSn(note.id), true))
+			if(DataBase::RemoveNote(QSn(note.id), true))
 			{
 				emit SignalNoteRemoved(note.id);
 			}
@@ -616,8 +616,8 @@ void NetClient::RemoveNoteByServerCommand(const QString &idOnServer)
 		}
 		else if(answ == "Move to default group")
 		{
-			if(DataBase::MoveNoteToGroupOnClient(QSn(note.id), DataBase::DefaultGroupId2(),
-												 QDateTime::currentDateTime().toString(Fields::dtFormatLastUpated())))
+			if(DataBase::MoveNoteToGroup(QSn(note.id), DataBase::DefaultGroupId2(),
+												 QDateTime::currentDateTime().toString(Fields::dtFormatLastUpdated())))
 			{
 				emit SignalNoteChangedGgroup(note.id);
 			}
@@ -705,11 +705,11 @@ void NetClient::command_update_note_worker(QString && commandContent)
 
 void NetClient::request_get_note_worker(ISocket * sock, NetClient::RequestData && requestData)
 {
-	QString &idOnServer = requestData.content;
-	auto rec = DataBase::NoteByIdOnServer(idOnServer);
+	QString &idNote = requestData.content;
+	auto rec = DataBase::NoteById(idNote);
 	if(rec.isEmpty())
 	{
-		Error("CheckNoteId "+idOnServer+" false");
+		Error("CheckNoteId "+idNote+" false");
 		AnswerForRequestSending(sock, std::move(requestData), NetConstants::invalid());
 		return;
 	}
