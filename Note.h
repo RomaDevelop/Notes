@@ -43,7 +43,7 @@ public:
 	void DialogEditCurrentGroup();
 	void DialogCreateNewGroup();
 
-	QString group = defaultGroupName();
+	QString groupName = defaultGroupName();
 	QString groupId = defaultGroupId();
 	void MoveToGroup(QString newGroupName);
 	void UpdateNote_group(const QString &newGroupId, const QString &newGroupName, QDateTime newDtLastUpdated);
@@ -52,7 +52,9 @@ public:
 	Note Clone() const;
 	void InitFromTmpNote(Note &note);
 	void InitFromRecord(QStringList &record);
-	static Note CreateFromRecord(QStringList &record);
+	QStringList SaveToRecord() const;
+	static				   Note  CreateFromRecord(QStringList &record);
+	static std::shared_ptr<Note> CreateFromRecord_shptr(QStringList &record);
 	static QString InitFromRecordAndSaveToStr(QStringList &record);
 	void UpdateThisNoteFromSQL();
 
@@ -68,12 +70,14 @@ public:
 	void SetDTCreatedFromStr(QString dtCreated) { this->dtCreated = QDateTime::fromString(dtCreated, Fields::dtFormat()); }
 
 	QDateTime DTNotify() { return dtNotify; }
+	QString DTNotifyStr() const { return dtNotify.toString(Fields::dtFormat()); }
 	QDateTime DTPostpone() { return dtPostpone; }
+	QString DTPostponeStr() const { return dtPostpone.toString(Fields::dtFormat()); }
 	bool CmpDTs(const QDateTime &dtNotify, const QDateTime &dtPostpone);
 	void SetDT(QDateTime dtNotify, QDateTime dtPostpone);
 
 	QDateTime DtLastUpdated() { return dtLastUpdated; }
-	QString DtLastUpdatedStr() { return dtLastUpdated.toString(Fields::dtFormatLastUpdated()); }
+	QString DtLastUpdatedStr() const { return dtLastUpdated.toString(Fields::dtFormatLastUpdated()); }
 	void SetDtLastUpdated(QDateTime dt) { dtLastUpdated = std::move(dt); }
 
 	static const QString& StartText() { static QString str = "Введите текст"; return str; }

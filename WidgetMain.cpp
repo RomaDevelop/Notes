@@ -316,7 +316,7 @@ void WidgetMain::CreateTableContextMenu()
 		auto actionGroupsSubscribes = menu->addAction("Подписки на группы");
 
 		actionEditGroup->setEnabled(true);
-		if(note->group == Note::defaultGroupName()) actionEditGroup->setEnabled(false);
+		if(note->groupName == Note::defaultGroupName()) actionEditGroup->setEnabled(false);
 
 		connect(actionMoveToGroup, &QAction::triggered, [note](){ note->DialogMoveToGroup(); });
 		connect(actionEditGroup, &QAction::triggered, [note](){ note->DialogEditCurrentGroup(); });
@@ -783,7 +783,7 @@ int WidgetMain::MakeWidgetsForMainTable(NoteInMain &newNote)
 void WidgetMain::UpdateWidgetsFromNote(NoteInMain &note)
 {
 	note.rowView.itemName->setText("   " + note.note->Name());
-	note.rowView.itemGroup->setText(note.note->group);
+	note.rowView.itemGroup->setText(note.note->groupName);
 	note.rowView.chBox->setChecked(note.note->activeNotify);
 	note.rowView.dteNotify->setDateTime(note.note->DTNotify());
 	note.rowView.dtePostpone->setDateTime(note.note->DTPostpone());
@@ -830,7 +830,7 @@ bool WidgetMain::RemoveNoteSQLOnClient(Note * note)
 							 "чтобы при связи с сервером передать ему сообщить о том что они были удалены");
 
 	// если локальная заметка
-	if(DataBase::IsGroupLocalByName(note->group)) {
+	if(DataBase::IsGroupLocalByName(note->groupName)) {
 		DataBase::RemoveNote(QSn(note->id), true);
 		return true;
 	}

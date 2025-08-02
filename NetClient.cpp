@@ -501,7 +501,7 @@ void NetClient::CreateOrUpdateNoteFromGetedNote(const QString &noteAsStr, QStrin
 	if(auto countGroups = DataBase::CountGroupsWithId(noteFromServer->groupId); countGroups == "1") {}
 	else if(countGroups == "0")
 	{
-		auto res = DataBase::TryCreateNewGlobalGroup(noteFromServer->group, noteFromServer->groupId);
+		auto res = DataBase::TryCreateNewGlobalGroup(noteFromServer->groupName, noteFromServer->groupId);
 		if(res != noteFromServer->groupId.toLongLong())
 		{
 			QMbError("CreateOrUpdateNoteFromGetedNote: can't create group for note, res = " + QSn(res));
@@ -554,7 +554,7 @@ void NetClient::CreateOrUpdateNoteFromGetedNote(const QString &noteAsStr, QStrin
 				auto origNote = widgetMain->FindOriginalNote(noteFromServer->id);
 				if(!origNote) { QMbError("UpdateNoteFromGetedNote: !origNote"); return; }
 
-				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(*noteFromServer.get());
+				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(noteFromServer->SaveToRecord());
 				WidgetNoteEditor::MakeOrShowNoteEditor(*origNote);
 			}
 		}
@@ -564,7 +564,7 @@ void NetClient::CreateOrUpdateNoteFromGetedNote(const QString &noteAsStr, QStrin
 			Log("Updating from server with newer edition of note " + noteFromServer->Name());
 			noteFromServer->id = rec[Fields::idNoteInd].toLongLong();
 			auto res = DataBase::UpdateRecordFromNote(noteFromServer.get());
-			Log(noteFromServer->group + " " + noteFromServer->groupId);
+			Log(noteFromServer->groupName + " " + noteFromServer->groupId);
 			if(res.isEmpty()) emit SignalNoteUpdated(noteFromServer->id);
 			else
 			{
@@ -612,7 +612,7 @@ void NetClient::RemoveNoteByServerCommand(const QString &idNote)
 			}
 
 			if(answ == "Remove and show after")
-				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(note);
+				WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(note.SaveToRecord());
 		}
 		else if(answ == "Move to default group")
 		{

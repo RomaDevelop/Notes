@@ -11,8 +11,8 @@
 #include "MyQShortings.h"
 
 using QStringRefWr_const = std::reference_wrapper<const QString>;
-using QStringRefWrVector = std::vector<QStringRefWr_const>;
-using QStringRefWr_const_set = std::set<QStringRefWr_const>;
+using QStringRefWr_c_Vector = std::vector<QStringRefWr_const>;
+using QStringRefWr_c_set = std::set<QStringRefWr_const>;
 
 namespace FastActions_ns {
 	inline const QString& execute() { static QString str = "[execute]"; return str; }
@@ -30,7 +30,7 @@ struct Features
 
 	static QStringRef HeadForCheckFeature(const QString &content);
 	static bool CheckFeature(const QString &content, const QString &feature);
-	static QStringRefWr_const_set ScanForFeatures(const QString &content);
+	static QStringRefWr_c_set ScanForFeatures(const QString &content);
 };
 
 struct GitExtensionsTool

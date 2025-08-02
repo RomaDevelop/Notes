@@ -85,9 +85,9 @@ bool Features::CheckFeature(const QString &content, const QString &feature)
 	return head.contains(feature);
 }
 
-QStringRefWr_const_set Features::ScanForFeatures(const QString &content)
+QStringRefWr_c_set Features::ScanForFeatures(const QString &content)
 {
-	QStringRefWr_const_set result;
+	QStringRefWr_c_set result;
 	QStringRef head = HeadForCheckFeature(content);
 	for(auto &feature:all())
 	{

@@ -24,9 +24,9 @@
 #include "FastActions.h"
 #include "DataBase.h"
 
-WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditor(Note &note)
+WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditor(Note &note, bool noteIsTmpNote)
 {
-	DataBase::AddOpensCount(QSn(note.id), 1);
+	if(!noteIsTmpNote) DataBase::AddOpensCount(QSn(note.id), 1);
 
 	if(auto existingEditor = existingEditors.find(&note); existingEditor == existingEditors.end())
 	{
@@ -50,21 +50,13 @@ WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditor(Note &note)
 	}
 }
 
-WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(Note note)
+WidgetNoteEditor *WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(QStringList noteRecord)
 {
-	std::shared_ptr<Note> tmpNote = std::make_shared<Note>(note.Name(), note.activeNotify,
-														   note.DTNotify(), note.DTPostpone(), note.Content());
-
-	auto editor = MakeOrShowNoteEditor(*tmpNote.get());
+	std::shared_ptr<Note> tmpNote = Note::CreateFromRecord_shptr(noteRecord);
+	auto editor = MakeOrShowNoteEditor(*tmpNote.get(), true);
 	editor->StoreTmpNote(tmpNote);
 	editor->SetReadOnly();
 	return editor;
-}
-
-WidgetNoteEditor *WidgetNoteEditor::MakeOrShowNoteEditorTmpNote(QStringList &noteRecord)
-{
-	Note note = Note::CreateFromRecord(noteRecord);
-	return MakeOrShowNoteEditorTmpNote(note);
 }
 
 void WidgetNoteEditor::SetReadOnly()

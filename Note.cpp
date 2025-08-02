@@ -27,7 +27,7 @@ Note::Note(QString name_, bool activeNotify_, QDateTime dtNotify_, QDateTime dtP
 QString Note::ToStrForLog()
 {
 	QString str;
-	str.append(name).append(" ").append(group).append("\n");
+	str.append(name).append(" ").append(groupName).append("\n");
 	str.append("notif, postpone, last updated: ").append(dtNotify.toString(Fields::dtFormat()));
 	str.append(" ").append(dtPostpone.toString(Fields::dtFormat())).append(" ").append(dtLastUpdated.toString(Fields::dtFormatLastUpdated()));
 	str.append("\nContent: ").append(content.size() < 20 ? content : content.left(17) + "...");
@@ -51,7 +51,7 @@ void Note::DialogMoveToGroup()
 		if(DataBase::IsGroupLocalById(grData.first)) list.back() = grData.second + " (local)";
 		else list.back() = grData.second + " (global)";
 
-		if(grData.second == group)
+		if(grData.second == groupName)
 		{
 			list.back() += " (current)";
 			currentIndex = i;
@@ -122,14 +122,12 @@ void Note::DialogCreateNewGroup()
 	}
 }
 
-
-
 void Note::MoveToGroup(QString newGroupName)
 {
 	auto newGroupId = DataBase::GroupId(newGroupName);
 	if(newGroupId.isEmpty()) { QMbError("ChangeGroup:: grId.isEmpty() for group " + newGroupName); return; }
 
-	bool currentGroupIsLocal = DataBase::IsGroupLocalByName(group);
+	bool currentGroupIsLocal = DataBase::IsGroupLocalByName(groupName);
 	bool newGroupIsLocal = DataBase::IsGroupLocalById(newGroupId);
 
 	auto newDtUpdated = QDateTime::currentDateTime();
@@ -157,7 +155,7 @@ void Note::MoveToGroup(QString newGroupName)
 		};
 
 		Note tmpNote(*this);
-		tmpNote.group = newGroupName;
+		tmpNote.groupName = newGroupName;
 		tmpNote.groupId = newGroupId;
 		tmpNote.dtLastUpdated = newDtUpdated;
 		netClient->RequestToServerWithWait(NetConstants::request_create_note_on_server(), tmpNote.ToStr_v1(), std::move(answFoo));
@@ -196,7 +194,7 @@ void Note::UpdateNote_group(const QString &newGroupId, const QString &newGroupNa
 		return;
 	}
 
-	group = newGroupName;
+	groupName = newGroupName;
 	groupId = newGroupId;
 	dtLastUpdated = newDtLastUpdated;
 	EmitCbs(cbsGroupChanged);
@@ -208,7 +206,7 @@ void Note::UpdateNote_id_group(qint64 newNoteId, QString newGroupId, QString new
 	if(saveRes.isEmpty())
 	{
 		id = newNoteId;
-		group = std::move(newGroupName);
+		groupName = std::move(newGroupName);
 		groupId = std::move(newGroupId);
 		dtLastUpdated = newDtLastUpdated;
 		EmitCbs(cbsGroupChanged);
@@ -224,7 +222,7 @@ Note Note::Clone() const
 	note.dtCreated = dtCreated;
 	note.dtNotify = dtNotify;
 	note.dtPostpone = dtPostpone;
-	note.group = group;
+	note.groupName = groupName;
 	note.groupId = groupId;
 	note.id = id;
 	note.content = content;
@@ -239,7 +237,7 @@ void Note::InitFromTmpNote(Note &note)
 	dtCreated = std::move(note.dtCreated);
 	dtNotify = std::move(note.dtNotify);
 	dtPostpone = std::move(note.dtPostpone);
-	group = note.group;
+	groupName = note.groupName;
 	groupId = note.groupId;
 	id = note.id;
 	content = std::move(note.content);
@@ -248,22 +246,45 @@ void Note::InitFromTmpNote(Note &note)
 
 void Note::InitFromRecord(QStringList &row)
 {
-	name = std::move(row[Fields::nameNoteInd]);
-	activeNotify = row[Fields::activeNotifyInd].toInt();
-	dtCreated = QDateTime::fromString(row[Fields::dtCreatedInd], Fields::dtFormat());
-	dtNotify = QDateTime::fromString(row[Fields::dtNotifyInd], Fields::dtFormat());
-	dtPostpone = QDateTime::fromString(row[Fields::dtPostponeInd], Fields::dtFormat());
-	group = DataBase::GroupName(row[Fields::idGroupIndInNotes]);
-	groupId = row[Fields::idGroupIndInNotes];
-	id = row[Fields::idNoteInd].toInt();
-	content = std::move(row[Fields::contentInd]);
-	dtLastUpdated = QDateTime::fromString(row[Fields::lastUpdatedInd], Fields::dtFormatLastUpdated());
+	name			= std::move(row[Fields::nameNoteInd]);
+	activeNotify	= row[Fields::activeNotifyInd].toInt();
+	dtCreated		= QDateTime::fromString(row[Fields::dtCreatedInd], Fields::dtFormat());
+	dtNotify		= QDateTime::fromString(row[Fields::dtNotifyInd], Fields::dtFormat());
+	dtPostpone		= QDateTime::fromString(row[Fields::dtPostponeInd], Fields::dtFormat());
+	groupName		= DataBase::GroupName(row[Fields::idGroupIndInNotes]);
+	groupId			= row[Fields::idGroupIndInNotes];
+	id				= row[Fields::idNoteInd].toInt();
+	content			= std::move(row[Fields::contentInd]);
+	dtLastUpdated	= QDateTime::fromString(row[Fields::lastUpdatedInd], Fields::dtFormatLastUpdated());
+}
+
+QStringList Note::SaveToRecord() const
+{
+	QStringList rec = MyQString::SizedQStringList(Fields::fieldsInRecCount);
+	rec[Fields::nameNoteInd]		 = name			;
+	rec[Fields::activeNotifyInd]	 = Fields::LogicValueFromBool(activeNotify)	;
+	rec[Fields::dtCreatedInd]		 = DTCreatedStr()		;
+	rec[Fields::dtNotifyInd]		 = DTNotifyStr()		;
+	rec[Fields::dtPostponeInd]		 = DTPostponeStr()		;
+	rec[Fields::idGroupIndInNotes]	 = groupName		;
+	rec[Fields::idGroupIndInNotes]	 = groupId		;
+	rec[Fields::idNoteInd]			 = QSn(id)				;
+	rec[Fields::contentInd]			 = content		;
+	rec[Fields::lastUpdatedInd]		 = DtLastUpdatedStr()	;
+	return rec;
 }
 
 Note Note::CreateFromRecord(QStringList & record)
 {
 	Note note;
 	note.InitFromRecord(record);
+	return note;
+}
+
+std::shared_ptr<Note> Note::CreateFromRecord_shptr(QStringList &record)
+{
+	std::shared_ptr<Note> note(new Note);
+	note->InitFromRecord(record);
 	return note;
 }
 
@@ -366,33 +387,18 @@ void Note::SendNoteSavedToServer(QString id, bool showWarningIfServerNotConnecte
 
 std::unique_ptr<Note> Note::LoadNote(const QString &text)
 {
-	if(!text.startsWith(SaveKeyWods::version())) // не содержит версию - самая старая
-	{
-		auto fileParts = text.split(SaveKeyWods::endValue(), QString::SkipEmptyParts);
-		if(fileParts.size() != 5) { qdbg << "Wrong file to load note"; return {}; }
+	if(!text.startsWith(SaveKeyWods::version())) { QMbError("Wrong text to load note"); return {}; }
 
-		auto noteUptr = std::make_unique<Note>(Note(
-							   std::move(fileParts[0]),
-							   fileParts[1].toInt(),
-							   QDateTime().fromString(fileParts[2], SaveKeyWods::dtFormat()),
-							   QDateTime().fromString(fileParts[3], SaveKeyWods::dtFormat()),
-							   std::move(fileParts[4])
-							   ));
+	int v = GetVersion(text);
+	if(loadsFunctionsMap.empty()) InitLoadsFooMap();
+	if(auto it = loadsFunctionsMap.find(v); it != loadsFunctionsMap.end())
+	{
+		auto &loadFunctoin = it->second;
+		auto noteUptr = std::make_unique<Note>(loadFunctoin(text));
+		if(!noteUptr) QMbError("loadFunctoin from loadsFunctionsMap returned nullptr");
 		return noteUptr;
 	}
-	else // содержит версию
-	{
-		int v = GetVersion(text);
-		if(loadsFunctionsMap.empty()) InitLoadsFooMap();
-		if(auto it = loadsFunctionsMap.find(v); it != loadsFunctionsMap.end())
-		{
-			auto &loadFunctoin = it->second;
-			auto noteUptr = std::make_unique<Note>(loadFunctoin(text));
-			if(!noteUptr) qdbg << "loadFunctoin from loadsFunctionsMap returned nullptr";
-			return noteUptr;
-		}
-		else { qdbg << "Not found load function for version "+QSn(v); return {}; }
-	}
+	else QMbError("Not found load function for version "+QSn(v));
 
 	return {};
 }
@@ -400,19 +406,20 @@ std::unique_ptr<Note> Note::LoadNote(const QString &text)
 Note Note::FromStr_v1(const QString &text)
 {
 	auto fileParts = text.split(SaveKeyWods::endValue());
-	if(fileParts.size() < 10) { QMbError("Wrong file content (size="+QSn(fileParts.size())+")"); return {}; }
+	if(fileParts.size() < 12) { QMbError("Wrong file content (size="+QSn(fileParts.size())+")"); return {}; }
 
 	Note newNote;
-	newNote.name = std::move(fileParts[1]);
-	newNote.id = fileParts[2].toLongLong();
-	newNote.activeNotify = fileParts[4].toLongLong();
-	newNote.SetDTCreatedFromStr(fileParts[5]);
-	newNote.dtNotify = QDateTime().fromString(fileParts[6], Fields::dtFormat());
-	newNote.dtPostpone = QDateTime().fromString(fileParts[7], Fields::dtFormat());
-	newNote.group = std::move(fileParts[8]);
-	newNote.groupId = std::move(fileParts[9]);
-	newNote.content = std::move(fileParts[10]);
-	newNote.dtLastUpdated = QDateTime().fromString(fileParts[11], Fields::dtFormatLastUpdated());
+	int index = 1;
+	newNote.name = std::move(fileParts[index++]);
+	newNote.id = fileParts[index++].toLongLong();
+	newNote.activeNotify = fileParts[index++].toLongLong();
+	newNote.SetDTCreatedFromStr(fileParts[index++]);
+	newNote.dtNotify = QDateTime().fromString(fileParts[index++], Fields::dtFormat());
+	newNote.dtPostpone = QDateTime().fromString(fileParts[index++], Fields::dtFormat());
+	newNote.groupName = std::move(fileParts[index++]);
+	newNote.groupId = std::move(fileParts[index++]);
+	newNote.content = std::move(fileParts[index++]);
+	newNote.dtLastUpdated = QDateTime().fromString(fileParts[index++], Fields::dtFormatLastUpdated());
 	return newNote;
 }
 
@@ -426,7 +433,7 @@ QString Note::ToStr_v1() const
 	noteText.append(DTCreatedStr()).append(SaveKeyWods::endValue());
 	noteText.append(dtNotify.toString(Fields::dtFormat())).append(SaveKeyWods::endValue());
 	noteText.append(dtPostpone.toString(Fields::dtFormat())).append(SaveKeyWods::endValue());
-	noteText.append(group).append(SaveKeyWods::endValue());
+	noteText.append(groupName).append(SaveKeyWods::endValue());
 	noteText.append(groupId).append(SaveKeyWods::endValue());
 	noteText.append(content).append(SaveKeyWods::endValue());
 	noteText.append(dtLastUpdated.toString(Fields::dtFormatLastUpdated())).append(SaveKeyWods::endValue());
