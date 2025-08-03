@@ -344,10 +344,7 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 		dtEditPostpone->setDateTime(this->note.DTPostpone());
 	};
 
-	QStatusBar *statusBar = new QStatusBar(this);
-	vlo_main->addWidget(statusBar);
-	labelStatus = new QLabel;
-	statusBar->addWidget(labelStatus);
+	CreateStatusBar(vlo_main);
 
 	note.AddCBDTUpdated(dtUpdateFoo, this, cbCounter);
 
@@ -363,6 +360,20 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	InitTimerNoteSaver();
 
 	existingEditors[&note] = this;
+}
+
+void WidgetNoteEditor::CreateStatusBar(QLayout *lo_main)
+{
+	QStatusBar *statusBar = new QStatusBar(this);
+	lo_main->addWidget(statusBar);
+
+	auto labelGroup = new QLabel("Группа: " + note.groupName);
+	statusBar->addWidget(labelGroup);
+	auto UpdateGroupFoo = [labelGroup, this](void *){ labelGroup->setText("Группа: " + note.groupName); };
+	note.AddCBGroupChanged(UpdateGroupFoo, this, cbCounter);
+
+	labelStatus = new QLabel;
+	statusBar->addWidget(labelStatus);
 }
 
 void WidgetNoteEditor::InitTimerNoteSaver()
