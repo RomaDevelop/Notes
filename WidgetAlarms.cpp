@@ -272,10 +272,34 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 	note->AddCBDTUpdated(cb, newNoteInAlarmsPtr, newNoteInAlarmsPtr->cbCounter);
 
 	connect(btnReschedule, &QPushButton::clicked, [this, btnReschedule, note](){
-		ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, note);
+		bool workCurrentNote = true;
+		if(GetSelectedNotes().size() > 1)
+		{
+			auto answ = MyQDialogs::CustomDialog("Notes working", "Selected more one note. Reschedule all selected notes or current?",
+												 {"All selected", "Current"});
+			if(answ == "All selected") workCurrentNote = false;
+			else if(answ == "Current") workCurrentNote = true;
+			else QMbError("dialog error");
+		}
+
+		if(workCurrentNote)
+			ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, note);
+		else ShowMenuPostpone(btnReschedule->mapToGlobal(QPoint(0, btnReschedule->height())), changeDtNotify, NoteForPostponeSelected());
 	});
 	connect(btnPostpone, &QPushButton::clicked, [this, btnPostpone, note](){
-		ShowMenuPostpone(btnPostpone->mapToGlobal(QPoint(0, btnPostpone->height())), setPostpone, note);
+		bool workCurrentNote = true;
+		if(GetSelectedNotes().size() > 1)
+		{
+			auto answ = MyQDialogs::CustomDialog("Notes working", "Selected more one note. Pospone all selected notes or current?",
+												 {"All selected", "Current"});
+			if(answ == "All selected") workCurrentNote = false;
+			else if(answ == "Current") workCurrentNote = true;
+			else QMbError("dialog error");
+		}
+
+		if(workCurrentNote)
+			ShowMenuPostpone(btnPostpone->mapToGlobal(QPoint(0, btnPostpone->height())), setPostpone, note);
+		else ShowMenuPostpone(btnPostpone->mapToGlobal(QPoint(0, btnPostpone->height())), setPostpone, NoteForPostponeSelected());
 	});
 	connect(btnRemove, &QPushButton::clicked, [this, note](){
 		if(QMessageBox::question(0,"Remove note","Removing note "+note->Name()+"\n\nAre you shure?") == QMessageBox::Yes)
