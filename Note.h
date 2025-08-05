@@ -37,6 +37,13 @@ public:
 
 	QString ToStrForLog();
 
+	inline static void Log(const QString &str) { if(logWorker) logWorker(str); else qdbg << str; }
+	inline static void Error(const QString &str) { if(errorWorker) errorWorker(str); else qdbg << str; }
+
+	using logWorkerFunction = std::function<void(const QString &str)>;
+	inline static logWorkerFunction logWorker;
+	inline static logWorkerFunction errorWorker;
+
 	inline static const QString& defaultGroupName() { static QString str = "defaultGroup"; return str; }
 	inline static const QString& defaultGroupId() { static QString str = "0"; return str; }
 	void DialogMoveToGroup();

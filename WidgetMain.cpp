@@ -154,6 +154,9 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	DataBase::InitChildDataBase(DataBase::client);
 	DataBase::BackupBase();
 
+	Note::logWorker = [](const QString &str){ qdbg << str; };
+	Note::errorWorker = [](const QString &str){ QMbError(str); };
+
 	QString currentDt = QDateTime::currentDateTime().toString(DateTimeFormatForFileName);
 
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);

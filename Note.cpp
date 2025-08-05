@@ -70,14 +70,14 @@ void Note::DialogMoveToGroup()
 		return;
 	}
 
-	if(res.index < 0) QMbError("unexpacted error res.index < 0");
+	if(res.index < 0) Error("unexpacted error res.index < 0");
 
 	MoveToGroup(grDatas[res.index].second);
 }
 
 void Note::DialogEditCurrentGroup()
 {
-	QMbError("Unrealesed");
+	Error("Unrealesed");
 }
 
 void Note::DialogCreateNewGroup()
@@ -87,34 +87,34 @@ void Note::DialogCreateNewGroup()
 	{
 		auto inpRes = MyQDialogs::InputLine("Group creation", "Input new local group name");
 		if(!inpRes.accepted) return;
-		if(inpRes.text.isEmpty()) { QMbError("Empty group name"); return; }
+		if(inpRes.text.isEmpty()) { Error("Empty group name"); return; }
 
 		auto resId = DataBase::TryCreateNewLocalGroup(inpRes.text);
 		if(resId < 0) QMbInfo("Group " + inpRes.text + " created");
-		else QMbError("TryCreateNewGroup in local base error, resId("+QSn(resId)+") >= 0");
+		else Error("TryCreateNewGroup in local base error, resId("+QSn(resId)+") >= 0");
 	}
 	else if (answ == "global")
 	{
 		if(netClient->sessionId <= 0)
 		{
-			QMbError("Server not connected, operation impossible");
+			Error("Server not connected, operation impossible");
 			return;
 		}
 
 		auto inpRes = MyQDialogs::InputLine("Group creation", "Input new global group name");
 		if(!inpRes.accepted) return;
-		if(inpRes.text.isEmpty()) { QMbError("Empty group name"); return; }
+		if(inpRes.text.isEmpty()) { Error("Empty group name"); return; }
 
 		QString newGroupName = std::move(inpRes.text);
 
 		auto answFoo = [newGroupName](QString &&answContent){
 			auto idNewGroup = NetConstants::GetFromAnsw_try_create_group_IdGroup(answContent);
-			if(idNewGroup < 0) QMbError("Group was not created, answer is " + QSn(idNewGroup) + "");
+			if(idNewGroup < 0) Error("Group was not created, answer is " + QSn(idNewGroup) + "");
 			else
 			{
 				auto resId = DataBase::TryCreateNewGlobalGroup(newGroupName, QSn(idNewGroup));
-				if(resId == idNewGroup) QMbInfo("Group " + newGroupName + " created");
-				else QMbError("TryCreateNewGroup in local base error, resId differs: " + QSn(resId));
+				if(resId == idNewGroup) Error("Group " + newGroupName + " created");
+				else Error("TryCreateNewGroup in local base error, resId differs: " + QSn(resId));
 			}
 		};
 
@@ -125,7 +125,7 @@ void Note::DialogCreateNewGroup()
 void Note::MoveToGroup(QString newGroupName)
 {
 	auto newGroupId = DataBase::GroupId(newGroupName);
-	if(newGroupId.isEmpty()) { QMbError("ChangeGroup:: grId.isEmpty() for group " + newGroupName); return; }
+	if(newGroupId.isEmpty()) { Error("ChangeGroup:: grId.isEmpty() for group " + newGroupName); return; }
 
 	bool currentGroupIsLocal = DataBase::IsGroupLocalByName(groupName);
 	bool newGroupIsLocal = DataBase::IsGroupLocalById(newGroupId);
@@ -147,7 +147,7 @@ void Note::MoveToGroup(QString newGroupName)
 			if(idNoteFromServer < 0)
 			{
 				netClient->Error("bad answ to create note on server " + answContent);
-				QMbError("Can't move note to group, bad server answ");
+				Error("Can't move note to group, bad server answ");
 				return;
 			}
 
@@ -177,20 +177,20 @@ void Note::MoveToGroup(QString newGroupName)
 					UpdateNote_id_group(newId.toLongLong(), newGroupId, newGroupName, newDtUpdated);
 				}
 			}
-			else QMbError("Can't move note to group, bad server answ");
+			else Error("Can't move note to group, bad server answ");
 		};
 
 		auto request = NetConstants::MakeRequest_move_note_to_group(QSn(this->id), newGroupId, newDtUpdated);
 		netClient->RequestToServerWithWait(NetConstants::request_move_note_to_group(), std::move(request), std::move(answFoo));
 	}
-	else QMbError("Note::MoveToGroup impossible case");
+	else Error("Note::MoveToGroup impossible case");
 }
 
 void Note::UpdateNote_group(const QString &newGroupId, const QString &newGroupName, QDateTime newDtLastUpdated)
 {
 	if(!DataBase::MoveNoteToGroup(QSn(id), newGroupId, newDtLastUpdated.toString(Fields::dtFormatLastUpdated())))
 	{
-		QMbError("DataBase::MoveNoteToGroup returned false; tryed move to " + newGroupName);
+		Error("DataBase::MoveNoteToGroup returned false; tryed move to " + newGroupName);
 		return;
 	}
 
@@ -211,7 +211,7 @@ void Note::UpdateNote_id_group(qint64 newNoteId, QString newGroupId, QString new
 		dtLastUpdated = newDtLastUpdated;
 		EmitCbs(cbsGroupChanged);
 	}
-	else QMbError("SaveNoteOnClient_IdNote_IdGroup error: " + saveRes);
+	else Error("SaveNoteOnClient_IdNote_IdGroup error: " + saveRes);
 }
 
 Note Note::Clone() const
@@ -298,8 +298,10 @@ QString Note::InitFromRecordAndSaveToStr(QStringList &record)
 
 void Note::UpdateThisNoteFromSQL()
 {
+	if(DataBase::CountNoteId(QSn(id)) != 1) { Error("UpdateThisNoteFromSQL: bad CountNoteId = "+QSn(DataBase::CountNoteId(QSn(id)))); return; }
+
 	auto rec = DataBase::NoteById(QSn(id));
-	if(rec.isEmpty()) { QMbError("UpdateThisNoteFromSQL"); return; }
+	if(rec.isEmpty()) { Error("UpdateThisNoteFromSQL rec isEmpty"); return; }
 	InitFromRecord(rec);
 }
 
@@ -381,13 +383,13 @@ void Note::SendNoteSavedToServer(QString id, bool showWarningIfServerNotConnecte
 	else
 	{
 		if(showWarningIfServerNotConnected)
-			QMbWarning("Server not connected, note saved local, it saved local and will try send to server later");
+			QMbWarning("Server not connected, note saved local and will try send to server later");
 	}
 }
 
 std::unique_ptr<Note> Note::LoadNote(const QString &text)
 {
-	if(!text.startsWith(SaveKeyWods::version())) { QMbError("Wrong text to load note"); return {}; }
+	if(!text.startsWith(SaveKeyWods::version())) { Error("Wrong text to load note"); return {}; }
 
 	int v = GetVersion(text);
 	if(loadsFunctionsMap.empty()) InitLoadsFooMap();
@@ -395,10 +397,10 @@ std::unique_ptr<Note> Note::LoadNote(const QString &text)
 	{
 		auto &loadFunctoin = it->second;
 		auto noteUptr = std::make_unique<Note>(loadFunctoin(text));
-		if(!noteUptr) QMbError("loadFunctoin from loadsFunctionsMap returned nullptr");
+		if(!noteUptr) Error("loadFunctoin from loadsFunctionsMap returned nullptr");
 		return noteUptr;
 	}
-	else QMbError("Not found load function for version "+QSn(v));
+	else Error("Not found load function for version "+QSn(v));
 
 	return {};
 }
@@ -406,7 +408,7 @@ std::unique_ptr<Note> Note::LoadNote(const QString &text)
 Note Note::FromStr_v1(const QString &text)
 {
 	auto fileParts = text.split(SaveKeyWods::endValue());
-	if(fileParts.size() < 12) { QMbError("Wrong file content (size="+QSn(fileParts.size())+")"); return {}; }
+	if(fileParts.size() < 12) { Error("Wrong file content (size="+QSn(fileParts.size())+")"); return {}; }
 
 	Note newNote;
 	int index = 1;
@@ -584,7 +586,7 @@ void Note::RemoveCbs(void * handler, int removedCountShouldBe)
 	{
 		qdbg << "RemoveCbs: removedCountShouldBe != countRemoved ("+QSn(removedCountShouldBe)
 					+" != "+QSn(countRemoved)+") for note " + name;
-		QMbError("RemoveCbs: removedCountShouldBe != countRemoved ("+QSn(removedCountShouldBe)
+		Error("RemoveCbs: removedCountShouldBe != countRemoved ("+QSn(removedCountShouldBe)
 					+" != "+QSn(countRemoved)+") for note " + name);
 	}
 }
