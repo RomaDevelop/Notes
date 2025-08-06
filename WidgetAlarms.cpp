@@ -617,17 +617,36 @@ void WidgetAlarms::InitMessageForNotifyTimer()
 {
 	auto timer = new QTimer(this);
 	timer->start(10);
+
 	connect(timer, &QTimer::timeout, this, [this](){
 		while(!notesToShowMessageForNotify.empty())
 		{
 			Note *note = notesToShowMessageForNotify.front();
 
-			auto answ = MyQDialogs::CustomDialog("Message-notify for note", "Message-notify for note:\n" + note->Name(),
-												 {"Open for edit", "Move up in notify widget", "Nothing to do"});
-			if(answ == "Open for edit") { WidgetNoteEditor::MakeOrShowNoteEditor(*note); }
-			else if(answ == "Move up in notify widget") { MoveNoteUp(*note); }
-			else if(answ == "Nothing to do") {  }
+			bool toAll = false;
+			bool *toAllPtr = nullptr;
+			if(notesToShowMessageForNotify.size() > 1)
+				toAllPtr = &toAll;
+			auto answ = MyQDialogs::CustomDialog2("Message-notify for note", "Message-notify for note:\n" + note->Name(),
+												 {"Open for edit", "Move up in notify widget", "Nothing to do"},
+												 toAllPtr, "Apply to next "+QSn(notesToShowMessageForNotify.size())+" notes");
+
+			std::vector<Note*> notesToDoNow;
+			if(toAll) notesToDoNow = notesToShowMessageForNotify;
+			else notesToDoNow = {note};
+
+			if(answ == "Open for edit"){
+				for(auto &note:notesToDoNow) WidgetNoteEditor::MakeOrShowNoteEditor(*note);
+			}
+			else if(answ == "Move up in notify widget") {
+				for(auto &note:notesToDoNow) MoveNoteUp(*note);
+			}
+			else if(answ == "Nothing to do"){
+
+			}
 			else QMbError("Unrealesed answ");
+
+			if(toAll) { notesToShowMessageForNotify.clear(); break; }
 
 			notesToShowMessageForNotify.erase(notesToShowMessageForNotify.begin());
 		}
