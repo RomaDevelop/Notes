@@ -147,7 +147,10 @@ void WidgetAlarms::CreateBottomRow(QHBoxLayout *hlo)
 	hlo->addWidget(btnFastActions);
 	connect(btnFastActions, &QPushButton::clicked, [this, btnFastActions](){
 		int index = table->currentRow();
-		notes[index]->note->ShowMenuFastActions(btnFastActions);
+		if(index == -1) index = 0;
+		if(index < (int)notes.size())
+			notes[index]->note->ShowMenuFastActions(btnFastActions);
+		else QMbError("btnFastActions: bad index");
 	});
 
 	hlo->addStretch();
