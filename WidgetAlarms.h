@@ -40,6 +40,7 @@ public:
 	QString tableColWidths;
 
 private:
+	void CreateTableContextMenu();
 	void CreateBottomRow(QHBoxLayout *hlo);
 
 	std::vector<std::unique_ptr<NoteInAlarms>> notes;
@@ -55,6 +56,8 @@ private:
 	static Note* NoteForPostponeSelected() { static Note note; return &note; }
 	void ShowMenuPostpone(QPoint pos, menuPostponeCase, Note* note);
 	void SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, menuPostponeCase caseCurrent);
+
+	Note* NoteOfCurrentRow(bool getFirstIfNoSelected);
 	std::set<Note*> GetSelectedNotes();
 
 	QString settingsFile;

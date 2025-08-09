@@ -62,6 +62,8 @@ WidgetAlarms::WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidge
 	});
 	timerGeoSaver->start(200);
 
+	CreateTableContextMenu();
+
 	InitFitColWidthTimer();
 	InitTimerSetterLabels();
 	InitMessageForNotifyTimer();
@@ -125,6 +127,26 @@ void WidgetAlarms::GiveNotes(const std::vector<Note *> & givingNotes)
 	else hide();
 }
 
+void WidgetAlarms::CreateTableContextMenu()
+{
+	table->setContextMenuPolicy(Qt::CustomContextMenu);
+
+	connect(table, &QWidget::customContextMenuRequested, [this](const QPoint& pos) {
+		auto note = NoteOfCurrentRow(false);
+		if(!note) return;
+
+		static QMenu *menu = nullptr;
+		delete menu;
+		menu = new QMenu(this);
+
+		auto actionRename = menu->addAction("Переименовать");
+
+		connect(actionRename, &QAction::triggered, [note](){ note->DialogRenameNote(); });
+
+		menu->exec(table->viewport()->mapToGlobal(pos));
+	});
+}
+
 void WidgetAlarms::CreateBottomRow(QHBoxLayout *hlo)
 {
 	auto btnShowMainWindow = new QToolButton();
@@ -146,11 +168,8 @@ void WidgetAlarms::CreateBottomRow(QHBoxLayout *hlo)
 	btnFastActions->setIcon(QIcon(Resources::action().GetPathName()));
 	hlo->addWidget(btnFastActions);
 	connect(btnFastActions, &QPushButton::clicked, [this, btnFastActions](){
-		int index = table->currentRow();
-		if(index == -1) index = 0;
-		if(index < (int)notes.size())
-			notes[index]->note->ShowMenuFastActions(btnFastActions);
-		else QMbError("btnFastActions: bad index");
+		if(auto note = NoteOfCurrentRow(true); note)
+			note->ShowMenuFastActions(btnFastActions);
 	});
 
 	hlo->addStretch();
@@ -516,6 +535,23 @@ void WidgetAlarms::SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, 
 
 		if(notes.empty()) hide();
 	}
+}
+
+Note *WidgetAlarms::NoteOfCurrentRow(bool getFirstIfNoSelected)
+{
+	int index = table->currentRow();
+	if(index == -1)
+	{
+		if(getFirstIfNoSelected)
+			index = 0;
+		else return nullptr;
+	}
+
+	if(index >= 0 and index < (int)notes.size())
+		return notes[index]->note;
+
+	QMbError("btnFastActions: bad index");
+	return nullptr;
 }
 
 std::set<Note *> WidgetAlarms::GetSelectedNotes()

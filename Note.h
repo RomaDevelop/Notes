@@ -46,6 +46,7 @@ public:
 
 	inline static const QString& defaultGroupName() { static QString str = "defaultGroup"; return str; }
 	inline static const QString& defaultGroupId() { static QString str = "0"; return str; }
+	void DialogRenameNote();
 	void DialogMoveToGroup();
 	void DialogEditCurrentGroup();
 	void DialogCreateNewGroup();

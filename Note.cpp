@@ -34,6 +34,16 @@ QString Note::ToStrForLog()
 	return str;
 }
 
+void Note::DialogRenameNote()
+{
+	auto answ = MyQDialogs::InputLineExt("Renaming note", "Input new note name", name);
+	if(answ.button == MyQDialogs::Accept() && answ.text != name)
+	{
+		if(answ.text.isEmpty()) { QMbError("Name can't be empty"); return; }
+		SetName(answ.text);
+	}
+}
+
 void Note::DialogMoveToGroup()
 {
 	QStringPairVector grDatas = DataBase::GroupsIdsAndNames();

@@ -314,6 +314,8 @@ void WidgetMain::CreateTableContextMenu()
 		delete menu;
 		menu = new QMenu(this);
 
+		auto actionRename = menu->addAction("Переименовать");
+		menu->addSeparator();
 		auto actionMoveToGroup = menu->addAction("Переместить в группу");
 		auto actionEditGroup = menu->addAction("Редактировать группу");
 		auto actionGroupsSubscribes = menu->addAction("Подписки на группы");
@@ -321,6 +323,7 @@ void WidgetMain::CreateTableContextMenu()
 		actionEditGroup->setEnabled(true);
 		if(note->groupName == Note::defaultGroupName()) actionEditGroup->setEnabled(false);
 
+		connect(actionRename, &QAction::triggered, [note](){ note->DialogRenameNote(); });
 		connect(actionMoveToGroup, &QAction::triggered, [note](){ note->DialogMoveToGroup(); });
 		connect(actionEditGroup, &QAction::triggered, [note](){ note->DialogEditCurrentGroup(); });
 		connect(actionGroupsSubscribes, &QAction::triggered, [this](){ DialogGroupsSubscribes(); });
