@@ -88,6 +88,8 @@ public:
 	QString DtLastUpdatedStr() const { return dtLastUpdated.toString(Fields::dtFormatLastUpdated()); }
 	void SetDtLastUpdated(QDateTime dt) { dtLastUpdated = std::move(dt); }
 
+	bool CheckNoteForFilters(const QString &textFilter, const QString &textFilterTranslited);
+
 	static const QString& StartText() { static QString str = "Введите текст"; return str; }
 
 	void SaveNoteOnClient(const QString &reason);
@@ -140,6 +142,7 @@ public:
 	virtual void CreateNewNote() = 0;
 	virtual void ShowMainWindow() = 0;
 	virtual void MostOpenedNotes() = 0;
+	virtual std::vector<Note*> Notes(std::function<bool(Note*)> filter = {}) = 0;
 };
 
 #endif // NOTE_H

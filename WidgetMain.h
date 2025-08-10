@@ -39,6 +39,7 @@ public:
 	virtual void CreateNewNote() override;
 	virtual void ShowMainWindow() override;
 	virtual void MostOpenedNotes() override;
+	virtual std::vector<Note*> Notes(std::function<bool(Note*)> filter = {}) override;
 
 	Note* FindOriginalNote(qint64 idNote);
 

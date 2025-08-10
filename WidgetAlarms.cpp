@@ -41,9 +41,8 @@ WidgetAlarms::WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidge
 
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
 	QHBoxLayout *hlo1 = new QHBoxLayout;
-	QHBoxLayout *hlo2 = new QHBoxLayout;
+
 	vlo_main->addLayout(hlo1);
-	vlo_main->addLayout(hlo2);
 
 	table = new QTableWidget;
 	table->setColumnCount(1);
@@ -54,7 +53,8 @@ WidgetAlarms::WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidge
 		WidgetNoteEditor::MakeOrShowNoteEditor(*notes[r]->note);
 	});
 
-	CreateBottomRow(hlo2);
+	CreateBottomRow(vlo_main);
+	CreateFindSection(vlo_main);
 
 	auto timerGeoSaver = new QTimer(this);
 	connect(timerGeoSaver, &QTimer::timeout, [this](){
@@ -147,8 +147,11 @@ void WidgetAlarms::CreateTableContextMenu()
 	});
 }
 
-void WidgetAlarms::CreateBottomRow(QHBoxLayout *hlo)
+void WidgetAlarms::CreateBottomRow(QBoxLayout *loMain)
 {
+	QHBoxLayout *hlo = new QHBoxLayout;
+	loMain->addLayout(hlo);
+
 	auto btnShowMainWindow = new QToolButton();
 	btnShowMainWindow->setIcon(QIcon(Resources::list().GetPathName()));
 	hlo->addWidget(btnShowMainWindow);
@@ -158,6 +161,11 @@ void WidgetAlarms::CreateBottomRow(QHBoxLayout *hlo)
 	btnMostOpenedNotes->setIcon(QIcon(Resources::list_mo().GetPathName()));
 	hlo->addWidget(btnMostOpenedNotes);
 	connect(btnMostOpenedNotes, &QPushButton::clicked, this, [this](){ notesOwner->MostOpenedNotes(); });
+
+	auto btnFind = new QToolButton();
+	btnFind->setIcon(QIcon(Resources::find().GetPathName()));
+	hlo->addWidget(btnFind);
+	connect(btnFind, &QPushButton::clicked, this, [this](){ FindSectionShowHide(); });
 
 	auto btnAdd = new QToolButton();
 	btnAdd->setIcon(QIcon(Resources::add().GetPathName()));
@@ -210,6 +218,77 @@ void WidgetAlarms::CreateBottomRow(QHBoxLayout *hlo)
 		ShowMenuPostpone(btnPostponeAll->mapToGlobal(QPoint(0, btnPostponeAll->height())),
 						 setPostpone, NoteForPostponeAll());
 	});
+}
+
+void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
+{
+	auto widgetFind = new QWidget;
+	widgetFind->setVisible(false);
+	loMain->addWidget(widgetFind);
+
+	auto tableFind = new QTableWidget;
+	tableFind->setColumnCount(1);
+	tableFind->verticalScrollBar()->hide();
+	tableFind->verticalHeader()->hide();
+	tableFind->horizontalHeader()->hide();
+	//tableFind->setFixedHeight(100);
+
+	FindSectionShowHide = [this, widgetFind, tableFind]() {
+		this->setFixedWidth(width());
+		table->setFixedHeight(table->height());
+
+		widgetFind->setVisible(!widgetFind->isVisible());
+
+		QTimer::singleShot(10,[this, widgetFind, tableFind](){
+			adjustSize();
+			tableFind->setColumnWidth(0, tableFind->width());
+			if(!widgetFind->isVisible()) // если сбросить и FixedWidth FixedHeight когда widgetFind отображается окно уродуется
+			{
+				table->setMinimumHeight(0);
+				table->setMaximumHeight(QWIDGETSIZE_MAX);
+				this->setMinimumWidth(0);
+				this->setMaximumWidth(QWIDGETSIZE_MAX);
+			}
+		});
+	};
+
+	auto vloFind = new QVBoxLayout(widgetFind);
+	vloFind->setContentsMargins(0,0,0,0);
+
+	auto hlo1 = new QHBoxLayout;
+	hlo1->setContentsMargins(0,0,0,0);
+	vloFind->addLayout(hlo1);
+
+	auto leFind = new QLineEdit;
+	hlo1->addWidget(leFind);
+	connect(leFind, &QLineEdit::textChanged, [this, tableFind](const QString &text){
+		tableFind->setRowCount(0);
+		if(text.isEmpty()) return;
+
+		QString textTranslited = MyQString::Translited(text);
+
+		auto notes = notesOwner->Notes([text, textTranslited](Note *note){
+				if(note->CheckNoteForFilters(text, textTranslited))
+					return true;
+				else return false;
+		});
+
+		tableFind->setRowCount(notes.size());
+		int i = 0;
+		for(auto &note:notes)
+		{
+			tableFind->setItem(i++, 0, new QTableWidgetItem(note->Name()));
+		}
+	});
+
+	auto btnClearSearch = new QToolButton;
+	btnClearSearch->setIcon(QApplication::style()->standardIcon(QStyle::StandardPixmap::SP_TitleBarCloseButton));
+	hlo1->addWidget(btnClearSearch);
+	connect(btnClearSearch, &QToolButton::clicked, [leFind](){ leFind->clear(); });
+
+	hlo1->addStretch();
+
+	vloFind->addWidget(tableFind);
 }
 
 NoteInAlarms * WidgetAlarms::FindNote(Note * noteToFind)

@@ -343,6 +343,20 @@ void Note::SetDT(QDateTime dtNotify, QDateTime dtPostpone)
 	}
 }
 
+bool Note::CheckNoteForFilters(const QString &textFilter, const QString &textFilterTranslited)
+{
+	if(textFilter.isEmpty() && textFilterTranslited.isEmpty()) return true;
+
+	QStringRef contentHead(&content, 0, content.size() > 2000 ? 2000 : content.size());
+
+	if(name.contains(textFilter, Qt::CaseInsensitive)
+			|| name.contains(textFilterTranslited, Qt::CaseInsensitive)
+			|| contentHead.contains(textFilter, Qt::CaseInsensitive)
+			|| contentHead.contains(textFilterTranslited, Qt::CaseInsensitive))
+		return true;
+	else return false;
+}
+
 void Note::SaveNoteOnClient(const QString &reason)
 {
 	qdbg << "SaveNote for "+reason+" name:" + name;

@@ -361,6 +361,11 @@ void WidgetMain::CreateTrayIcon()
 
 	menu->addSeparator();
 
+	menu->addAction("Most opened notes");
+	connect(menu->actions().back(), &QAction::triggered, this, [this](){ MostOpenedNotes(); });
+
+	menu->addSeparator();
+
 	menu->addAction("Create new note");
 	connect(menu->actions().back(), &QAction::triggered, this, [this](){ CreateNewNote(); });
 
@@ -559,6 +564,18 @@ void WidgetMain::MostOpenedNotes()
 	}
 }
 
+std::vector<Note *> WidgetMain::Notes(std::function<bool (Note *)> filter)
+{
+	std::vector<Note *> ret;
+	if(filter) {
+		for(auto &note:notes) if(filter(note->note.get())) ret.push_back(note->note.get());
+	}
+	else {
+		for(auto &note:notes) ret.push_back(note->note.get());
+	}
+	return ret;
+}
+
 Note *WidgetMain::FindOriginalNote(qint64 idNote)
 {
 	for(auto &note:notes)
@@ -666,6 +683,8 @@ Note *WidgetMain::NoteOfRow(int row)
 {
 	auto item = table->item(row, ColIndexes::name);
 	if(!item) { QMbError("NoteOfRow: !item for row " + QSn(row)); return nullptr; }
+
+	if(0) CodeMarkers::to_do("make map to fast find NoteOfRow");
 
 	for(uint i=0; i<notes.size(); i++)
 	{
@@ -798,16 +817,10 @@ void WidgetMain::UpdateWidgetsFromNote(NoteInMain &note)
 void WidgetMain::FilterNotes(const QString &textFilter)
 {
 	QString textFilterTranslited = MyQString::Translited(textFilter);
-	QString contentHead;
+
 	for(int row=0; row<table->rowCount(); row++)
 	{
-		QStringRef contentHead(&NoteOfRow(row)->Content(), 0,
-							   NoteOfRow(row)->Content().size() > 2000 ? 2000 : NoteOfRow(row)->Content().size());
-		if(textFilter.isEmpty()
-				|| table->item(row, ColIndexes::name)->text().contains(textFilter, Qt::CaseInsensitive)
-				|| table->item(row, ColIndexes::name)->text().contains(textFilterTranslited, Qt::CaseInsensitive)
-				|| contentHead.contains(textFilter, Qt::CaseInsensitive)
-				|| contentHead.contains(textFilterTranslited, Qt::CaseInsensitive))
+		if(NoteOfRow(row)->CheckNoteForFilters(textFilter, textFilterTranslited))
 		{
 			table->setRowHidden(row, false);
 		}
