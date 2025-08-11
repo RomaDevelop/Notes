@@ -36,6 +36,7 @@ WidgetAlarms::WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidge
 {
 	settingsFile = MyQDifferent::PathToExe() + "/files/settings_widget_alarms.ini";
 
+	setWindowFlag(Qt::WindowMaximizeButtonHint, false);
 	setWindowFlag(Qt::WindowCloseButtonHint, false);
 	setWindowFlag(Qt::WindowDoesNotAcceptFocus, true);
 
@@ -165,7 +166,7 @@ void WidgetAlarms::CreateBottomRow(QBoxLayout *loMain)
 	auto btnFind = new QToolButton();
 	btnFind->setIcon(QIcon(Resources::find().GetPathName()));
 	hlo->addWidget(btnFind);
-	connect(btnFind, &QPushButton::clicked, this, [this](){ FindSectionShowHide(); });
+	connect(btnFind, &QPushButton::clicked, this, [this](){ SlotBtnFindClicked(); });
 
 	auto btnAdd = new QToolButton();
 	btnAdd->setIcon(QIcon(Resources::add().GetPathName()));
@@ -226,6 +227,8 @@ void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
 	widgetFind->setVisible(false);
 	loMain->addWidget(widgetFind);
 
+	auto lineEditFind = new QLineEdit;
+
 	auto tableFind = new QTableWidget;
 	tableFind->setColumnCount(1);
 	tableFind->verticalScrollBar()->hide();
@@ -233,13 +236,13 @@ void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
 	tableFind->horizontalHeader()->hide();
 	//tableFind->setFixedHeight(100);
 
-	FindSectionShowHide = [this, widgetFind, tableFind]() {
+	SlotBtnFindClicked = [this, widgetFind, lineEditFind, tableFind]() {
 		this->setFixedWidth(width());
 		table->setFixedHeight(table->height());
 
 		widgetFind->setVisible(!widgetFind->isVisible());
 
-		QTimer::singleShot(10,[this, widgetFind, tableFind](){
+		QTimer::singleShot(10,[this, widgetFind, lineEditFind, tableFind](){
 			adjustSize();
 			tableFind->setColumnWidth(0, tableFind->width());
 			if(!widgetFind->isVisible()) // если сбросить и FixedWidth FixedHeight когда widgetFind отображается окно уродуется
@@ -248,6 +251,11 @@ void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
 				table->setMaximumHeight(QWIDGETSIZE_MAX);
 				this->setMinimumWidth(0);
 				this->setMaximumWidth(QWIDGETSIZE_MAX);
+			}
+			else
+			{
+				PlatformDependent::FlashClickOnTitle(this);
+				lineEditFind->setFocus();
 			}
 		});
 	};
@@ -259,9 +267,8 @@ void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
 	hlo1->setContentsMargins(0,0,0,0);
 	vloFind->addLayout(hlo1);
 
-	auto leFind = new QLineEdit;
-	hlo1->addWidget(leFind);
-	connect(leFind, &QLineEdit::textChanged, [this, tableFind](const QString &text){
+	hlo1->addWidget(lineEditFind);
+	connect(lineEditFind, &QLineEdit::textChanged, [this, tableFind](const QString &text){
 		tableFind->setRowCount(0);
 		if(text.isEmpty()) return;
 
@@ -284,7 +291,7 @@ void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
 	auto btnClearSearch = new QToolButton;
 	btnClearSearch->setIcon(QApplication::style()->standardIcon(QStyle::StandardPixmap::SP_TitleBarCloseButton));
 	hlo1->addWidget(btnClearSearch);
-	connect(btnClearSearch, &QToolButton::clicked, [leFind](){ leFind->clear(); });
+	connect(btnClearSearch, &QToolButton::clicked, [lineEditFind](){ lineEditFind->clear(); });
 
 	hlo1->addStretch();
 

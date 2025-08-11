@@ -43,7 +43,7 @@ private:
 	void CreateTableContextMenu();
 	void CreateBottomRow(QBoxLayout *loMain);
 	void CreateFindSection(QBoxLayout *loMain);
-	std::function<void()> FindSectionShowHide = [](){ QMbError("null ShowFindSection"); };
+	std::function<void()> SlotBtnFindClicked = [](){ QMbError("null ShowFindSection"); };
 
 	std::vector<std::unique_ptr<NoteInAlarms>> notes;
 	NoteInAlarms* FindNote(Note *noteToFind);
