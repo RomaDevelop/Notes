@@ -143,6 +143,7 @@ public:
 	virtual void ShowMainWindow() = 0;
 	virtual void MostOpenedNotes() = 0;
 	virtual std::vector<Note*> Notes(std::function<bool(Note*)> filter = {}) = 0;
+	virtual bool IsNoteValid(Note *note) = 0;
 };
 
 #endif // NOTE_H

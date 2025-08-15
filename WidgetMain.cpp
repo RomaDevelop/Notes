@@ -568,12 +568,22 @@ std::vector<Note *> WidgetMain::Notes(std::function<bool (Note *)> filter)
 {
 	std::vector<Note *> ret;
 	if(filter) {
-		for(auto &note:notes) if(filter(note->note.get())) ret.push_back(note->note.get());
+		for(auto &note:notes)
+			if(filter(note->note.get()))
+				ret.push_back(note->note.get());
 	}
 	else {
-		for(auto &note:notes) ret.push_back(note->note.get());
+		for(auto &note:notes)
+			ret.push_back(note->note.get());
 	}
 	return ret;
+}
+
+bool WidgetMain::IsNoteValid(Note *note)
+{
+	for(auto &validNote:notes)
+		if(validNote->note.get() == note) return true;
+	return false;
 }
 
 Note *WidgetMain::FindOriginalNote(qint64 idNote)

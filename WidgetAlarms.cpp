@@ -230,12 +230,14 @@ void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
 	auto lineEditFind = new QLineEdit;
 
 	auto tableFind = new QTableWidget;
+	tableFind->setEditTriggers(QTableWidget::NoEditTriggers);
 	tableFind->setColumnCount(1);
 	tableFind->verticalScrollBar()->hide();
 	tableFind->verticalHeader()->hide();
 	tableFind->horizontalHeader()->hide();
 	//tableFind->setFixedHeight(100);
 
+	// обработчик нажания на кнопку Лупа
 	SlotBtnFindClicked = [this, widgetFind, lineEditFind, tableFind]() {
 		this->setFixedWidth(width());
 		table->setFixedHeight(table->height());
@@ -267,31 +269,55 @@ void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
 	hlo1->setContentsMargins(0,0,0,0);
 	vloFind->addLayout(hlo1);
 
+	auto FillingTableSearchRes = [tableFind](std::vector<Note*> notes){
+		tableFind->setRowCount(notes.size());
+		int row = 0;
+		for(auto &note:notes)
+		{
+			auto text = "  "+note->Name() + " (" + note->DTNotify().toString() + " | " + note->DTPostpone().toString() + ")";
+			auto item = new QTableWidgetItem(text);
+			item->setData(Qt::UserRole, (qlonglong)note);
+			tableFind->setItem(row++, 0, item);
+		}
+	};
+
 	hlo1->addWidget(lineEditFind);
-	connect(lineEditFind, &QLineEdit::textChanged, [this, tableFind](const QString &text){
+	connect(lineEditFind, &QLineEdit::textChanged, [this, tableFind, FillingTableSearchRes](const QString &text){
 		tableFind->setRowCount(0);
 		if(text.isEmpty()) return;
 
 		QString textTranslited = MyQString::Translited(text);
 
+// выборка заметок
 		auto notes = notesOwner->Notes([text, textTranslited](Note *note){
-				if(note->CheckNoteForFilters(text, textTranslited))
-					return true;
-				else return false;
+			if(note->CheckNoteForFilters(text, textTranslited))
+				return true;
+			else return false;
 		});
 
-		tableFind->setRowCount(notes.size());
-		int i = 0;
-		for(auto &note:notes)
-		{
-			tableFind->setItem(i++, 0, new QTableWidgetItem(note->Name()));
-		}
+		FillingTableSearchRes(notes);
 	});
 
 	auto btnClearSearch = new QToolButton;
 	btnClearSearch->setIcon(QApplication::style()->standardIcon(QStyle::StandardPixmap::SP_TitleBarCloseButton));
 	hlo1->addWidget(btnClearSearch);
 	connect(btnClearSearch, &QToolButton::clicked, [lineEditFind](){ lineEditFind->clear(); });
+
+	auto btnClearRefresh = new QToolButton;
+	btnClearRefresh->setIcon(QApplication::style()->standardIcon(QStyle::StandardPixmap::SP_BrowserReload));
+	hlo1->addWidget(btnClearRefresh);
+	connect(btnClearRefresh, &QToolButton::clicked, [lineEditFind](){ emit lineEditFind->textChanged(lineEditFind->text()); });
+
+	connect(tableFind, &QTableWidget::itemDoubleClicked, this, [this, tableFind](QTableWidgetItem *item){
+		Note *notePtr = (Note*)item->data(Qt::UserRole).toLongLong();
+		if(!notesOwner->IsNoteValid(notePtr)) {
+			QMbInfo("This note is invalid now");
+			tableFind->removeRow(item->row());
+			return;
+		}
+
+		WidgetNoteEditor::MakeOrShowNoteEditor(*notePtr);
+	});
 
 	hlo1->addStretch();
 

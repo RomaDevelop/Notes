@@ -40,6 +40,7 @@ public:
 	virtual void ShowMainWindow() override;
 	virtual void MostOpenedNotes() override;
 	virtual std::vector<Note*> Notes(std::function<bool(Note*)> filter = {}) override;
+	virtual bool IsNoteValid(Note *note) override;
 
 	Note* FindOriginalNote(qint64 idNote);
 
