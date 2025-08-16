@@ -21,6 +21,7 @@
 #include "FastActions.h"
 #include "WidgetNoteEditor.h"
 #include "Resources.h"
+#include "DialogInputTime.h"
 
 const QString& RescheduleCaption() { static QString str = " Перенести на ... "; return str; }
 const QString& RostponeCaption() { static QString str = " Отложить на ... "; return str; }
@@ -308,6 +309,13 @@ void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
 	hlo1->addWidget(btnClearRefresh);
 	connect(btnClearRefresh, &QToolButton::clicked, [lineEditFind](){ emit lineEditFind->textChanged(lineEditFind->text()); });
 
+	auto btnHideSearch = new QToolButton;
+	btnHideSearch->setIcon(QApplication::style()->standardIcon(QStyle::StandardPixmap::SP_TitleBarShadeButton));
+	hlo1->addWidget(btnHideSearch);
+	connect(btnHideSearch, &QToolButton::clicked, [this](){ SlotBtnFindClicked(); });
+
+	hlo1->addStretch();
+
 	connect(tableFind, &QTableWidget::itemDoubleClicked, this, [this, tableFind](QTableWidgetItem *item){
 		Note *notePtr = (Note*)item->data(Qt::UserRole).toLongLong();
 		if(!notesOwner->IsNoteValid(notePtr)) {
@@ -318,8 +326,6 @@ void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
 
 		WidgetNoteEditor::MakeOrShowNoteEditor(*notePtr);
 	});
-
-	hlo1->addStretch();
 
 	vloFind->addWidget(tableFind);
 }
@@ -486,7 +492,8 @@ void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 
 void WidgetAlarms::RemoveNoteFromWidgetAlarms(int index)
 {
-	notes[index]->note->RemoveCbs(notes[index].get(), notes[index]->cbCounter);
+	if(notesOwner->IsNoteValid(notes[index]->note))
+		notes[index]->note->RemoveCbs(notes[index].get(), notes[index]->cbCounter);
 	table->removeRow(index);
 	notes.erase(notes.begin() + index);
 
@@ -498,7 +505,16 @@ void WidgetAlarms::RemoveNoteFromWidgetAlarms(Note * aNote, bool showError)
 	for(uint i=0; i<notes.size(); i++)
 		if(notes[i]->note == aNote)
 		{
+			int restoreRow = table->currentRow() == (int)i ? i : -1;
+
 			RemoveNoteFromWidgetAlarms(i);
+
+			if(restoreRow != -1)
+			{
+				if(restoreRow >= table->rowCount()) restoreRow--;
+				if(restoreRow >=0 ) table->setCurrentCell(restoreRow, 0);
+			}
+
 			return;
 		}
 	if(showError) QMbError("RemoveNoteFromWidgetAlarms: note " + aNote->Name() + " not found");
@@ -543,15 +559,17 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 						 {"21 дней", secondsInDay*21}, {"25 дней", secondsInDay*25}, {"Месяц", secondsInDay*daysInMonth},
 						 {"", ForPostpone_ns::separator},
 						 {"40 дней", secondsInDay*40}, {"50 дней", secondsInDay*50}, {"Два месяца", secondsInDay*daysInMonth*2},
-						 {"Ввести вручную", ForPostpone_ns::handInput}};
+						 {"Ввести вручную", ForPostpone_ns::handInput},
+						 };
 	else if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
 		delays = 		{{"5 минут", 60*5}, {"10 минут", 60*10}, {"15 минут", 60*15}, {"20 минут", 60*20},
 						 {"25 минут", 60*25}, {"30 минут", 60*30}, {"35 минут", 60*35}, {"40 минут", 60*40},
 						 {"45 минут", 60*45}, {"50 минут", 60*50}, {"1 час", 60*60}, {"1,5 часа", 60*90},
 						 {"2 часа", 60*60*2}, {"3 часа", 60*60*3}, {"4 часа", 60*60*4}, {"5 часов", 60*60*5},
 						 {"6 часов", 60*60*6}, {"7 часов", 60*60*7}, {"8 часов", 60*60*8},  {"10 часов", 60*60*10},
-						  {"12 часов", 60*60*12},  {"14 часов", 60*60*14},  {"16 часов", 60*60*16},
-						 {"Ввести вручную", ForPostpone_ns::handInput}};
+						 {"12 часов", 60*60*12},  {"14 часов", 60*60*14},  {"16 часов", 60*60*16},
+						 {"Ввести вручную", ForPostpone_ns::handInput},
+						 };
 	else QMbError("wrong menuPostponeCaseValue");
 
 	std::set<Note*> notesToDo { note };
@@ -617,32 +635,36 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 
 void WidgetAlarms::SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, menuPostponeCase caseCurrent)
 {
-	int itogDelaySecs = delaySecs; // почему то не давал изменять значение delaySecs внутри лямбды
-	if(itogDelaySecs == ForPostpone_ns::handInput)
+
+	if(delaySecs == ForPostpone_ns::handInput)
 	{
-		auto res = MyQDialogs::InputLineExt("Введите значение", "Введите значение", "",
-											{"Секунд","Минут","Часов","Дней","Отмена"}, 500);
-		if(res.text.isEmpty()) return;
-		if(!IsUInt(res.text)) { QMbError("Input is not number" + res.text); return; }
-		if(0) ;
-		else if(res.button == "Секунд") itogDelaySecs = res.text.toUInt();
-		else if(res.button == "Минут") itogDelaySecs = res.text.toUInt()*60;
-		else if(res.button == "Часов") itogDelaySecs = res.text.toUInt()*60*60;
-		else if(res.button == "Дней") itogDelaySecs = res.text.toUInt()*60*60*24;
-		else if(res.button == "Отмена") return;
-		else if(res.button.isEmpty()) return;
-		else QMbError("Error button name " + res.button);
+		auto res = DialogInputTime::Execute();
+		if(!res.accepted) return;
+		delaySecs = DialogInputTime::TotalSecs(res);
+
+//		auto res = MyQDialogs::InputLineExt("Введите значение", "Введите значение", "",
+//											{"Секунд","Минут","Часов","Дней","Отмена"}, 500);
+//		if(res.text.isEmpty()) return;
+//		if(!IsUInt(res.text)) { QMbError("Input is not number" + res.text); return; }
+//		if(0) ;
+//		else if(res.button == "Секунд") delaySecs = res.text.toUInt();
+//		else if(res.button == "Минут") delaySecs = res.text.toUInt()*60;
+//		else if(res.button == "Часов") delaySecs = res.text.toUInt()*60*60;
+//		else if(res.button == "Дней") delaySecs = res.text.toUInt()*60*60*24;
+//		else if(res.button == "Отмена") return;
+//		else if(res.button.isEmpty()) return;
+//		else QMbError("Error button name " + res.button);
 	}
 
 	for(auto &noteToPospone:notesToPostpone)
 	{
 		if(caseCurrent == menuPostponeCase::setPostpone)
 		{
-			noteToPospone->SetDT(noteToPospone->DTNotify(), AddSecsFromNow(itogDelaySecs));
+			noteToPospone->SetDT(noteToPospone->DTNotify(), AddSecsFromNow(delaySecs));
 		}
 		else if(caseCurrent == menuPostponeCase::changeDtNotify)
 		{
-			noteToPospone->SetDT(AddSecsFromToday(noteToPospone->DTNotify(), itogDelaySecs), noteToPospone->DTNotify());
+			noteToPospone->SetDT(AddSecsFromToday(noteToPospone->DTNotify(), delaySecs), noteToPospone->DTNotify());
 		}
 
 		if(notes.empty()) hide();

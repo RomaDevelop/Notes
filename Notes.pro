@@ -7,6 +7,7 @@ SOURCES += \
     ../NotesServer/NetConstants.cpp \
     ../include/AdditionalTray.cpp \
     ../include/PlatformDependent.cpp \
+    DialogInputTime.cpp \
     FastActions.cpp \
     NetClient.cpp \
     Note.cpp \
@@ -25,6 +26,7 @@ HEADERS += \
     ../include/PlatformDependent.h \
     ../include/TextEditCleaner.h \
     DevNames.h \
+    DialogInputTime.h \
     FastActions.h \
     NetClient.h \
     Note.h \

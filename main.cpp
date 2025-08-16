@@ -9,6 +9,8 @@
 
 #include "DevNames.h"
 
+#include "DialogInputTime.h"
+
 int main(int argc, char *argv[])
 {
 	qdbg << "дома из-за увеличенных шрифтов есть некоторые уродства";
@@ -30,5 +32,6 @@ int main(int argc, char *argv[])
 
 	WidgetMain w;
 	w.show();
+
 	return a.exec();
 }

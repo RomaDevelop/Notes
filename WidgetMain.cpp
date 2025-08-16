@@ -583,6 +583,7 @@ bool WidgetMain::IsNoteValid(Note *note)
 {
 	for(auto &validNote:notes)
 		if(validNote->note.get() == note) return true;
+	if(0) CodeMarkers::can_be_optimized("should make set and find in it");
 	return false;
 }
 
@@ -667,6 +668,7 @@ void WidgetMain::LoadNotes()
 {
 	ClearNotesInWidgetMain();
 	auto notes = Note::LoadNotes();
+	int i=0;
 	for(auto &note:notes)
 	{
 		MakeNewNote(note);
