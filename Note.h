@@ -141,7 +141,8 @@ public:
 
 	virtual void CreateNewNote() = 0;
 	virtual void ShowMainWindow() = 0;
-	virtual void MostOpenedNotes() = 0;
+	enum lists { mostOpened, recentOpened, nextAlarms };
+	virtual void NotesLists(lists list) = 0;
 	virtual std::vector<Note*> Notes(std::function<bool(Note*)> filter = {}) = 0;
 	virtual bool IsNoteValid(Note *note) = 0;
 };

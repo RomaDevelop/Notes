@@ -265,7 +265,7 @@ void Note::InitFromRecord(QStringList &row)
 	groupId			= row[Fields::idGroupIndInNotes];
 	id				= row[Fields::idNoteInd].toInt();
 	content			= std::move(row[Fields::contentInd]);
-	dtLastUpdated	= QDateTime::fromString(row[Fields::lastUpdatedInd], Fields::dtFormatLastUpdated());
+	dtLastUpdated	= QDateTime::fromString(row[Fields::dtLastUpdatedInd], Fields::dtFormatLastUpdated());
 }
 
 QStringList Note::SaveToRecord() const
@@ -280,7 +280,7 @@ QStringList Note::SaveToRecord() const
 	rec[Fields::idGroupIndInNotes]	 = groupId		;
 	rec[Fields::idNoteInd]			 = QSn(id)				;
 	rec[Fields::contentInd]			 = content		;
-	rec[Fields::lastUpdatedInd]		 = DtLastUpdatedStr()	;
+	rec[Fields::dtLastUpdatedInd]		 = DtLastUpdatedStr()	;
 	return rec;
 }
 

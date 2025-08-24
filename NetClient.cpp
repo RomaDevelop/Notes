@@ -533,11 +533,11 @@ void NetClient::CreateOrUpdateNoteFromGetedNote(const QString &noteAsStr, QStrin
 	else
 	{
 		bool doUpdate = false;
-		if(noteFromServer->DtLastUpdatedStr() == rec[Fields::lastUpdatedInd])
+		if(noteFromServer->DtLastUpdatedStr() == rec[Fields::dtLastUpdatedInd])
 		{
 			Log("Note from server " + noteFromServer->Name() + " has same dtLastUpdated");
 		}
-		else if(noteFromServer->DtLastUpdatedStr() > rec[Fields::lastUpdatedInd]) doUpdate = true;
+		else if(noteFromServer->DtLastUpdatedStr() > rec[Fields::dtLastUpdatedInd]) doUpdate = true;
 		else
 		{
 			auto answ = MyQDialogs::CustomDialog("Notes conflict",

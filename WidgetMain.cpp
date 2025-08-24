@@ -110,7 +110,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 			for(int i=0; i<3; i++)
 			{
 				QProcess process;
-				process.setWorkingDirectory(LaunchParams::CurrentDeveloper()->sourcesPath);
+				process.setWorkingDirectory(LaunchParams::CurrentDeveloper().sourcesPath);
 				process.start("git", QStringList() << "fetch" << "github");
 				if(!process.waitForStarted(3000))
 				{
@@ -220,11 +220,19 @@ WidgetMain::~WidgetMain()
 
 void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 {
-// Most opened notes
+// Lists notes
 	auto btnMostOpenedNotes = new QToolButton();
 	btnMostOpenedNotes->setIcon(QIcon(Resources::list_mo().GetPathName()));
 	hlo1->addWidget(btnMostOpenedNotes);
-	connect(btnMostOpenedNotes, &QPushButton::clicked, this, [this](){ MostOpenedNotes(); });
+	connect(btnMostOpenedNotes, &QPushButton::clicked, this, [this](){ NotesLists(INotesOwner::mostOpened); });
+	auto btnRecentOpenedNotes = new QToolButton();
+	btnRecentOpenedNotes->setIcon(QIcon(Resources::list_ro().GetPathName()));
+	hlo1->addWidget(btnRecentOpenedNotes);
+	connect(btnRecentOpenedNotes, &QPushButton::clicked, this, [this](){ NotesLists(INotesOwner::recentOpened); });
+	auto btnNextAlarmsNotes = new QToolButton();
+	btnNextAlarmsNotes->setIcon(QIcon(Resources::list_na().GetPathName()));
+	hlo1->addWidget(btnNextAlarmsNotes);
+	connect(btnNextAlarmsNotes, &QPushButton::clicked, this, [this](){ NotesLists(INotesOwner::nextAlarms); });
 
 // Add
 	QToolButton *btnPlus = new QToolButton();
@@ -362,7 +370,11 @@ void WidgetMain::CreateTrayIcon()
 	menu->addSeparator();
 
 	menu->addAction("Most opened notes");
-	connect(menu->actions().back(), &QAction::triggered, this, [this](){ MostOpenedNotes(); });
+	connect(menu->actions().back(), &QAction::triggered, this, [this](){ NotesLists(mostOpened); });
+	menu->addAction("Recent opened notes");
+	connect(menu->actions().back(), &QAction::triggered, this, [this](){ NotesLists(recentOpened); });
+	menu->addAction("Next alarms notes");
+	connect(menu->actions().back(), &QAction::triggered, this, [this](){ NotesLists(nextAlarms); });
 
 	menu->addSeparator();
 
@@ -539,9 +551,25 @@ void WidgetMain::ShowMainWindow()
 	PlatformDependent::SetTopMostFlash(this);
 }
 
-void WidgetMain::MostOpenedNotes()
+void WidgetMain::NotesLists(lists list)
 {
-	auto ids = DataBase::NotesIdsOrderedByOpensCount();
+	QStringList ids;
+	QString caption;
+	if(list == mostOpened)
+	{
+		ids = DataBase::NotesIdsOrderedByOpensCount();
+		caption = "Most opened notes";
+	}
+	else if (list == recentOpened) {
+		ids = DataBase::NotesIdsOrderedByLastOpened();
+		caption = "Last opened notes";
+	}
+	else if (list == nextAlarms) {
+		ids = DataBase::NotesIdsOrderedByDtPostpone();
+		caption = "Next alarms notes";
+	}
+	else { QMbError("Unrealised action " + MyQString::AsDebug(list)); }
+
 	std::vector<Note*> notes;
 	for(auto &id:ids)
 	{
@@ -556,7 +584,7 @@ void WidgetMain::MostOpenedNotes()
 		names += note->Name();
 	}
 
-	auto answ = MyQDialogs::ListDialog("Most opened notes", names);
+	auto answ = MyQDialogs::ListDialog(caption, names);
 	if(answ.accepted)
 	{
 		Note &noteRef = *notes[answ.index];
@@ -668,7 +696,6 @@ void WidgetMain::LoadNotes()
 {
 	ClearNotesInWidgetMain();
 	auto notes = Note::LoadNotes();
-	int i=0;
 	for(auto &note:notes)
 	{
 		MakeNewNote(note);

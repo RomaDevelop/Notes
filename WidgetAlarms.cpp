@@ -162,7 +162,15 @@ void WidgetAlarms::CreateBottomRow(QBoxLayout *loMain)
 	auto btnMostOpenedNotes = new QToolButton();
 	btnMostOpenedNotes->setIcon(QIcon(Resources::list_mo().GetPathName()));
 	hlo->addWidget(btnMostOpenedNotes);
-	connect(btnMostOpenedNotes, &QPushButton::clicked, this, [this](){ notesOwner->MostOpenedNotes(); });
+	connect(btnMostOpenedNotes, &QPushButton::clicked, this, [this](){ notesOwner->NotesLists(INotesOwner::mostOpened); });
+	auto btnRecentOpenedNotes = new QToolButton();
+	btnRecentOpenedNotes->setIcon(QIcon(Resources::list_ro().GetPathName()));
+	hlo->addWidget(btnRecentOpenedNotes);
+	connect(btnRecentOpenedNotes, &QPushButton::clicked, this, [this](){ notesOwner->NotesLists(INotesOwner::recentOpened); });
+	auto btnNextAlarmsNotes = new QToolButton();
+	btnNextAlarmsNotes->setIcon(QIcon(Resources::list_na().GetPathName()));
+	hlo->addWidget(btnNextAlarmsNotes);
+	connect(btnNextAlarmsNotes, &QPushButton::clicked, this, [this](){ notesOwner->NotesLists(INotesOwner::nextAlarms); });
 
 	auto btnFind = new QToolButton();
 	btnFind->setIcon(QIcon(Resources::find().GetPathName()));
@@ -796,26 +804,41 @@ void WidgetAlarms::InitMessageForNotifyTimer()
 		{
 			Note *note = notesToShowMessageForNotify.front();
 
-			bool toAll = false;
-			bool *toAllPtr = nullptr;
+			QString text = "Message-notify for note:\n" + note->Name();
+			QStringList buttons {"Open for edit", "Move up in notify widget", "Nothing to do"};
 			if(notesToShowMessageForNotify.size() > 1)
-				toAllPtr = &toAll;
-			auto answ = MyQDialogs::CustomDialog2("Message-notify for note", "Message-notify for note:\n" + note->Name(),
-												 {"Open for edit", "Move up in notify widget", "Nothing to do"},
-												 toAllPtr, "Apply to next "+QSn(notesToShowMessageForNotify.size())+" notes");
+			{
+				buttons.insert(2, "Move up all");
+				buttons.append("Nothing for all");
 
-			std::vector<Note*> notesToDoNow;
-			if(toAll) notesToDoNow = notesToShowMessageForNotify;
-			else notesToDoNow = {note};
+				text += "\n\nand than going messages for "+QSn(notesToShowMessageForNotify.size()-1)+" notes: ";
+				for(uint i=1; i<notesToShowMessageForNotify.size(); i++)
+				{
+					if(i >= 6) { text += "\n..."; break; }
+					text += "\n"+notesToShowMessageForNotify[i]->Name();
+				}
+			}
+
+			auto answ = MyQDialogs::CustomDialog("Message-notify for note", text, buttons);
+
+			bool toAll = false;
 
 			if(answ == "Open for edit"){
-				for(auto &note:notesToDoNow) WidgetNoteEditor::MakeOrShowNoteEditor(*note);
+				WidgetNoteEditor::MakeOrShowNoteEditor(*note);
 			}
 			else if(answ == "Move up in notify widget") {
-				for(auto &note:notesToDoNow) MoveNoteUp(*note);
+				MoveNoteUp(*note);
+			}
+			else if(answ == "Move up all")
+			{
+				toAll = true;
+				for(auto &note:notesToShowMessageForNotify) MoveNoteUp(*note);
 			}
 			else if(answ == "Nothing to do"){
 
+			}
+			else if(answ == "Nothing for all"){
+				toAll = true;
 			}
 			else QMbError("Unrealesed answ");
 

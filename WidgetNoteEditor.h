@@ -16,9 +16,9 @@ class WidgetNoteEditor : public QWidget
 
 public:
 	static WidgetNoteEditor* MakeOrShowNoteEditor(Note &note, bool noteIsTmpNote = false);
+	static WidgetNoteEditor* MakeOrShowNoteEditorTmpNote(QStringList noteRecord);
 	//static WidgetNoteEditor* MakeOrShowNoteEditorTmpNote(Note note);
 		// не стоит делать такой способ ибо в Note коллбеки которые могут копироваться
-	static WidgetNoteEditor* MakeOrShowNoteEditorTmpNote(QStringList noteRecord);
 
 	void StoreTmpNote(std::shared_ptr<Note> tmpNote) { this->tmpNote = tmpNote; }
 	void SetReadOnly();

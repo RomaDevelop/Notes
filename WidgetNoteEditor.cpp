@@ -26,7 +26,11 @@
 
 WidgetNoteEditor* WidgetNoteEditor::MakeOrShowNoteEditor(Note &note, bool noteIsTmpNote)
 {
-	if(!noteIsTmpNote) DataBase::AddOpensCount(QSn(note.id), 1);
+	if(!noteIsTmpNote)
+	{
+		DataBase::AddOpensCount(QSn(note.id), 1);
+		DataBase::SetLastOpened(QSn(note.id));
+	}
 
 	if(auto existingEditor = existingEditors.find(&note); existingEditor == existingEditors.end())
 	{

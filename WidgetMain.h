@@ -38,7 +38,7 @@ public:
 
 	virtual void CreateNewNote() override;
 	virtual void ShowMainWindow() override;
-	virtual void MostOpenedNotes() override;
+	virtual void NotesLists(lists list) override;
 	virtual std::vector<Note*> Notes(std::function<bool(Note*)> filter = {}) override;
 	virtual bool IsNoteValid(Note *note) override;
 

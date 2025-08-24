@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
 						   "C:/Work/C++/"),
 					   });
 
-	Resources::Init(LaunchParams::CurrentDeveloper()->sourcesPath + "/resources", MyQDifferent::PathToExe()+"/files/resources", true);
+	Resources::Init(LaunchParams::CurrentDeveloper().sourcesPath + "/resources", MyQDifferent::PathToExe()+"/files/resources", true);
 
 	WidgetMain w;
 	w.show();

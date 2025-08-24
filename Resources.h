@@ -11,6 +11,8 @@ DECLARE_RESOURCES(Resources)
 	DECLARE_RESOURCE(add, "add.ico")
 	DECLARE_RESOURCE(list, "list.ico")
 	DECLARE_RESOURCE(list_mo, "list_mo.ico")
+	DECLARE_RESOURCE(list_na, "list_na.ico")
+	DECLARE_RESOURCE(list_ro, "list_ro.ico")
 	DECLARE_RESOURCE(remove, "remove.ico")
 	DECLARE_RESOURCE(find, "find.ico")
 END_DECLARE_RESOURCES;
