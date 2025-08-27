@@ -97,7 +97,6 @@ WidgetAlarms::~WidgetAlarms()
 
 void WidgetAlarms::GiveNotes(const std::vector<Note *> & givingNotes)
 {
-	bool added = false;
 	for(uint i=0; i<notes.size();)
 	{
 		if(std::find(givingNotes.begin(), givingNotes.end(), notes[i]->note) == givingNotes.end())
@@ -105,6 +104,7 @@ void WidgetAlarms::GiveNotes(const std::vector<Note *> & givingNotes)
 		else ++i;
 	}
 
+	bool added = false;
 	for(auto &newNote:givingNotes)
 	{
 		if(NoteInAlarms *findedNote = FindNote(newNote); findedNote == nullptr)
@@ -411,7 +411,7 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 	auto cb = [this, newNoteInAlarmsPtr](void*){
 		if(!newNoteInAlarmsPtr->note->CheckAlarm(QDateTime::currentDateTime()))
 		{
-			RemoveNoteFromWidgetAlarms(newNoteInAlarmsPtr->note, true);
+			RemoveNoteFromWidgetAlarms(NoteIndex(newNoteInAlarmsPtr->note));
 			return;
 		}
 		SetLabelText(*newNoteInAlarmsPtr);
@@ -452,7 +452,7 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 	connect(btnRemove, &QPushButton::clicked, [this, note](){
 		if(QMessageBox::question(0,"Remove note","Removing note "+note->Name()+"\n\nAre you shure?") == QMessageBox::Yes)
 		{
-			RemoveNoteFromWidgetAlarms(note, true);
+			RemoveNoteFromWidgetAlarms(NoteIndex(note));
 			note->ExecRemoveNoteWorker();
 		}
 	});
@@ -471,7 +471,7 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 
 void WidgetAlarms::MoveNoteUp(Note& note)
 {
-	RemoveNoteFromWidgetAlarms(&note, true);
+	RemoveNoteFromWidgetAlarms(NoteIndex(&note));
 	AddNote(&note, true, true);
 }
 
@@ -498,34 +498,42 @@ void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 	note.labelName->setMaximumWidth(labelNameWidth);
 }
 
+int WidgetAlarms::NoteIndex(Note *note)
+{
+	for(uint i=0; i<notes.size(); i++)
+		if(notes[i]->note == note) return i;
+	return -1;
+}
+
 void WidgetAlarms::RemoveNoteFromWidgetAlarms(int index)
 {
+	if(index < 0 or index >= (int)notes.size())
+	{
+		QMbError("RemoveNoteFromWidgetAlarms: note get bad index: " + QSn(index));
+		return;
+	}
+
 	if(notesOwner->IsNoteValid(notes[index]->note))
 		notes[index]->note->RemoveCbs(notes[index].get(), notes[index]->cbCounter);
+
+	int scrollBarValue = table->verticalScrollBar()->value();
+	int currentRow = table->currentRow();
+
 	table->removeRow(index);
+
+	if(currentRow >= 0 and currentRow < table->rowCount())
+	{
+		// need to restore current row because of idiotic QTableView behavior.
+		// Removing row 5 or other changes current row from 1 to 2 or other
+		if(index < currentRow) currentRow--;
+		if(currentRow >= 0)
+			table->setCurrentCell(currentRow, 0);
+	}
+	table->verticalScrollBar()->setValue(scrollBarValue);
+
 	notes.erase(notes.begin() + index);
 
 	QTimer::singleShot(10,this,[this]{ FitColWidth(); });
-}
-
-void WidgetAlarms::RemoveNoteFromWidgetAlarms(Note * aNote, bool showError)
-{
-	for(uint i=0; i<notes.size(); i++)
-		if(notes[i]->note == aNote)
-		{
-			int restoreRow = table->currentRow() == (int)i ? i : -1;
-
-			RemoveNoteFromWidgetAlarms(i);
-
-			if(restoreRow != -1)
-			{
-				if(restoreRow >= table->rowCount()) restoreRow--;
-				if(restoreRow >=0 ) table->setCurrentCell(restoreRow, 0);
-			}
-
-			return;
-		}
-	if(showError) QMbError("RemoveNoteFromWidgetAlarms: note " + aNote->Name() + " not found");
 }
 
 QDateTime AddSecsFromToday(const QDateTime &dt, qint64 secs)
@@ -643,7 +651,6 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 
 void WidgetAlarms::SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, menuPostponeCase caseCurrent)
 {
-
 	if(delaySecs == ForPostpone_ns::handInput)
 	{
 		auto res = DialogInputTime::Execute();
@@ -666,6 +673,7 @@ void WidgetAlarms::SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, 
 
 	for(auto &noteToPospone:notesToPostpone)
 	{
+
 		if(caseCurrent == menuPostponeCase::setPostpone)
 		{
 			noteToPospone->SetDT(noteToPospone->DTNotify(), AddSecsFromNow(delaySecs));

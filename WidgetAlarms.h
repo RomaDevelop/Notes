@@ -31,15 +31,14 @@ class WidgetAlarms : public QWidget
 {
 	Q_OBJECT
 public:
-	QTableWidget *table;
 
 	explicit WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidget *parent = nullptr);
 	~WidgetAlarms();
 	void GiveNotes(const std::vector<Note*> &givingNotes);
 
-	QString tableColWidths;
-
 private:
+	QTableWidget *table;
+
 	void CreateTableContextMenu();
 	void CreateBottomRow(QBoxLayout *loMain);
 	void CreateFindSection(QBoxLayout *loMain);
@@ -50,6 +49,7 @@ private:
 	void AddNote(Note* note, bool addInTop, bool disableFeatureMessage = false);
 	void MoveNoteUp(Note& note);
 	void SetLabelText(NoteInAlarms & note);
+	int NoteIndex(Note* note); // returns -1 if not found
 	void RemoveNoteFromWidgetAlarms(int index);
 	void RemoveNoteFromWidgetAlarms(Note* aNote, bool showError);
 

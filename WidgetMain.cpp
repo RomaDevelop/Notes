@@ -141,8 +141,8 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	else if(answ == "Abort launch")
 	{
 		this->deleteLater();
-		if(0) CodeMarkers::to_do_afterwards("в этом сценарии вылетает крит, потому что при уничтожении окна идет обращение к виджетам, "
-											"которые в этом сценарии еще не созданы");
+		QTimer::singleShot(0,[](){ QApplication::exit(); });
+		if(0) CodeMarkers::to_do_afterwards("в этом сценарии вылетает крит");
 		return;
 	}
 	else QMbError("Unexpacted answ");
