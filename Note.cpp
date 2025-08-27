@@ -343,6 +343,21 @@ void Note::SetDT(QDateTime dtNotify, QDateTime dtPostpone)
 	}
 }
 
+QString Note::Name_DTNotify_DTPospone() const
+{
+	QString str;
+	static const int addSize = + 2 + strlen(DateTimeFormat_rus) + 3 + strlen(DateTimeFormat_rus) + 1 + 10;
+	int size = name.size() + addSize;
+	str.reserve(size);
+	str.append(name).append(" (").append(dtNotify.toString(DateTimeFormat_rus)).append(" | ")
+			.append(dtPostpone.toString(DateTimeFormat_rus)).append(")");
+	if(str.size() > size)
+	{
+		DO_ONCE(QMbError("Name_DTNot_DTPosp: fakt size: "+QSn(str.size())+" istead of "+QSn(size)));
+	}
+	return str;
+}
+
 bool Note::CheckNoteForFilters(const QString &textFilter, const QString &textFilterTranslited)
 {
 	if(textFilter.isEmpty() && textFilterTranslited.isEmpty()) return true;

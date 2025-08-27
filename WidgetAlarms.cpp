@@ -283,8 +283,7 @@ void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
 		int row = 0;
 		for(auto &note:notes)
 		{
-			auto text = "  "+note->Name() + " (" + note->DTNotify().toString() + " | " + note->DTPostpone().toString() + ")";
-			auto item = new QTableWidgetItem(text);
+			auto item = new QTableWidgetItem(note->Name_DTNotify_DTPospone().prepend("  "));
 			item->setData(Qt::UserRole, (qlonglong)note);
 			tableFind->setItem(row++, 0, item);
 		}
@@ -478,7 +477,7 @@ void WidgetAlarms::MoveNoteUp(Note& note)
 void WidgetAlarms::SetLabelText(NoteInAlarms & note)
 {
 	QString text1 = "   " + note.note->Name();
-	QString text2 = "  ("+note.note->DTNotify().toString("dd MMM yyyy hh:mm:ss")+")";
+	QString text2 = "  ("+note.note->DTNotify().toString(DateTimeFormat_rus)+")";
 	note.labelName->setText(text1);
 	note.labelDate->setText(text2);
 	note.labelDots->hide();

@@ -66,20 +66,20 @@ public:
 	static QString InitFromRecordAndSaveToStr(QStringList &record);
 	void UpdateThisNoteFromSQL();
 
-	QString Name() { return name; }
+	const QString& Name() { return name; }
 	void SetName(QString newName);
 
 	const QString& Content() { return content; }
 	void SetContent(QString content);
 
-	QDateTime DTCreated() const { return dtCreated; }
+	const QDateTime& DTCreated() const { return dtCreated; }
 	QString DTCreatedStr() const { return dtCreated.toString(Fields::dtFormat()); }
 	void SetDTCreated(QDateTime dtCreated) { this->dtCreated = std::move(dtCreated); }
 	void SetDTCreatedFromStr(QString dtCreated) { this->dtCreated = QDateTime::fromString(dtCreated, Fields::dtFormat()); }
 
-	QDateTime DTNotify() { return dtNotify; }
+	const QDateTime& DTNotify() { return dtNotify; }
 	QString DTNotifyStr() const { return dtNotify.toString(Fields::dtFormat()); }
-	QDateTime DTPostpone() { return dtPostpone; }
+	const QDateTime& DTPostpone() { return dtPostpone; }
 	QString DTPostponeStr() const { return dtPostpone.toString(Fields::dtFormat()); }
 	bool CmpDTs(const QDateTime &dtNotify, const QDateTime &dtPostpone);
 	void SetDT(QDateTime dtNotify, QDateTime dtPostpone);
@@ -87,6 +87,8 @@ public:
 	QDateTime DtLastUpdated() { return dtLastUpdated; }
 	QString DtLastUpdatedStr() const { return dtLastUpdated.toString(Fields::dtFormatLastUpdated()); }
 	void SetDtLastUpdated(QDateTime dt) { dtLastUpdated = std::move(dt); }
+
+	QString Name_DTNotify_DTPospone() const;
 
 	bool CheckNoteForFilters(const QString &textFilter, const QString &textFilterTranslited);
 

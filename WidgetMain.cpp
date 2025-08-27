@@ -570,24 +570,30 @@ void WidgetMain::NotesLists(lists list)
 	}
 	else { QMbError("Unrealised action " + MyQString::AsDebug(list)); }
 
-	std::vector<Note*> notes;
+	std::vector<Note*> notesToShow;
 	for(auto &id:ids)
 	{
 		auto noteInMain = NoteById(id.toLongLong());
-		if(noteInMain) notes.push_back(noteInMain->note.get());
-		if(notes.size() == 20) break;
+		if(noteInMain)
+		{
+			if(list == nextAlarms and noteInMain->note->DTPostpone() < QDateTime::currentDateTime())
+				continue;
+
+			notesToShow.push_back(noteInMain->note.get());
+		}
+		if(notesToShow.size() == 20) break;
 	}
 
-	QStringList names;
-	for(auto &note:notes)
+	QStringList rows;
+	for(auto &note:notesToShow)
 	{
-		names += note->Name();
+		rows += note->Name_DTNotify_DTPospone();
 	}
 
-	auto answ = MyQDialogs::ListDialog(caption, names);
+	auto answ = MyQDialogs::ListDialog(caption, rows, "Open note", "Close list");
 	if(answ.accepted)
 	{
-		Note &noteRef = *notes[answ.index];
+		Note &noteRef = *notesToShow[answ.index];
 		WidgetNoteEditor::MakeOrShowNoteEditor(noteRef);
 	}
 }
