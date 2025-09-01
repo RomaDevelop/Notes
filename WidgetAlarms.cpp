@@ -29,6 +29,8 @@ const QString& RemoveCaption() { static QString str = " Удалить "; return
 const QString& AllButtonsCaptions() {
 	static QString str = QString(RescheduleCaption()).append(RostponeCaption()).append(RemoveCaption()); return str; }
 
+const int secondsInDay = 60*60*24;
+
 WidgetAlarms::WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidget *parent):
 	QWidget(parent),
 	fontForLabels{fontForLabels},
@@ -562,8 +564,7 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 	menu = new QMenu(this);
 	declare_struct_2_fields_move(Delay, QString, text, int, seconds);
 	std::vector<Delay> delays;
-	const int secondsInDay = 60*60*24;
-	const int daysInMonth = QDate::currentDate().daysInMonth();
+	int daysInCurrnetMonth = QDate::currentDate().daysInMonth();
 
 	if(menuPostponeCaseCurrent == menuPostponeCase::changeDtNotify)
 		delays = 		{{"1 день", secondsInDay}, {"2 дня", secondsInDay*2}, {"3 дня", secondsInDay*3}, {"4 дня", secondsInDay*4},
@@ -571,9 +572,9 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 						 {"9 дней", secondsInDay*9}, {"10 дней", secondsInDay*10}, {"11 дней", secondsInDay*11}, {"12 дней", secondsInDay*12},
 						 {"13 дней", secondsInDay*13}, {"14 дней", secondsInDay*14}, {"15 дней", secondsInDay*15},
 						 {"", ForPostpone_ns::separator}, {"18 дней", secondsInDay*18},
-						 {"21 дней", secondsInDay*21}, {"25 дней", secondsInDay*25}, {"Месяц", secondsInDay*daysInMonth},
+						 {"21 дней", secondsInDay*21}, {"25 дней", secondsInDay*25}, {"Месяц", secondsInDay*daysInCurrnetMonth},
 						 {"", ForPostpone_ns::separator},
-						 {"40 дней", secondsInDay*40}, {"50 дней", secondsInDay*50}, {"Два месяца", secondsInDay*daysInMonth*2},
+						 {"40 дней", secondsInDay*40}, {"50 дней", secondsInDay*50}, {"Два месяца", secondsInDay*daysInCurrnetMonth*2},
 						 {"Ввести вручную", ForPostpone_ns::handInput},
 						 };
 	else if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
@@ -655,31 +656,40 @@ void WidgetAlarms::SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, 
 		auto res = DialogInputTime::Execute();
 		if(!res.accepted) return;
 		delaySecs = DialogInputTime::TotalSecs(res);
-
-//		auto res = MyQDialogs::InputLineExt("Введите значение", "Введите значение", "",
-//											{"Секунд","Минут","Часов","Дней","Отмена"}, 500);
-//		if(res.text.isEmpty()) return;
-//		if(!IsUInt(res.text)) { QMbError("Input is not number" + res.text); return; }
-//		if(0) ;
-//		else if(res.button == "Секунд") delaySecs = res.text.toUInt();
-//		else if(res.button == "Минут") delaySecs = res.text.toUInt()*60;
-//		else if(res.button == "Часов") delaySecs = res.text.toUInt()*60*60;
-//		else if(res.button == "Дней") delaySecs = res.text.toUInt()*60*60*24;
-//		else if(res.button == "Отмена") return;
-//		else if(res.button.isEmpty()) return;
-//		else QMbError("Error button name " + res.button);
 	}
+
+	// чтобы после 12 ночи случайно не перенести заметку на "завтра" или "послезавта", хотя это будет на день дальше
+	auto currentTime = QTime::currentTime();
+	std::function<bool(QDateTime newDt)> Question;
+	QTime morningStart(0,0,0), morningEnd(8,0,0);
+	// morningStart = QTime(18,0,0); morningEnd = QTime(19,0,0); // for testing
+	if(caseCurrent == menuPostponeCase::changeDtNotify
+			and delaySecs <= secondsInDay*2
+			and currentTime >= morningStart and currentTime < morningEnd)
+		Question = [](QDateTime newDt) -> bool
+		{
+			auto answ = QMessageBox::question({}, "Date change",
+								"It's already the morning of the "+QDateTime::currentDateTime().toString(DateTimeFormat_rus)
+								+ ".\n\nDo you really want to move the task to the "+newDt.toString(DateTimeFormat_rus));
+			if(answ == QMessageBox::Yes) return true;
+			else if(answ == QMessageBox::No) {}
+			else QMbError("Unrealesed answ");
+			return false;
+		};
 
 	for(auto &noteToPospone:notesToPostpone)
 	{
-
-		if(caseCurrent == menuPostponeCase::setPostpone)
+		if(caseCurrent == menuPostponeCase::changeDtNotify)
 		{
-			noteToPospone->SetDT(noteToPospone->DTNotify(), AddSecsFromNow(delaySecs));
+			auto newTime = AddSecsFromToday(noteToPospone->DTNotify(), delaySecs);
+			if(Question and Question(newTime) == false)
+				return;
+			noteToPospone->SetDT(newTime, newTime);
 		}
-		else if(caseCurrent == menuPostponeCase::changeDtNotify)
+		else if(caseCurrent == menuPostponeCase::setPostpone)
 		{
-			noteToPospone->SetDT(AddSecsFromToday(noteToPospone->DTNotify(), delaySecs), noteToPospone->DTNotify());
+			auto newTime = AddSecsFromNow(delaySecs);
+			noteToPospone->SetDT(noteToPospone->DTNotify(), newTime);
 		}
 
 		if(notes.empty()) hide();
