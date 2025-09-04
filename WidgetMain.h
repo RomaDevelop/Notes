@@ -34,6 +34,7 @@ public:
 
 	explicit WidgetMain(QWidget *parent = nullptr);
 	~WidgetMain();
+	bool closeNoQuestions = false;
 	void closeEvent (QCloseEvent *event) override;
 
 	virtual void CreateNewNote() override;

@@ -385,7 +385,7 @@ void WidgetMain::CreateTrayIcon()
 
 	menu->addAction("Close app");
 	MyQWidget::SetFontBold(menu->actions().back(), true);
-	connect(menu->actions().back(), &QAction::triggered, this, &QWidget::close);
+	connect(menu->actions().back(), &QAction::triggered, this, [this](){ closeNoQuestions = true; close(); });
 
 	auto screens = QGuiApplication::screens();
 	if(screens.size() < 2) return;
@@ -506,15 +506,18 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 
 void WidgetMain::closeEvent(QCloseEvent * event)
 {
-	auto answ = MyQDialogs::CustomDialog("Завершение работы приложения","Вы уверены, что хотите завершить работу приложения?"
-																		"\n\n(уведомления на задачи не будут поступать)"
-																		"\n(можно свернуть в трей, приложение продолжит работать)",
-										 {"Завершить", "Свернуть в трей", "Ничего не делать"});
-	if(0){}
-	else if(answ == "Завершить") {/*ничего не делаем*/}
-	else if(answ == "Свернуть в трей") { hide(); event->ignore(); return; }
-	else if(answ == "Ничего не делать") { event->ignore(); return; }
-	else { QMbc(0,"error", "not realesed button " + answ); event->ignore(); return; }
+	if(!closeNoQuestions)
+	{
+		auto answ = MyQDialogs::CustomDialog("Завершение работы приложения","Вы уверены, что хотите завершить работу приложения?"
+																			"\n\n(уведомления на задачи не будут поступать)"
+																			"\n(можно свернуть в трей, приложение продолжит работать)",
+											 {"Завершить", "Свернуть в трей", "Ничего не делать"});
+		if(0){}
+		else if(answ == "Завершить") {/*ничего не делаем*/}
+		else if(answ == "Свернуть в трей") { hide(); event->ignore(); return; }
+		else if(answ == "Ничего не делать") { event->ignore(); return; }
+		else { QMbc(0,"error", "not realesed button " + answ); event->ignore(); return; }
+	}
 
 	/// не надо тут пытаться сохранять задачи
 	/// ибо при завершении работы программы инициированном ОС они не будут успевать сохраняться
