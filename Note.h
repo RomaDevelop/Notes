@@ -83,6 +83,7 @@ public:
 	QString DTPostponeStr() const { return dtPostpone.toString(Fields::dtFormat()); }
 	bool CmpDTs(const QDateTime &dtNotify, const QDateTime &dtPostpone);
 	void SetDT(QDateTime dtNotify, QDateTime dtPostpone);
+	void SetDTPostpone(QDateTime dtPostpone);
 
 	QDateTime DtLastUpdated() { return dtLastUpdated; }
 	QString DtLastUpdatedStr() const { return dtLastUpdated.toString(Fields::dtFormatLastUpdated()); }
@@ -111,7 +112,7 @@ public:
 	void ExecRemoveNoteWorker();
 	std::function<void()> removeNoteWorker;
 
-	bool CheckAlarm(const QDateTime &dateToCompare);
+	qint64 SecsToAlarm(const QDateTime &dateToCompare);
 
 	void ShowMenuFastActions(QWidget *widgetToShowUnder);
 
@@ -143,7 +144,7 @@ public:
 
 	virtual void CreateNewNote() = 0;
 	virtual void ShowMainWindow() = 0;
-	enum lists { mostOpened, recentOpened, nextAlarms };
+	enum lists { mostOpened, recentOpened, nextAlarms, nextAlarmsAlarmNow };
 	virtual void NotesLists(lists list) = 0;
 	virtual std::vector<Note*> Notes(std::function<bool(Note*)> filter = {}) = 0;
 	virtual bool IsNoteValid(Note *note) = 0;

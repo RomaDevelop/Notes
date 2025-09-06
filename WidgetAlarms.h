@@ -34,10 +34,11 @@ public:
 
 	explicit WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidget *parent = nullptr);
 	~WidgetAlarms();
-	void GiveNotes(const std::vector<Note*> &givingNotes);
+	void AlarmNotes(const std::vector<Note*> &notesToAlarm, Note *nextAlarmNote);
 
 private:
 	QTableWidget *table;
+	QLabel *labelNextAlarm;
 
 	void CreateTableContextMenu();
 	void CreateBottomRow(QBoxLayout *loMain);

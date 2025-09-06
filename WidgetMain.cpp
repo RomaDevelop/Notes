@@ -233,6 +233,10 @@ void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 	btnNextAlarmsNotes->setIcon(QIcon(Resources::list_na().GetPathName()));
 	hlo1->addWidget(btnNextAlarmsNotes);
 	connect(btnNextAlarmsNotes, &QPushButton::clicked, this, [this](){ NotesLists(INotesOwner::nextAlarms); });
+	auto btnNextAlarmsNotesJoin = new QToolButton();
+	btnNextAlarmsNotesJoin->setIcon(QIcon(Resources::list_arrow_down().GetPathName()));
+	hlo1->addWidget(btnNextAlarmsNotesJoin);
+	connect(btnNextAlarmsNotesJoin, &QPushButton::clicked, this, [this](){ NotesLists(INotesOwner::nextAlarmsAlarmNow); });
 
 // Add
 	QToolButton *btnPlus = new QToolButton();
@@ -411,15 +415,26 @@ void WidgetMain::CheckNotesForAlarm()
 	if(0) CodeMarkers::to_do("Нужно адекватный алгоритм проверки чтобы не ломалось если будет много задач");
 	QDateTime currentDateTime = QDateTime::currentDateTime();
 	std::vector<Note*> alarmedNotes;
+	Note *nextAlarmNote = nullptr;
+	qint64 secsToNextAlarm = 60*60*8;
 	for(auto &note:notes)
 	{
-		if(note->note->CheckAlarm(currentDateTime))
+		auto secsToAlarmCurrent = note->note->SecsToAlarm(currentDateTime);
+		if(secsToAlarmCurrent <= 0)
 		{
 			alarmedNotes.emplace_back(note->note.get());
 		}
+		else
+		{
+			if(secsToAlarmCurrent < secsToNextAlarm)
+			{
+				nextAlarmNote = note->note.get();
+				secsToNextAlarm = secsToAlarmCurrent;
+			}
+		}
 	}
 
-	widgetAlarms->GiveNotes(alarmedNotes);
+	widgetAlarms->AlarmNotes(alarmedNotes, nextAlarmNote);
 }
 
 bool WidgetMain::DialogGroupsSubscribes()
@@ -567,7 +582,7 @@ void WidgetMain::NotesLists(lists list)
 		ids = DataBase::NotesIdsOrderedByLastOpened();
 		caption = "Last opened notes";
 	}
-	else if (list == nextAlarms) {
+	else if (list == nextAlarms or list == nextAlarmsAlarmNow) {
 		ids = DataBase::NotesIdsOrderedByDtPostpone();
 		caption = "Next alarms notes";
 	}
@@ -579,8 +594,9 @@ void WidgetMain::NotesLists(lists list)
 		auto noteInMain = NoteById(id.toLongLong());
 		if(noteInMain)
 		{
-			if(list == nextAlarms and noteInMain->note->DTPostpone() < QDateTime::currentDateTime())
-				continue;
+			if(list == nextAlarms or list == nextAlarmsAlarmNow)
+				if(noteInMain->note->DTPostpone() < QDateTime::currentDateTime())
+					continue;
 
 			notesToShow.push_back(noteInMain->note.get());
 		}
@@ -593,12 +609,37 @@ void WidgetMain::NotesLists(lists list)
 		rows += note->Name_DTNotify_DTPospone();
 	}
 
-	auto answ = MyQDialogs::ListDialog(caption, rows, "Open note", "Close list");
-	if(answ.accepted)
+	enum showWay { listDialogToOpenEditor, chBoxDialogToAlarmNow };
+	showWay showWayVal = listDialogToOpenEditor;
+	if(list == nextAlarmsAlarmNow) showWayVal = chBoxDialogToAlarmNow;
+
+	if(showWayVal == listDialogToOpenEditor)
 	{
-		Note &noteRef = *notesToShow[answ.index];
-		WidgetNoteEditor::MakeOrShowNoteEditor(noteRef);
+		auto answ = MyQDialogs::ListDialog(caption, rows, "Open note", "Close list", 920);
+		if(answ.accepted)
+		{
+			Note &noteRef = *notesToShow[answ.index];
+			WidgetNoteEditor::MakeOrShowNoteEditor(noteRef);
+		}
 	}
+	else if(showWayVal == chBoxDialogToAlarmNow)
+	{
+		auto answ = MyQDialogs::CheckBoxDialog("Choose alarms to alarm now", rows, {}, {}, false, 920);
+		if(answ.accepted)
+		{
+			std::vector<Note*> notesToJoinAlarms;
+			for(auto &index:answ.checkedIndexes)
+			{
+				notesToJoinAlarms.push_back(notesToShow[index]);
+			}
+
+			for(auto &note:notesToJoinAlarms)
+			{
+				note->SetDTPostpone(QDateTime::currentDateTime());
+			}
+		}
+	}
+	else { QMbError("Unrealised showWay " + MyQString::AsDebug(showWayVal)); }
 }
 
 std::vector<Note *> WidgetMain::Notes(std::function<bool (Note *)> filter)
@@ -938,7 +979,7 @@ void WidgetMain::ClearNotesInWidgetMain()
 {
 	while(table->rowCount()) table->removeRow(table->rowCount()-1);
 	notes.clear();
-	if(widgetAlarms) widgetAlarms->GiveNotes({});
+	if(widgetAlarms) widgetAlarms->AlarmNotes({}, nullptr);
 }
 
 void WidgetMain::DefaultColsWidths()

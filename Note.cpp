@@ -343,6 +343,16 @@ void Note::SetDT(QDateTime dtNotify, QDateTime dtPostpone)
 	}
 }
 
+void Note::SetDTPostpone(QDateTime dtPostpone)
+{
+	this->dtPostpone = std::move(dtPostpone);
+	for(uint i=0; i<cbsDTUpdated.size(); i++)
+	{
+		auto &cb = cbsDTUpdated[i];
+		cb.cb(cb.handler);
+	}
+}
+
 QString Note::Name_DTNotify_DTPospone() const
 {
 	QString str;
@@ -502,9 +512,9 @@ void Note::ExecRemoveNoteWorker()
 	else qdbg << "Note::Remove() execed, but removeWorker not valid";
 }
 
-bool Note::CheckAlarm(const QDateTime & dateToCompare)
+qint64 Note::SecsToAlarm(const QDateTime & dateToCompare)
 {
-	return dateToCompare >= dtPostpone;
+	return dateToCompare.secsTo(dtPostpone);
 }
 
 void Note::ShowMenuFastActions(QWidget *widgetToShowUnder)

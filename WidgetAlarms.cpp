@@ -97,17 +97,17 @@ WidgetAlarms::~WidgetAlarms()
 	}
 }
 
-void WidgetAlarms::GiveNotes(const std::vector<Note *> & givingNotes)
+void WidgetAlarms::AlarmNotes(const std::vector<Note *> & notesToAlarm, Note *nextAlarmNote)
 {
 	for(uint i=0; i<notes.size();)
 	{
-		if(std::find(givingNotes.begin(), givingNotes.end(), notes[i]->note) == givingNotes.end())
+		if(std::find(notesToAlarm.begin(), notesToAlarm.end(), notes[i]->note) == notesToAlarm.end())
 			RemoveNoteFromWidgetAlarms(i);
 		else ++i;
 	}
 
 	bool added = false;
-	for(auto &newNote:givingNotes)
+	for(auto &newNote:notesToAlarm)
 	{
 		if(NoteInAlarms *findedNote = FindNote(newNote); findedNote == nullptr)
 		{
@@ -117,6 +117,22 @@ void WidgetAlarms::GiveNotes(const std::vector<Note *> & givingNotes)
 	}
 
 	setWindowTitle(QSn(notes.size()) + " alarms for notes");
+
+	if(!nextAlarmNote) labelNextAlarm->clear();
+	else
+	{
+		static QString text;
+		static QTime t(0,0,0);
+
+		auto &name = nextAlarmNote->Name();
+
+		text.clear();
+		text.append("Next alarm in ").append(t.addSecs(nextAlarmNote->SecsToAlarm(QDateTime::currentDateTime())).toString("hh:mm:ss"));
+		text.append(" - ").append(name.size() <= 20 ? name : name.left(18).append("..."));
+
+		labelNextAlarm->setText(text);
+		labelNextAlarm->setToolTip(name);
+	}
 
 	if(!notes.empty())
 	{
@@ -165,14 +181,21 @@ void WidgetAlarms::CreateBottomRow(QBoxLayout *loMain)
 	btnMostOpenedNotes->setIcon(QIcon(Resources::list_mo().GetPathName()));
 	hlo->addWidget(btnMostOpenedNotes);
 	connect(btnMostOpenedNotes, &QPushButton::clicked, this, [this](){ notesOwner->NotesLists(INotesOwner::mostOpened); });
+
 	auto btnRecentOpenedNotes = new QToolButton();
 	btnRecentOpenedNotes->setIcon(QIcon(Resources::list_ro().GetPathName()));
 	hlo->addWidget(btnRecentOpenedNotes);
 	connect(btnRecentOpenedNotes, &QPushButton::clicked, this, [this](){ notesOwner->NotesLists(INotesOwner::recentOpened); });
+
 	auto btnNextAlarmsNotes = new QToolButton();
 	btnNextAlarmsNotes->setIcon(QIcon(Resources::list_na().GetPathName()));
 	hlo->addWidget(btnNextAlarmsNotes);
 	connect(btnNextAlarmsNotes, &QPushButton::clicked, this, [this](){ notesOwner->NotesLists(INotesOwner::nextAlarms); });
+
+	auto btnNextAlarmsNotesJoin = new QToolButton();
+	btnNextAlarmsNotesJoin->setIcon(QIcon(Resources::list_arrow_down().GetPathName()));
+	hlo->addWidget(btnNextAlarmsNotesJoin);
+	connect(btnNextAlarmsNotesJoin, &QPushButton::clicked, this, [this](){ notesOwner->NotesLists(INotesOwner::nextAlarmsAlarmNow); });
 
 	auto btnFind = new QToolButton();
 	btnFind->setIcon(QIcon(Resources::find().GetPathName()));
@@ -192,43 +215,35 @@ void WidgetAlarms::CreateBottomRow(QBoxLayout *loMain)
 			note->ShowMenuFastActions(btnFastActions);
 	});
 
-	hlo->addStretch();
-
-	auto btnRescheduleSelected = new QPushButton(" Перенести выбранные на ... ");
-	auto btnPostponeSelected = new QPushButton(" Отложить выбранные на ... ");
-	btnRescheduleSelected->hide();
-	btnPostponeSelected->hide();
-	hlo->addWidget(btnRescheduleSelected);
-	hlo->addWidget(btnPostponeSelected);
-	connect(btnRescheduleSelected, &QPushButton::clicked, [this, btnRescheduleSelected](){
-		ShowMenuPostpone(btnRescheduleSelected->mapToGlobal(QPoint(0, btnRescheduleSelected->height())),
-						 changeDtNotify, NoteForPostponeSelected());
-	});
-
-	connect(btnPostponeSelected, &QPushButton::clicked, [this, btnPostponeSelected](){
-		ShowMenuPostpone(btnPostponeSelected->mapToGlobal(QPoint(0, btnPostponeSelected->height())),
-						 setPostpone, NoteForPostponeSelected());
-	});
-	connect(table, &QTableWidget::itemSelectionChanged, this, [this, btnRescheduleSelected, btnPostponeSelected](){
-		if(GetSelectedNotes().size() > 1)
-			{ btnRescheduleSelected->show(); btnPostponeSelected->show(); }
-		else { btnRescheduleSelected->hide(); btnPostponeSelected->hide(); }
-	});
-
 	hlo->addSpacing(10);
+
+	labelNextAlarm = new QLabel;
+	hlo->addWidget(labelNextAlarm);
+
+	hlo->addStretch();
 
 	auto btnRescheduleAll = new QPushButton(" Перенести все на ... ");
 	auto btnPostponeAll = new QPushButton(" Отложить все на ... ");
 	hlo->addWidget(btnRescheduleAll);
 	hlo->addWidget(btnPostponeAll);
 	connect(btnRescheduleAll, &QPushButton::clicked, [this, btnRescheduleAll](){
+		auto action = NoteForPostponeAll();
+		if(btnRescheduleAll->text().contains("выбранные")) action = NoteForPostponeSelected();
 		ShowMenuPostpone(btnRescheduleAll->mapToGlobal(QPoint(0, btnRescheduleAll->height())),
-						 changeDtNotify, NoteForPostponeAll());
+						 changeDtNotify, action);
 	});
 
 	connect(btnPostponeAll, &QPushButton::clicked, [this, btnPostponeAll](){
+		auto action = NoteForPostponeAll();
+		if(btnPostponeAll->text().contains("выбранные")) action = NoteForPostponeSelected();
 		ShowMenuPostpone(btnPostponeAll->mapToGlobal(QPoint(0, btnPostponeAll->height())),
-						 setPostpone, NoteForPostponeAll());
+						 setPostpone, action);
+	});
+
+	connect(table, &QTableWidget::itemSelectionChanged, this, [this, btnRescheduleAll, btnPostponeAll](){
+		if(GetSelectedNotes().size() > 1)
+			{ btnRescheduleAll->setText(" Перенести выбранные на ... "); btnPostponeAll->setText(" Отложить выбранные на ... "); }
+		else { btnRescheduleAll->setText(" Перенести все на ... "); btnPostponeAll->setText(" Отложить все на ... "); }
 	});
 }
 
@@ -410,7 +425,7 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 	hlo2->addSpacing(4);
 
 	auto cb = [this, newNoteInAlarmsPtr](void*){
-		if(!newNoteInAlarmsPtr->note->CheckAlarm(QDateTime::currentDateTime()))
+		if(newNoteInAlarmsPtr->note->SecsToAlarm(QDateTime::currentDateTime()) > 0)
 		{
 			RemoveNoteFromWidgetAlarms(NoteIndex(newNoteInAlarmsPtr->note));
 			return;
@@ -689,7 +704,7 @@ void WidgetAlarms::SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, 
 		else if(caseCurrent == menuPostponeCase::setPostpone)
 		{
 			auto newTime = AddSecsFromNow(delaySecs);
-			noteToPospone->SetDT(noteToPospone->DTNotify(), newTime);
+			noteToPospone->SetDTPostpone(newTime);
 		}
 
 		if(notes.empty()) hide();
