@@ -3,6 +3,7 @@ QT       += core gui sql network widgets
 CONFIG += c++17
 
 SOURCES += \
+    ../CommitsParser/git.cpp \
     ../NotesServer/DataBase.cpp \
     ../NotesServer/NetConstants.cpp \
     ../include/AdditionalTray.cpp \
@@ -17,6 +18,7 @@ SOURCES += \
     main.cpp
 
 HEADERS += \
+    ../CommitsParser/git.h \
     ../NotesServer/DataBase.h \
     ../NotesServer/NetConstants.h \
     ../include/AdditionalTray.h \
@@ -37,7 +39,8 @@ HEADERS += \
 
 INCLUDEPATH += \
     ../include \
-	../NotesServer
+	../NotesServer \
+	../CommitsParser
 
 DEPENDPATH += \
     ../include

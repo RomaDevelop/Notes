@@ -35,6 +35,8 @@
 
 #include "AdditionalTray.h"
 
+#include "git.h"
+
 #include "NetConstants.h"
 #include "DataBase.h"
 #include "WidgetNoteEditor.h"
@@ -512,6 +514,40 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 	items.emplace_back(MyQDialogs::SeparatorMenuItem());
 	items.emplace_back("GitExtesions: open repo with DB", [this](){
 		GitExtensionsTool::ExecuteGitExtensions(DataBase::baseDataCurrent->pathDataBase, true, filesPath);
+	});
+	items.emplace_back("Close DB, commit, push, close app", [this](){
+		DataBase::currentQSqlDb->close();
+
+		auto CycleWithQuestion = [this](QString errorText, std::function<GitStatus()> action){
+			bool cycle = true;
+			while(cycle)
+			{
+				GitStatus gitRes = action();
+				if(gitRes.success and gitRes.error.isEmpty() and gitRes.errorOutput.isEmpty())
+					break;
+				auto answ = MyQDialogs::CustomDialog("Error", errorText+"\nGitStatus:\n"+gitRes.ToStr(),
+													 {"Try again", "Close and open git extensions", "Close"});
+				if(answ == "Try again") ;
+				else if(answ == "Close and open git extensions")
+				{
+					GitExtensionsTool::ExecuteGitExtensions(DataBase::baseDataCurrent->pathDataBase, true, filesPath);
+					closeNoQuestions = true;
+					cycle = false;
+					close();
+				}
+				else if(answ == "Close")
+				{
+					closeNoQuestions = true;
+					cycle = false;
+					close();
+				}
+				else { QMbError("bad answ "+answ); return; }
+			}
+		};
+
+		QString pathRepo = DataBase::baseDataCurrent->pathDataBase;
+		CycleWithQuestion("Error git add .", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "add", "." }); });
+		CycleWithQuestion("Error git commit -m Update", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "commit", "-m", "Update" }); });
 	});
 
 	MyQDialogs::MenuUnderWidget(btn, std::move(items));
