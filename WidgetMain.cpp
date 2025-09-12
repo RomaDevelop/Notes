@@ -548,8 +548,12 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 		QString pathRepo = DataBase::baseDataCurrent->pathDataBase;
 		CycleWithQuestion("Error git add .", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "add", "." }); });
 		CycleWithQuestion("Error git commit -m Update", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "commit", "-m", "Update" }); });
-		CycleWithQuestion("Error git push github master", [pathRepo](){
-			auto gitRes = Git::DoGitCommand2(pathRepo, { "push", "github", "master" });
+		CycleWithQuestion("Error git push github master", [pathRepo, this](){
+			auto gitRes = Git::DoGitCommand2(pathRepo, { "push", "github", "masiter" });
+			if(gitRes.success and gitRes.errorOutput.startsWith("To https://github") and gitRes.errorOutput.endsWith("master -> master"))
+			{
+				//GitExtensionsTool::ExecuteGitExtensions(DataBase::baseDataCurrent->pathDataBase, true, filesPath);
+			}
 			return gitRes;
 		});
 
