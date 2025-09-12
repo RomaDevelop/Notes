@@ -558,7 +558,7 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 					gitRes.errorOutput.chop(1);
 				}
 				qdbg << gitRes.errorOutput.startsWith("To https://github.com") << gitRes.errorOutput.endsWith("master -> master");
-				if( (gitRes.errorOutput.startsWith("To https://github.com") and gitRes.errorOutput.endsWith("master -> master\\n\\n"))
+				if( (gitRes.errorOutput.startsWith("To https://github.com") and gitRes.errorOutput.endsWith("master -> master"))
 						or gitRes.errorOutput == "Everything up-to-date")
 				{
 					gitRes.errorOutput.clear();
