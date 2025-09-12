@@ -548,6 +548,15 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 		QString pathRepo = DataBase::baseDataCurrent->pathDataBase;
 		CycleWithQuestion("Error git add .", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "add", "." }); });
 		CycleWithQuestion("Error git commit -m Update", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "commit", "-m", "Update" }); });
+		CycleWithQuestion("Error git push github master", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "push", "github", "master" }); });
+
+		closeNoQuestions = false;
+		auto answ = QMessageBox::question({}, "Work finished", "Work (add, commit, push) finished. Close app?");
+		if(answ == QMessageBox::Yes)
+		{
+			closeNoQuestions = true;
+			close();
+		}
 	});
 
 	MyQDialogs::MenuUnderWidget(btn, std::move(items));
