@@ -548,17 +548,24 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 		QString pathRepo = DataBase::baseDataCurrent->pathDataBase;
 		CycleWithQuestion("Error git add .", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "add", "." }); });
 		CycleWithQuestion("Error git commit -m Update", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "commit", "-m", "Update" }); });
-		CycleWithQuestion("Error git push github master", [pathRepo, this](){
-			auto gitRes = Git::DoGitCommand2(pathRepo, { "push", "github", "masiter" });
+		CycleWithQuestion("Error git push github master", [pathRepo](){
+			auto gitRes = Git::DoGitCommand2(pathRepo, { "push", "github", "master" });
 			if(gitRes.success and gitRes.errorOutput.startsWith("To https://github") and gitRes.errorOutput.endsWith("master -> master"))
 			{
-				//GitExtensionsTool::ExecuteGitExtensions(DataBase::baseDataCurrent->pathDataBase, true, filesPath);
+				gitRes.errorOutput.clear();
 			}
 			return gitRes;
 		});
 
+		QProcess process;
+		process.setWorkingDirectory(pathRepo);
+		auto statusAfterWork = Git::GetGitStatusForOneDir(process, pathRepo);
+
 		closeNoQuestions = false;
-		auto answ = QMessageBox::question({}, "Work finished", "Work (add, commit, push) finished. Close app?");
+		auto answ = QMessageBox::question({}, "Work finished",
+										  "Work (add, commit, push) finished."
+											"\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
+												+" Close app?");
 		if(answ == QMessageBox::Yes)
 		{
 			closeNoQuestions = true;
