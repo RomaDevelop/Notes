@@ -554,8 +554,8 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 			auto gitRes = Git::DoGitCommand2(pathRepo, { "push", "github", "master" });
 			if(gitRes.success)
 			{
-				qdbg << gitRes.errorOutput.startsWith("To https://github.com") << gitRes.errorOutput.endsWith("master -> master\n\n");
-				if( (gitRes.errorOutput.startsWith("To https://github.com") and gitRes.errorOutput.endsWith("master -> master\n\n"))
+				qdbg << gitRes.errorOutput.startsWith("To https://github.com") << gitRes.errorOutput.endsWith("master -> master\\n\\n");
+				if( (gitRes.errorOutput.startsWith("To https://github.com") and gitRes.errorOutput.endsWith("master -> master\\n\\n"))
 						or gitRes.errorOutput == "Everything up-to-date")
 				{
 					gitRes.errorOutput.clear();
