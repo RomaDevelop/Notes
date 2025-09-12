@@ -554,7 +554,8 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 			auto gitRes = Git::DoGitCommand2(pathRepo, { "push", "github", "master" });
 			if(gitRes.success)
 			{
-				if( (gitRes.errorOutput.startsWith("To https://github") and gitRes.errorOutput.endsWith("master -> master\n\n"))
+				qdbg << gitRes.errorOutput.startsWith("To https://github.com") << gitRes.errorOutput.endsWith("master -> master\n\n");
+				if( (gitRes.errorOutput.startsWith("To https://github.com") and gitRes.errorOutput.endsWith("master -> master\n\n"))
 						or gitRes.errorOutput == "Everything up-to-date")
 				{
 					gitRes.errorOutput.clear();
@@ -570,8 +571,8 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 		closeNoQuestions = false;
 		auto answ = QMessageBox::question({}, "Work finished",
 										  "Work (add, commit, push) finished."
-											"\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
-												+" Close app?");
+											"\n\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
+												+"\n\nClose app?");
 		if(answ == QMessageBox::Yes)
 		{
 			closeNoQuestions = true;
