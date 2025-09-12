@@ -527,8 +527,9 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 					break;
 				qdbg << gitRes.ToStr();
 				auto answ = MyQDialogs::CustomDialog("Error", errorText+"\nGitStatus:\n"+gitRes.ToStr(),
-													 {"Try again", "Close and open git extensions", "Close"});
+													 {"Try again", "Continue app work", "Close and open git extensions", "Close"});
 				if(answ == "Try again") ;
+				else if(answ == "Continue app work") cycle = false;
 				else if(answ == "Close and open git extensions")
 				{
 					GitExtensionsTool::ExecuteGitExtensions(DataBase::baseDataCurrent->pathDataBase, true, filesPath);
@@ -553,7 +554,7 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 			auto gitRes = Git::DoGitCommand2(pathRepo, { "push", "github", "master" });
 			if(gitRes.success)
 			{
-				if( (gitRes.errorOutput.startsWith("To https://github") and gitRes.errorOutput.endsWith("master -> master"))
+				if( (gitRes.errorOutput.startsWith("To https://github") and gitRes.errorOutput.endsWith("master -> master\n\n"))
 						or gitRes.errorOutput == "Everything up-to-date")
 				{
 					gitRes.errorOutput.clear();
