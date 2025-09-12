@@ -112,7 +112,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 			for(int i=0; i<3; i++)
 			{
 				QProcess process;
-				process.setWorkingDirectory(LaunchParams::CurrentDeveloper().sourcesPath);
+				process.setWorkingDirectory(base.pathDataBase);
 				process.start("git", QStringList() << "fetch" << "github");
 				if(!process.waitForStarted(3000))
 				{
@@ -135,10 +135,48 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 			else fetchRes = "finish";
 		}
 
-		;
-		if(GitExtensionsTool::ExecuteGitExtensions(base.pathDataBase, true, filesPath))
-			QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
-		//else QMbError("Error launching GitExtensions"); // ExecuteGitExtensions выводит ошибку сам
+		QString pullRes;
+		while(pullRes != "finish")
+		{
+			for(int i=0; i<3; i++)
+			{
+				QProcess process;
+				process.setWorkingDirectory(base.pathDataBase);
+				process.start("git", QStringList() << "pull");
+				if(!process.waitForStarted(3000))
+				{
+					pullRes = "error waitForStarted " + (QStringList() << "pull").join(" ");
+				}
+				else if(!process.waitForFinished(3000))
+				{
+					pullRes = "error waitForFinished " + (QStringList() << "pull").join(" ");
+				}
+				else pullRes = process.readAllStandardError();
+
+				if(pullRes.isEmpty()) break;
+			}
+
+			if(!pullRes.isEmpty())
+			{
+				auto answ = QMessageBox::question(nullptr, "Pull errors", "Pull did with errors:\n\n"+pullRes+"\n\nTry again?");
+				if(answ == QMessageBox::No) pullRes = "finish";
+			}
+			else pullRes = "finish";
+		}
+
+		QString pathRepo = base.pathDataBase;
+		auto statusAfterWork = Git::GetGitStatusForOneDir(pathRepo);
+
+		auto answ = QMessageBox::question({}, "Git extensions", "Fetch and push did.\n\n"
+								"\n\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
+								+"\n\nLaunch Git extensions?");
+
+		if(answ == QMessageBox::Yes)
+		{
+			if(GitExtensionsTool::ExecuteGitExtensions(base.pathDataBase, true, filesPath))
+				QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
+			//else QMbError("Error launching GitExtensions"); // ExecuteGitExtensions выводит ошибку сам
+		}
 	}
 	else if(answ == "Abort launch")
 	{
@@ -525,7 +563,6 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 				GitStatus gitRes = action();
 				if(gitRes.success and gitRes.error.isEmpty() and gitRes.errorOutput.isEmpty())
 					break;
-				qdbg << gitRes.ToStr();
 				auto answ = MyQDialogs::CustomDialog("Error", errorText+"\nGitStatus:\n"+gitRes.ToStr(),
 													 {"Try again", "Continue app work", "Close and open git extensions", "Close"});
 				if(answ == "Try again") ;
@@ -557,7 +594,6 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 				while (gitRes.errorOutput.endsWith('\\') or gitRes.errorOutput.endsWith('\n') or gitRes.errorOutput.endsWith('n')) {
 					gitRes.errorOutput.chop(1);
 				}
-				qdbg << gitRes.errorOutput.startsWith("To https://github.com") << gitRes.errorOutput.endsWith("master -> master");
 				if( (gitRes.errorOutput.startsWith("To https://github.com") and gitRes.errorOutput.endsWith("master -> master"))
 						or gitRes.errorOutput == "Everything up-to-date")
 				{
@@ -567,9 +603,7 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 			return gitRes;
 		});
 
-		QProcess process;
-		process.setWorkingDirectory(pathRepo);
-		auto statusAfterWork = Git::GetGitStatusForOneDir(process, pathRepo);
+		auto statusAfterWork = Git::GetGitStatusForOneDir(pathRepo);
 
 		closeNoQuestions = false;
 		auto answ = QMessageBox::question({}, "Work finished",
