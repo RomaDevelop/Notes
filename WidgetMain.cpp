@@ -550,9 +550,13 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 		CycleWithQuestion("Error git commit -m Update", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "commit", "-m", "Update" }); });
 		CycleWithQuestion("Error git push github master", [pathRepo](){
 			auto gitRes = Git::DoGitCommand2(pathRepo, { "push", "github", "master" });
-			if(gitRes.success and gitRes.errorOutput.startsWith("To https://github") and gitRes.errorOutput.endsWith("master -> master"))
+			if(gitRes.success)
 			{
-				gitRes.errorOutput.clear();
+				if( (gitRes.errorOutput.startsWith("To https://github") and gitRes.errorOutput.endsWith("master -> master"))
+						or gitRes.errorOutput == "Everything up-to-date")
+				{
+					gitRes.errorOutput.clear();
+				}
 			}
 			return gitRes;
 		});
