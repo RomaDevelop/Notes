@@ -525,6 +525,7 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 				GitStatus gitRes = action();
 				if(gitRes.success and gitRes.error.isEmpty() and gitRes.errorOutput.isEmpty())
 					break;
+				qdbg << gitRes.ToStr();
 				auto answ = MyQDialogs::CustomDialog("Error", errorText+"\nGitStatus:\n"+gitRes.ToStr(),
 													 {"Try again", "Close and open git extensions", "Close"});
 				if(answ == "Try again") ;
