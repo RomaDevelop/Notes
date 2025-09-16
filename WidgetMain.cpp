@@ -20,6 +20,7 @@
 #include <QCryptographicHash>
 #include <QScreen>
 #include <QFileDialog>
+#include <QProgressDialog>
 
 #include "MyQDifferent.h"
 #include "MyQString.h"
@@ -100,93 +101,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 
 	auto base = DataBase::defineBase(DataBase::client);
 
-#ifndef QT_DEBUG
-	auto answ = MyQDialogs::CustomDialog("Launching Notes", "Do you want to update repo before launching Notes?",
-										 {"Yes, update", "No update", "Abort launch"});
-	if(answ == "No update") {}
-	else if(answ == "Yes, update")
-	{
-		QString fetchRes;
-		while(fetchRes != "finish")
-		{
-			for(int i=0; i<3; i++)
-			{
-				QProcess process;
-				process.setWorkingDirectory(base.pathDataBase);
-				process.start("git", QStringList() << "fetch" << "github");
-				if(!process.waitForStarted(3000))
-				{
-					fetchRes = "error waitForStarted " + (QStringList() << "fetch" << "github").join(" ");
-				}
-				else if(!process.waitForFinished(3000))
-				{
-					fetchRes = "error waitForFinished " + (QStringList() << "fetch" << "github").join(" ");
-				}
-				else fetchRes = process.readAllStandardError();
-
-				if(fetchRes.isEmpty()) break;
-			}
-
-			if(!fetchRes.isEmpty())
-			{
-				auto answ = QMessageBox::question(nullptr, "Fetch errors", "Fetch did with errors:\n\n"+fetchRes+"\n\nTry again?");
-				if(answ == QMessageBox::No) fetchRes = "finish";
-			}
-			else fetchRes = "finish";
-		}
-
-		QString pullRes;
-		while(pullRes != "finish")
-		{
-			for(int i=0; i<3; i++)
-			{
-				QProcess process;
-				process.setWorkingDirectory(base.pathDataBase);
-				process.start("git", QStringList() << "pull");
-				if(!process.waitForStarted(3000))
-				{
-					pullRes = "error waitForStarted " + (QStringList() << "pull").join(" ");
-				}
-				else if(!process.waitForFinished(3000))
-				{
-					pullRes = "error waitForFinished " + (QStringList() << "pull").join(" ");
-				}
-				else pullRes = process.readAllStandardError();
-
-				if(pullRes.isEmpty()) break;
-			}
-
-			if(!pullRes.isEmpty())
-			{
-				auto answ = QMessageBox::question(nullptr, "Pull errors", "Pull did with errors:\n\n"+pullRes+"\n\nTry again?");
-				if(answ == QMessageBox::No) pullRes = "finish";
-			}
-			else pullRes = "finish";
-		}
-
-		QString pathRepo = base.pathDataBase;
-		auto statusAfterWork = Git::GetGitStatusForOneDir(pathRepo);
-
-		auto answ = QMessageBox::question({}, "Git extensions", "Fetch and push did.\n\n"
-								"\n\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
-								+"\n\nLaunch Git extensions?");
-
-		if(answ == QMessageBox::Yes)
-		{
-			if(GitExtensionsTool::ExecuteGitExtensions(base.pathDataBase, true, filesPath))
-				QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
-			//else QMbError("Error launching GitExtensions"); // ExecuteGitExtensions выводит ошибку сам
-		}
-	}
-	else if(answ == "Abort launch")
-	{
-		this->deleteLater();
-		QTimer::singleShot(0,[](){ QApplication::exit(); });
-		if(0) CodeMarkers::to_do_afterwards("в этом сценарии вылетает крит");
-		return;
-	}
-	else QMbError("Unexpacted answ");
-#endif
+	GitWorkAtStart(base);
 
 	MyQSqlDatabase::Init(base, {},
 							[](const QString &str){ qdbg << str; },
@@ -553,69 +468,7 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 	items.emplace_back("GitExtesions: open repo with DB", [this](){
 		GitExtensionsTool::ExecuteGitExtensions(DataBase::baseDataCurrent->pathDataBase, true, filesPath);
 	});
-	items.emplace_back("Close DB, commit, push, close app", [this](){
-		DataBase::currentQSqlDb->close();
-
-		auto CycleWithQuestion = [this](QString errorText, std::function<GitStatus()> action){
-			bool cycle = true;
-			while(cycle)
-			{
-				GitStatus gitRes = action();
-				if(gitRes.success and gitRes.error.isEmpty() and gitRes.errorOutput.isEmpty())
-					break;
-				auto answ = MyQDialogs::CustomDialog("Error", errorText+"\nGitStatus:\n"+gitRes.ToStr(),
-													 {"Try again", "Continue app work", "Close and open git extensions", "Close"});
-				if(answ == "Try again") ;
-				else if(answ == "Continue app work") cycle = false;
-				else if(answ == "Close and open git extensions")
-				{
-					GitExtensionsTool::ExecuteGitExtensions(DataBase::baseDataCurrent->pathDataBase, true, filesPath);
-					closeNoQuestions = true;
-					cycle = false;
-					close();
-				}
-				else if(answ == "Close")
-				{
-					closeNoQuestions = true;
-					cycle = false;
-					close();
-				}
-				else { QMbError("bad answ "+answ); return; }
-			}
-		};
-
-		QString pathRepo = DataBase::baseDataCurrent->pathDataBase;
-		CycleWithQuestion("Error git add .", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "add", "." }); });
-		CycleWithQuestion("Error git commit -m Update", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "commit", "-m", "Update" }); });
-		CycleWithQuestion("Error git push github master", [pathRepo](){
-			auto gitRes = Git::DoGitCommand2(pathRepo, { "push", "github", "master" });
-			if(gitRes.success)
-			{
-				while (gitRes.errorOutput.endsWith('\\') or gitRes.errorOutput.endsWith('\n') or gitRes.errorOutput.endsWith('n')) {
-					gitRes.errorOutput.chop(1);
-				}
-				if( (gitRes.errorOutput.startsWith("To https://github.com") and gitRes.errorOutput.endsWith("master -> master"))
-						or gitRes.errorOutput == "Everything up-to-date")
-				{
-					gitRes.errorOutput.clear();
-				}
-			}
-			return gitRes;
-		});
-
-		auto statusAfterWork = Git::GetGitStatusForOneDir(pathRepo);
-
-		closeNoQuestions = false;
-		auto answ = QMessageBox::question({}, "Work finished",
-										  "Work (add, commit, push) finished."
-											"\n\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
-												+"\n\nClose app?");
-		if(answ == QMessageBox::Yes)
-		{
-			closeNoQuestions = true;
-			close();
-		}
-	});
+	items.emplace_back("Close DB, commit, push, close app", [this](){ GitWorkOnClose(); });
 
 	MyQDialogs::MenuUnderWidget(btn, std::move(items));
 }
@@ -644,6 +497,204 @@ void WidgetMain::closeEvent(QCloseEvent * event)
 	SaveSettings();
 	event->accept();
 	QApplication::exit();
+}
+
+void WidgetMain::GitWorkAtStart(BaseData &base)
+{
+#ifdef QT_DEBUG
+	return;
+#endif
+
+	auto answ = MyQDialogs::CustomDialog("Launching Notes", "Do you want to update repo before launching Notes?",
+										 {"Yes, update", "No update", "Abort launch"});
+	if(answ == "No update") {}
+	else if(answ == "Yes, update")
+	{
+		QProgressDialog progress("", "", 0, 3);
+		progress.setWindowTitle("Работа с Git");
+		progress.setLabelText("Выполнение fetch...");
+		progress.setCancelButton({});
+		progress.show();
+		QApplication::processEvents();
+
+		QString fetchRes;
+		while(fetchRes != "finish")
+		{
+			for(int i=0; i<3; i++)
+			{
+				QProcess process;
+				process.setWorkingDirectory(base.pathDataBase);
+				process.start("git", QStringList() << "fetch" << "github");
+				if(!process.waitForStarted(3000))
+				{
+					fetchRes = "error waitForStarted " + (QStringList() << "fetch" << "github").join(" ");
+				}
+				else if(!process.waitForFinished(3000))
+				{
+					fetchRes = "error waitForFinished " + (QStringList() << "fetch" << "github").join(" ");
+				}
+				else fetchRes = process.readAllStandardError();
+
+				if(fetchRes.isEmpty()) break;
+			}
+
+			if(!fetchRes.isEmpty())
+			{
+				auto answ = QMessageBox::question(nullptr, "Fetch errors", "Fetch did with errors:\n\n"+fetchRes+"\n\nTry again?");
+				if(answ == QMessageBox::No) fetchRes = "finish";
+			}
+			else fetchRes = "finish";
+		}
+
+		progress.setLabelText("Выполнение pull");
+		progress.setValue(1);
+		QApplication::processEvents();
+
+		QString pullRes;
+		while(pullRes != "finish")
+		{
+			for(int i=0; i<3; i++)
+			{
+				QProcess process;
+				process.setWorkingDirectory(base.pathDataBase);
+				process.start("git", QStringList() << "pull");
+				if(!process.waitForStarted(3000))
+				{
+					pullRes = "error waitForStarted " + (QStringList() << "pull").join(" ");
+				}
+				else if(!process.waitForFinished(3000))
+				{
+					pullRes = "error waitForFinished " + (QStringList() << "pull").join(" ");
+				}
+				else pullRes = process.readAllStandardError();
+
+				if(pullRes.isEmpty()) break;
+			}
+
+			if(!pullRes.isEmpty())
+			{
+				auto answ = QMessageBox::question(nullptr, "Pull errors", "Pull did with errors:\n\n"+pullRes+"\n\nTry again?");
+				if(answ == QMessageBox::No) pullRes = "finish";
+			}
+			else pullRes = "finish";
+		}
+
+		progress.setLabelText("Получение статуса...");
+		progress.setValue(2);
+		QApplication::processEvents();
+		QString pathRepo = base.pathDataBase;
+		auto statusAfterWork = Git::GetGitStatusForOneDir(pathRepo);
+
+		progress.close();
+		QApplication::processEvents();
+
+		auto answ = QMessageBox::question({}, "Git extensions", "Fetch and push did.\n\n"
+																"\n\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
+										  +"\n\nLaunch Git extensions?");
+
+		if(answ == QMessageBox::Yes)
+		{
+			if(GitExtensionsTool::ExecuteGitExtensions(base.pathDataBase, true, filesPath))
+				QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
+			//else QMbError("Error launching GitExtensions"); // ExecuteGitExtensions выводит ошибку сам
+		}
+	}
+	else if(answ == "Abort launch")
+	{
+		this->deleteLater();
+		QTimer::singleShot(0,[](){ QApplication::exit(); });
+		if(0) CodeMarkers::to_do_afterwards("в этом сценарии вылетает крит");
+		return;
+	}
+	else QMbError("Unexpacted answ");
+}
+
+void WidgetMain::GitWorkOnClose()
+{
+	DataBase::currentQSqlDb->close();
+
+	auto CycleWithQuestion = [this](QString errorText, std::function<GitStatus()> action){
+		bool cycle = true;
+		while(cycle)
+		{
+			GitStatus gitRes = action();
+			if(gitRes.success and gitRes.error.isEmpty() and gitRes.errorOutput.isEmpty())
+				break;
+			auto answ = MyQDialogs::CustomDialog("Error", errorText+"\nGitStatus:\n"+gitRes.ToStr(),
+												 {"Try again", "Continue app work", "Close and open git extensions", "Close"});
+			if(answ == "Try again") ;
+			else if(answ == "Continue app work") cycle = false;
+			else if(answ == "Close and open git extensions")
+			{
+				GitExtensionsTool::ExecuteGitExtensions(DataBase::baseDataCurrent->pathDataBase, true, filesPath);
+				closeNoQuestions = true;
+				cycle = false;
+				close();
+			}
+			else if(answ == "Close")
+			{
+				closeNoQuestions = true;
+				cycle = false;
+				close();
+			}
+			else { QMbError("bad answ "+answ); return; }
+		}
+	};
+
+	QString pathRepo = DataBase::baseDataCurrent->pathDataBase;
+
+	QProgressDialog progress("", "", 0, 4);
+	progress.setWindowTitle("Работа с Git");
+	progress.setCancelButton({});
+	progress.show();
+
+	progress.setLabelText("Выполнение add...");
+	progress.setValue(0);
+	QApplication::processEvents();
+	CycleWithQuestion("Error git add .", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "add", "." }); });
+
+	progress.setLabelText("Выполнение commit...");
+	progress.setValue(1);
+	QApplication::processEvents();
+	CycleWithQuestion("Error git commit -m Update", [pathRepo](){ return Git::DoGitCommand2(pathRepo, { "commit", "-m", "Update" }); });
+
+	progress.setLabelText("Выполнение push...");
+	progress.setValue(2);
+	QApplication::processEvents();
+	CycleWithQuestion("Error git push github master", [pathRepo](){
+		auto gitRes = Git::DoGitCommand2(pathRepo, { "push", "github", "master" });
+		if(gitRes.success)
+		{
+			while (gitRes.errorOutput.endsWith('\\') or gitRes.errorOutput.endsWith('\n') or gitRes.errorOutput.endsWith('n')) {
+				gitRes.errorOutput.chop(1);
+			}
+			if( (gitRes.errorOutput.startsWith("To https://github.com") and gitRes.errorOutput.endsWith("master -> master"))
+					or gitRes.errorOutput == "Everything up-to-date")
+			{
+				gitRes.errorOutput.clear();
+			}
+		}
+		return gitRes;
+	});
+
+	progress.setLabelText("Получение статуса...");
+	progress.setValue(3);
+	QApplication::processEvents();
+	auto statusAfterWork = Git::GetGitStatusForOneDir(pathRepo);
+
+	progress.close();
+	QApplication::processEvents();
+
+	closeNoQuestions = false;
+	auto answ = QMessageBox::question({}, "Work finished",
+									  "Work (add, commit, push) finished."
+									  "\n\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
+									  +"\n\nClose app?");
+	if(answ == QMessageBox::Yes)
+	{
+		closeNoQuestions = true;
+		close();
+	}
 }
 
 void WidgetMain::CreateNewNote()
