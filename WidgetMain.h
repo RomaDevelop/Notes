@@ -39,6 +39,7 @@ public:
 	explicit WidgetMain(QWidget *parent = nullptr);
 	~WidgetMain();
 	bool closeNoQuestions = false;
+	bool abortClose = false;
 	void closeEvent (QCloseEvent *event) override;
 
 	virtual void CreateNewNote() override;
@@ -54,7 +55,7 @@ private:
 	QTableWidget *table;
 
 	void GitWorkAtStart(BaseData &base);
-	void GitWorkOnClose();
+	void GitWorkCommit();
 	bool CheckGitStatus(GitStatus &status);
 
 	void CreateRow1(QHBoxLayout *hlo1);

@@ -222,7 +222,7 @@ void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 		else QMbError("NoteOfRow(table->currentRow()) returned nullptr");
 	});
 
-	hlo1->addSpacing(20);
+	hlo1->addSpacing(10);
 
 // Menu
 	QPushButton *btnMenu = new QPushButton("Menu");
@@ -230,7 +230,13 @@ void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 	hlo1->addWidget(btnMenu);
 	connect(btnMenu, &QPushButton::clicked, [this, btnMenu]() { SlotMenu(btnMenu); });
 
-	hlo1->addSpacing(20);
+// Test
+	QPushButton *btnTest = new QPushButton("Test");
+	btnTest->setFixedWidth(QFontMetrics(btnTest->font()).horizontalAdvance(btnTest->text()) + 20);
+	hlo1->addWidget(btnTest);
+	connect(btnTest,&QPushButton::clicked, this, &WidgetMain::SlotTest);
+
+	hlo1->addSpacing(10);
 
 // Search
 	auto hloSearch = new QHBoxLayout;
@@ -246,23 +252,9 @@ void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 	hloSearch->addWidget(btnClearSearch);
 	connect(btnClearSearch, &QToolButton::clicked, [leSearch](){ leSearch->clear(); });
 
-	hlo1->addSpacing(20);
+	hlo1->addSpacing(10);
 
-// Test
-	QPushButton *btnTest = new QPushButton("Test");
-	btnTest->setFixedWidth(QFontMetrics(btnTest->font()).horizontalAdvance(btnTest->text()) + 20);
-	hlo1->addWidget(btnTest);
-	connect(btnTest,&QPushButton::clicked, this, &WidgetMain::SlotTest);
-
-// Synch
-	QPushButton *btnSynch = new QPushButton("Synch");
-	btnSynch->setFixedWidth(QFontMetrics(btnSynch->font()).horizontalAdvance(btnSynch->text()) + 20);
-	hlo1->addWidget(btnSynch);
-	connect(btnSynch, &QPushButton::clicked, [this](){
-		netClient->request_all_notes_sending();
-		//netClient->SynchronizeAllNotes(AllNotesVect());
-	});
-
+// To tray
 	QPushButton *btnToTray = new QPushButton("To tray");
 	btnToTray->setFixedWidth(QFontMetrics(btnToTray->font()).horizontalAdvance(btnToTray->text()) + 20);
 	hlo1->addWidget(btnToTray);
@@ -456,8 +448,9 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 {
 	std::vector<MyQDialogs::MenuItem> items;
 	items.emplace_back("Net client", [this](){ netClient->widget->showNormal(); netClient->widget->activateWindow(); });
+	items.emplace_back("Synch", [this](){ netClient->request_all_notes_sending(); });
 	items.emplace_back(MyQDialogs::SeparatorMenuItem());
-	items.emplace_back("Resave not saved notes", [](){  });
+	items.emplace_back("Resave not saved notes", [](){ QMbInfo("mock"); });
 	items.emplace_back(MyQDialogs::SeparatorMenuItem());
 	items.emplace_back("Open DB", [](){ MyQExecute::Execute(DataBase::baseDataCurrent->baseFilePathName); });
 	items.emplace_back("Show DB in explorer", [](){ MyQExecute::ShowInExplorer(DataBase::baseDataCurrent->baseFilePathName); });
@@ -468,12 +461,10 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 	items.emplace_back("GitExtesions: open repo with DB", [this](){
 		GitExtensionsTool::ExecuteGitExtensions(DataBase::baseDataCurrent->pathDataBase, true, filesPath);
 	});
-	items.emplace_back("Close DB, commit, push, close app", [this](){ GitWorkOnClose(); });
+	items.emplace_back("Close DB, commit, push, close app", [this](){ GitWorkCommit(); });
 
 	MyQDialogs::MenuUnderWidget(btn, std::move(items));
 }
-
-
 
 void WidgetMain::closeEvent(QCloseEvent * event)
 {
@@ -482,9 +473,10 @@ void WidgetMain::closeEvent(QCloseEvent * event)
 		auto answ = MyQDialogs::CustomDialog("Завершение работы приложения","Вы уверены, что хотите завершить работу приложения?"
 																			"\n\n(уведомления на задачи не будут поступать)"
 																			"\n(можно свернуть в трей, приложение продолжит работать)",
-											 {"Завершить", "Свернуть в трей", "Ничего не делать"});
+											 {"Завершить", "Сделать коммит и завершить", "Свернуть в трей", "Ничего не делать"});
 		if(0){}
 		else if(answ == "Завершить") {/*ничего не делаем*/}
+		else if(answ == "Сделать коммит и завершить") { GitWorkCommit(); }
 		else if(answ == "Свернуть в трей") { hide(); event->ignore(); return; }
 		else if(answ == "Ничего не делать") { event->ignore(); return; }
 		else { QMbc(0,"error", "not realesed button " + answ); event->ignore(); return; }
@@ -493,6 +485,12 @@ void WidgetMain::closeEvent(QCloseEvent * event)
 	/// не надо тут пытаться сохранять задачи
 	/// ибо при завершении работы программы инициированном ОС они не будут успевать сохраняться
 	/// сохранение задач должно надежно происходить при их изменении
+
+	if(abortClose) {
+		abortClose = false;
+		event->ignore();
+		return;
+	}
 
 	SaveSettings();
 	event->accept();
@@ -590,7 +588,7 @@ void WidgetMain::GitWorkAtStart(BaseData &base)
 
 		if(CheckGitStatus(statusAfterWork))
 		{
-			QMbInfo("Fetch and pull completed successfully. Press ok to launch Notes");
+			QMbInfo("Fetch and pull completed successfully.\n\nPress ok to launch Notes");
 		}
 		else
 		{
@@ -616,7 +614,7 @@ void WidgetMain::GitWorkAtStart(BaseData &base)
 	else QMbError("Unexpacted answ");
 }
 
-void WidgetMain::GitWorkOnClose()
+void WidgetMain::GitWorkCommit()
 {
 	DataBase::currentQSqlDb->close();
 
@@ -708,6 +706,7 @@ void WidgetMain::GitWorkOnClose()
 		closeNoQuestions = true;
 		close();
 	}
+	else abortClose = true;
 }
 
 bool WidgetMain::CheckGitStatus(GitStatus &status)
