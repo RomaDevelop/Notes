@@ -588,15 +588,22 @@ void WidgetMain::GitWorkAtStart(BaseData &base)
 		progress.close();
 		QApplication::processEvents();
 
-		auto answ = QMessageBox::question({}, "Git extensions", "Fetch and push did.\n\n"
-																"\n\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
-										  +"\n\nLaunch Git extensions?");
-
-		if(answ == QMessageBox::Yes)
+		if(CheckGitStatus(statusAfterWork))
 		{
-			if(GitExtensionsTool::ExecuteGitExtensions(base.pathDataBase, true, filesPath))
-				QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
-			//else QMbError("Error launching GitExtensions"); // ExecuteGitExtensions выводит ошибку сам
+			QMbInfo("Fetch and pull completed successfully. Press ok to launch Notes");
+		}
+		else
+		{
+			auto answ = QMessageBox::question({}, "Git extensions", "Fetch and push completed.\n\nWARNING:\n\nUnexpected status:"
+						"\n\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
+											  +"\n\nLaunch Git extensions?");
+
+			if(answ == QMessageBox::Yes)
+			{
+				if(GitExtensionsTool::ExecuteGitExtensions(base.pathDataBase, true, filesPath))
+					QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
+				//else QMbError("Error launching GitExtensions"); // ExecuteGitExtensions выводит ошибку сам
+			}
 		}
 	}
 	else if(answ == "Abort launch")
@@ -686,15 +693,26 @@ void WidgetMain::GitWorkOnClose()
 	QApplication::processEvents();
 
 	closeNoQuestions = false;
-	auto answ = QMessageBox::question({}, "Work finished",
-									  "Work (add, commit, push) finished."
-									  "\n\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
-									  +"\n\nClose app?");
+	QString question = "Add, commit and push completed successfully.\n\nClose app?";
+	if(CheckGitStatus(statusAfterWork) == false)
+	{
+		question = "Work (add, commit, push) completed with.\n\nWARNING:\n\nUnexpected status:"
+				   "\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
+				   +"\n\nClose app?";
+
+	}
+
+	auto answ = QMessageBox::question({}, "Work finished", question);
 	if(answ == QMessageBox::Yes)
 	{
 		closeNoQuestions = true;
 		close();
 	}
+}
+
+bool WidgetMain::CheckGitStatus(GitStatus &status)
+{
+	return status.commitStatus == Statuses::commited() and status.pushStatus == Statuses::pushed();
 }
 
 void WidgetMain::CreateNewNote()

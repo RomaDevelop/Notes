@@ -23,6 +23,8 @@ declare_struct_5_fields_no_move(RowView, QTableWidgetItem*, itemName, QTableWidg
 											QDateTimeEdit*, dteNotify, QDateTimeEdit*, dtePostpone);
 declare_struct_3_fields_move(NoteInMain, RowView, rowView, std::unique_ptr<Note>, note, int, cbCounter);
 
+struct GitStatus;
+
 struct BaseData;
 
 class WidgetMain : public QWidget, public INotesOwner
@@ -53,6 +55,7 @@ private:
 
 	void GitWorkAtStart(BaseData &base);
 	void GitWorkOnClose();
+	bool CheckGitStatus(GitStatus &status);
 
 	void CreateRow1(QHBoxLayout *hlo1);
 	void CreateTableContextMenu();
