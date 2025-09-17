@@ -336,7 +336,7 @@ void WidgetMain::CreateTrayIcon()
 
 	menu->addAction("Close app");
 	MyQWidget::SetFontBold(menu->actions().back(), true);
-	connect(menu->actions().back(), &QAction::triggered, this, [this](){ closeNoQuestions = true; close(); });
+	connect(menu->actions().back(), &QAction::triggered, this, [this](){ TrayIconClose(); });
 
 	auto screens = QGuiApplication::screens();
 	if(screens.size() < 2) return;
@@ -348,6 +348,22 @@ void WidgetMain::CreateTrayIcon()
 	auto addIcon = new AdditionalTrayIcon(QApplication::style()->standardIcon(QStyle::SP_ArrowForward), globalPosForIcon, this);
 	addIcon->setContextMenu(menu);
 	connect(addIcon, &ClickableQWidget::clicked, this, [this](){ ShowMainWindow(); });
+}
+
+void WidgetMain::TrayIconClose()
+{
+	auto answ = QMessageBox::question({}, "Завершение работы приложения", "Сделать комит перед завершением работы?");
+	if(answ == QMessageBox::Yes)
+	{
+		GitWorkCommit();
+		if(abortClose) {
+			abortClose = false;
+			return;
+		}
+
+	}
+	closeNoQuestions = true;
+	close();
 }
 
 void WidgetMain::CreateNotesAlarmChecker()
@@ -468,6 +484,12 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 
 void WidgetMain::closeEvent(QCloseEvent * event)
 {
+	if(abortClose) {
+		abortClose = false;
+		event->ignore();
+		return;
+	}
+
 	if(!closeNoQuestions)
 	{
 		auto answ = MyQDialogs::CustomDialog("Завершение работы приложения","Вы уверены, что хотите завершить работу приложения?"
@@ -477,9 +499,9 @@ void WidgetMain::closeEvent(QCloseEvent * event)
 		if(0){}
 		else if(answ == "Завершить") {/*ничего не делаем*/}
 		else if(answ == "Сделать коммит и завершить") { GitWorkCommit(); }
-		else if(answ == "Свернуть в трей") { hide(); event->ignore(); return; }
-		else if(answ == "Ничего не делать") { event->ignore(); return; }
-		else { QMbc(0,"error", "not realesed button " + answ); event->ignore(); return; }
+		else if(answ == "Свернуть в трей") { hide(); abortClose = true; }
+		else if(answ == "Ничего не делать") { abortClose = true; }
+		else { QMbc(0,"error", "not realesed button " + answ); abortClose = true; }
 	}
 
 	/// не надо тут пытаться сохранять задачи
