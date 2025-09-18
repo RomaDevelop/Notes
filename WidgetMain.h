@@ -55,8 +55,8 @@ private:
 	QTableWidget *table;
 
 	void GitWorkAtStart(BaseData &base);
-	void GitWorkCommit();
-	bool CheckGitStatus(GitStatus &status);
+	void GitWorkCommitAndClose();
+	bool CheckGitStatus(const GitStatus &status);
 
 	void CreateRow1(QHBoxLayout *hlo1);
 	void CreateTableContextMenu();

@@ -355,7 +355,7 @@ void WidgetMain::TrayIconClose()
 	auto answ = QMessageBox::question({}, "Завершение работы приложения", "Сделать комит перед завершением работы?");
 	if(answ == QMessageBox::Yes)
 	{
-		GitWorkCommit();
+		GitWorkCommitAndClose();
 		if(abortClose) {
 			abortClose = false;
 			return;
@@ -477,7 +477,7 @@ void WidgetMain::SlotMenu(QPushButton *btn)
 	items.emplace_back("GitExtesions: open repo with DB", [this](){
 		GitExtensionsTool::ExecuteGitExtensions(DataBase::baseDataCurrent->pathDataBase, true, filesPath);
 	});
-	items.emplace_back("Close DB, commit, push, close app", [this](){ GitWorkCommit(); });
+	items.emplace_back("Close DB, commit, push, close app", [this](){ GitWorkCommitAndClose(); });
 
 	MyQDialogs::MenuUnderWidget(btn, std::move(items));
 }
@@ -498,7 +498,7 @@ void WidgetMain::closeEvent(QCloseEvent * event)
 											 {"Завершить", "Сделать коммит и завершить", "Свернуть в трей", "Ничего не делать"});
 		if(0){}
 		else if(answ == "Завершить") {/*ничего не делаем*/}
-		else if(answ == "Сделать коммит и завершить") { GitWorkCommit(); }
+		else if(answ == "Сделать коммит и завершить") { GitWorkCommitAndClose(); }
 		else if(answ == "Свернуть в трей") { hide(); abortClose = true; }
 		else if(answ == "Ничего не делать") { abortClose = true; }
 		else { QMbc(0,"error", "not realesed button " + answ); abortClose = true; }
@@ -636,7 +636,7 @@ void WidgetMain::GitWorkAtStart(BaseData &base)
 	else QMbError("Unexpacted answ");
 }
 
-void WidgetMain::GitWorkCommit()
+void WidgetMain::GitWorkCommitAndClose()
 {
 	DataBase::currentQSqlDb->close();
 
@@ -731,7 +731,7 @@ void WidgetMain::GitWorkCommit()
 	else abortClose = true;
 }
 
-bool WidgetMain::CheckGitStatus(GitStatus &status)
+bool WidgetMain::CheckGitStatus(const GitStatus &status)
 {
 	return status.commitStatus == Statuses::commited() and status.pushStatus == Statuses::pushed();
 }
