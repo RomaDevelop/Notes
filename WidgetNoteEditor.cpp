@@ -92,7 +92,6 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 	QVBoxLayout *vlo_main = new QVBoxLayout(this);
 	QHBoxLayout *hloNameAndDates = new QHBoxLayout;
-	QHBoxLayout *hloButtons = new QHBoxLayout;
 	QHBoxLayout *hloTextEdit = new QHBoxLayout;
 
 	vlo_main->addLayout(hloNameAndDates);
@@ -149,8 +148,49 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 	hloNameAndDates->addWidget(btnDtEditNotifyAdd);
 	hloNameAndDates->addWidget(dtEditPostpone);
 
-	vlo_main->addLayout(hloButtons);
+	CreateRow2_buttons(vlo_main);
+
 	vlo_main->addLayout(hloTextEdit);
+
+	textEdit = new MyQTextEdit;
+	textEdit->richTextPaste = false;
+	textEdit->setTabStopDistance(40);
+	hloTextEdit->addWidget(textEdit);
+	if(note.Content() == Note::StartText()) note.SetContent("<span style='font-size: 14pt;'>"+Note::StartText()+"</span>");
+	textEdit->document()->setDefaultStyleSheet("p { font-size: 14pt; }");
+	textEdit->setHtml(note.Content());
+	connect(textEdit, &QTextEdit::textChanged, [this](){
+		SetHaveChangesTrue("textEdit");
+	});
+
+	auto dtUpdateFoo = [this](void *){
+		MyCppDifferent::any_guard(notChagesNow, true, false);
+		dtEditNotify->setDateTime(this->note.DTNotify());
+		dtEditPostpone->setDateTime(this->note.DTPostpone());
+	};
+
+	CreateStatusBar(vlo_main);
+
+	note.AddCBDTUpdated(dtUpdateFoo, this, cbCounter);
+
+	settingsFile = MyQDifferent::PathToExe()+"/files/settings_note_editor.ini";
+	QTimer::singleShot(0,this,[this]
+	{
+		for(auto &foo:postShowFunctions)
+			foo();
+		postShowFunctions.clear();
+		LoadSettings();
+	});
+
+	InitTimerNoteSaver();
+
+	existingEditors[&note] = this;
+}
+
+void WidgetNoteEditor::CreateRow2_buttons(QVBoxLayout *vlo_main)
+{
+	QHBoxLayout *hloButtons = new QHBoxLayout;
+	vlo_main->addLayout(hloButtons);
 
 	auto SlotSetBold = [this](){
 		auto cursor = textEdit->textCursor();
@@ -325,45 +365,17 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 
 	hloButtons->addStretch();
 
+	QPushButton *btnSave = new QPushButton(" Save ");
+	hloButtons->addWidget(btnSave);
+	connect(btnSave,&QPushButton::clicked,[this](){
+		SaveNoteFromEditor(true);
+	});
+
 //	QPushButton *btnTest = new QPushButton(" Test ");
 //	hloButtons->addWidget(btnTest);
 //	connect(btnTest,&QPushButton::clicked, [this, btnDtEditNotifyAdd](){
 //		qdbg << btnDtEditNotifyAdd->height() << dtEditNotify->height();
 //	});
-
-	textEdit = new MyQTextEdit;
-	textEdit->richTextPaste = false;
-	textEdit->setTabStopDistance(40);
-	hloTextEdit->addWidget(textEdit);
-	if(note.Content() == Note::StartText()) note.SetContent("<span style='font-size: 14pt;'>"+Note::StartText()+"</span>");
-	textEdit->document()->setDefaultStyleSheet("p { font-size: 14pt; }");
-	textEdit->setHtml(note.Content());
-	connect(textEdit, &QTextEdit::textChanged, [this](){
-		SetHaveChangesTrue("textEdit");
-	});
-
-	auto dtUpdateFoo = [this](void *){
-		MyCppDifferent::any_guard(notChagesNow, true, false);
-		dtEditNotify->setDateTime(this->note.DTNotify());
-		dtEditPostpone->setDateTime(this->note.DTPostpone());
-	};
-
-	CreateStatusBar(vlo_main);
-
-	note.AddCBDTUpdated(dtUpdateFoo, this, cbCounter);
-
-	settingsFile = MyQDifferent::PathToExe()+"/files/settings_note_editor.ini";
-	QTimer::singleShot(0,this,[this]
-	{
-		for(auto &foo:postShowFunctions)
-			foo();
-		postShowFunctions.clear();
-		LoadSettings();
-	});
-
-	InitTimerNoteSaver();
-
-	existingEditors[&note] = this;
 }
 
 void WidgetNoteEditor::CreateStatusBar(QLayout *lo_main)

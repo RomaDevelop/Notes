@@ -31,7 +31,9 @@ NetClient::NetClient(WidgetMain *aWidgetMain, QObject *parent) :
 	QObject(parent),
 	widgetMain {aWidgetMain}
 {
-	CreateWidgets(true);
+	bool showNetClient = true;
+	showNetClient = false;
+	CreateWidgets(showNetClient);
 
 	//	QNetworkProxy *proxyPtr = new QNetworkProxy;
 	//	QNetworkProxy &proxy = *proxyPtr;

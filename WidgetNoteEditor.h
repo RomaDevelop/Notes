@@ -25,6 +25,7 @@ public:
 
 private:
 	explicit WidgetNoteEditor(Note &note, QWidget *parent = nullptr);
+	void CreateRow2_buttons(QVBoxLayout *lo_main);
 	void CreateStatusBar(QLayout *lo_main);
 	void InitTimerNoteSaver();
 public:

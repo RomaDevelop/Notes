@@ -666,11 +666,19 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 
 void WidgetAlarms::SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, menuPostponeCase caseCurrent)
 {
+	DialogInputTimeResult::from fromValue;
+	if(caseCurrent == menuPostponeCase::changeDtNotify)
+		fromValue = DialogInputTimeResult::fromToday;
+	else if(caseCurrent == menuPostponeCase::setPostpone)
+		fromValue = DialogInputTimeResult::fromNow;
+	else { QMbError("Unrealesed caseCurrent"); }
+
 	if(delaySecs == ForPostpone_ns::handInput)
 	{
-		auto res = DialogInputTime::Execute();
+		auto res = DialogInputTime::Execute(fromValue);
 		if(!res.accepted) return;
 		delaySecs = DialogInputTime::TotalSecs(res);
+		fromValue = res.fromValue;
 	}
 
 	// чтобы после 12 ночи случайно не перенести заметку на "завтра" или "послезавта", хотя это будет на день дальше
@@ -694,16 +702,18 @@ void WidgetAlarms::SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, 
 
 	for(auto &noteToPospone:notesToPostpone)
 	{
+		auto newTime = AddSecsFromNow(delaySecs);
+		if(fromValue == DialogInputTimeResult::fromToday)
+			newTime = AddSecsFromToday(noteToPospone->DTNotify(), delaySecs);
+
 		if(caseCurrent == menuPostponeCase::changeDtNotify)
 		{
-			auto newTime = AddSecsFromToday(noteToPospone->DTNotify(), delaySecs);
 			if(Question and Question(newTime) == false)
 				return;
 			noteToPospone->SetDT(newTime, newTime);
 		}
 		else if(caseCurrent == menuPostponeCase::setPostpone)
 		{
-			auto newTime = AddSecsFromNow(delaySecs);
 			noteToPospone->SetDTPostpone(newTime);
 		}
 
