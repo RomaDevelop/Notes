@@ -675,9 +675,13 @@ void WidgetAlarms::SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, 
 
 	if(delaySecs == ForPostpone_ns::handInput)
 	{
-		auto res = DialogInputTime::Execute(fromValue);
+		int size = notesToPostpone.size();
+		QString caption = "Editing "+QSn(size)+" notes";
+		if(size == 1) caption = "Editing note "+(*notesToPostpone.begin())->Name();
+
+		auto res = DialogInputTime::Execute(caption, fromValue);
 		if(!res.accepted) return;
-		delaySecs = DialogInputTime::TotalSecs(res);
+		delaySecs = res.totalSecs;
 		fromValue = res.fromValue;
 	}
 
