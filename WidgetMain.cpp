@@ -211,7 +211,7 @@ void WidgetMain::CreateRow1(QHBoxLayout *hlo1)
 		if(!note) { QMbError("NoteOfRow(table->currentRow()) returned nullptr"); return; }
 
 		if(QMessageBox::question(0,"Remove note","Removing note "+note->Name()+"\n\nAre you shure?") == QMessageBox::Yes)
-				note->ExecRemoveNoteWorker();
+				note->ExecRemoveNoteWorker(true);
 	});
 
 // FastActions
@@ -1032,8 +1032,8 @@ Note & WidgetMain::MakeNewNote(Note noteSrc)
 	newNote->AddCBContentUpdated(makeSaveMoteFoo("content updated"), &newNoteInMainRef, newNoteInMainRef.cbCounter);
 	newNote->AddCBDTUpdated(makeSaveMoteFoo("dt updated"), &newNoteInMainRef, newNoteInMainRef.cbCounter);
 
-	newNote->removeNoteWorker = [this, newNote](){
-		RemoveNote(newNote, true);
+	newNote->removeNoteWorker = [this, newNote](bool execSqlRemove){
+		RemoveNote(newNote, execSqlRemove);
 		CheckNotesForAlarm();
 	};
 
@@ -1210,7 +1210,7 @@ void WidgetMain::SlotForNetClientNoteRemoved(qint64 id)
 {
 	auto note = NoteById(id);
 	if(!note) QMbError("SlotForNetClientNoteRemoved note not found");
-	else RemoveNote(note->note.get(), false);
+	else note->note->ExecRemoveNoteWorker(false);
 }
 
 void WidgetMain::SlotForNetClientNoteChangedGroupOrUpdated(qint64 id)

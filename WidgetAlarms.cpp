@@ -512,7 +512,7 @@ void WidgetAlarms::AddNote(Note * note, AddNotePlace addPlace, bool disableFeatu
 		if(QMessageBox::question(0,"Remove note","Removing note "+note->Name()+"\n\nAre you shure?") == QMessageBox::Yes)
 		{
 			RemoveNoteFromWidgetAlarms(NoteIndex(note));
-			note->ExecRemoveNoteWorker();
+			note->ExecRemoveNoteWorker(true);
 		}
 	});
 

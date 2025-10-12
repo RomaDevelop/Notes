@@ -601,6 +601,7 @@ void NetClient::RemoveNoteByServerCommand(const QString &idNote)
 											 + "\n\nWhat should to do?",
 											 {"Remove", "Remove and show after", "Move to default group"});
 		if(0) CodeMarkers::to_do("can add action show note, but need make cykle choose actoion cdialog");
+		if(0) CodeMarkers::to_do("убрать отсюда удаление из БД? может с бд должен работать только кто-то один?");
 		if(answ == "Remove" || answ == "Remove and show after")
 		{
 			if(DataBase::RemoveNote(QSn(note.id), true))

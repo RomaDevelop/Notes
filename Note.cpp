@@ -506,9 +506,15 @@ int Note::GetVersion(const QString &text)
 	return v.toInt();
 }
 
-void Note::ExecRemoveNoteWorker()
+void Note::ExecRemoveNoteWorker(bool execSqlRemove)
 {
-	if(removeNoteWorker) removeNoteWorker();
+	for(uint i=0; i<cbsBeforeRemoved.size(); i++)
+	{
+		auto &cb = cbsBeforeRemoved[i];
+		cb.cb(cb.handler);
+	}
+
+	if(removeNoteWorker) removeNoteWorker(execSqlRemove);
 	else qdbg << "Note::Remove() execed, but removeWorker not valid";
 }
 
@@ -604,6 +610,18 @@ void Note::AddCBGroupChanged(std::function<void (void *)> aUpdatedCb, void *hand
 	else qdbg << "SetCBGroupChanged invalid cb or handler";
 }
 
+void Note::AddCBBeforeNoteRemoved(std::function<void (void *)> aUpdatedCb, void * handler, int & localCbCounter)
+{
+	if(aUpdatedCb && handler)
+	{
+		auto &cbRef = cbsBeforeRemoved.emplace_back();
+		cbRef.cb = aUpdatedCb;
+		cbRef.handler = handler;
+		localCbCounter++;
+	}
+	else qdbg << "AddCBBeforeNoteRemoved invalid cb or handler";
+}
+
 void Note::RemoveCbs(void * handler, int removedCountShouldBe)
 {
 	int countRemoved = 0;
@@ -629,6 +647,12 @@ void Note::RemoveCbs(void * handler, int removedCountShouldBe)
 		if(cbsGroupChanged[i].handler == handler)
 		{
 			cbsGroupChanged.erase(cbsGroupChanged.begin()+i);
+			countRemoved++;
+		}
+	for(uint i=0; i<cbsBeforeRemoved.size(); i++)
+		if(cbsBeforeRemoved[i].handler == handler)
+		{
+			cbsBeforeRemoved.erase(cbsBeforeRemoved.begin()+i);
 			countRemoved++;
 		}
 	if(removedCountShouldBe != countRemoved)

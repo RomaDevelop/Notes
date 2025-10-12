@@ -112,8 +112,8 @@ public:
 	}
 	static int GetVersion(const QString &text);
 
-	void ExecRemoveNoteWorker();
-	std::function<void()> removeNoteWorker;
+	void ExecRemoveNoteWorker(bool execSqlRemove);
+	std::function<void(bool execSqlRemove)> removeNoteWorker;
 
 	qint64 SecsToAlarm(const QDateTime &dateToCompare);
 
@@ -129,6 +129,7 @@ public:
 	void AddCBContentUpdated(std::function<void(void *handler)> aUpdatedCb, void *handler, int &localCbCounter);
 	void AddCBDTUpdated(std::function<void(void *handler)> aUpdatedCb, void *handler, int &localCbCounter);
 	void AddCBGroupChanged(std::function<void(void *handler)> aUpdatedCb, void *handler, int &localCbCounter);
+	void AddCBBeforeNoteRemoved(std::function<void(void *handler)> aUpdatedCb, void *handler, int &localCbCounter);
 	void RemoveCbs(void* handler, int removedCountShouldBe);
 private:
 	struct cbAndHandler { std::function<void(void* handler)> cb; void* handler; };
@@ -136,6 +137,7 @@ private:
 	std::vector<cbAndHandler> cbsContentUpdated;
 	std::vector<cbAndHandler> cbsDTUpdated;
 	std::vector<cbAndHandler> cbsGroupChanged;
+	std::vector<cbAndHandler> cbsBeforeRemoved;
 	static void EmitCbs(const std::vector<cbAndHandler> &cbs) { for(auto &cb:cbs) cb.cb(cb.handler); }
 // cbs end
 };

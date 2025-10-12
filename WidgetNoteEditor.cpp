@@ -168,10 +168,15 @@ WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
 		dtEditNotify->setDateTime(this->note.DTNotify());
 		dtEditPostpone->setDateTime(this->note.DTPostpone());
 	};
-
-	CreateStatusBar(vlo_main);
+	auto beforeRemovedFoo = [this](void *){
+		noteWasRemoved = true;
+		close();
+	};
 
 	note.AddCBDTUpdated(dtUpdateFoo, this, cbCounter);
+	note.AddCBBeforeNoteRemoved(beforeRemovedFoo, this, cbCounter);
+
+	CreateStatusBar(vlo_main);
 
 	settingsFile = MyQDifferent::PathToExe()+"/files/settings_note_editor.ini";
 	QTimer::singleShot(0,this,[this]
@@ -403,9 +408,11 @@ WidgetNoteEditor::~WidgetNoteEditor()
 {
 	qdbg << "~WidgetNoteEditor " + leName->text();
 
-	note.RemoveCbs(this, cbCounter);
-
-	SaveNoteFromEditor(true);
+	if(noteWasRemoved == false)
+	{
+		note.RemoveCbs(this, cbCounter);
+		SaveNoteFromEditor(true);
+	}
 
 	if(auto thisEditor = existingEditors.find(&note); thisEditor != existingEditors.end())
 	{
@@ -492,6 +499,8 @@ void WidgetNoteEditor::SetHaveChangesTrue(const QString &/*place*/)
 
 void WidgetNoteEditor::SaveNoteFromEditor(bool forceSave)
 {
+	if(noteWasRemoved) return;
+
 	if(!haveChanges) return;
 
 	if(!forceSave)

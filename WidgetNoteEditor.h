@@ -50,6 +50,7 @@ private:
 	QDateTime lastChagesDid;
 	QDateTime lastSaveDid;
 	int savedCount = 0;
+	bool noteWasRemoved = false;
 
 	QLineEdit *leName;
 	QDateTimeEdit *dtEditNotify;
