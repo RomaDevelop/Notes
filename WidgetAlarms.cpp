@@ -100,8 +100,6 @@ WidgetAlarms::~WidgetAlarms()
 
 void WidgetAlarms::AlarmNotes(std::set<Note*> alarmedNotes, std::map<int, vectorNotePtr> nextAlarmsNotes)
 {
-	Note *nextAlarmNote = nullptr;
-
 	bool added = false;
 	for(auto &alarmedNote:alarmedNotes)
 	{
@@ -112,41 +110,14 @@ void WidgetAlarms::AlarmNotes(std::set<Note*> alarmedNotes, std::map<int, vector
 		}
 	}
 
-	if(0) CodeMarkers::to_do("рефакторинг механизма склейки уведомлений");
-	/// нужно убрать склейку отсюда в виджет мэин
-	/// алгоритм склейки:
-	/// заметки должны быть отсортированы по уведомлению
-	/// если между заметками менее указанного интервала - дальней выставляется уведомление ближней
-	if(Settings::AlarmsJoinEnabled)
-	{
-		if(added)
-		{
-			for(auto &secsAndNotes:nextAlarmsNotes)
-			{
-				if(secsAndNotes.first <= Settings::AlarmsJoinMaxSecs)
-				{
-					for(auto &note:secsAndNotes.second)
-					{
-						note->SetDTPostpone(QDateTime::currentDateTime());
-						alarmedNotes.insert(note);
-						AddNote(note, AddNotePlace::inTop);
-					}
-				}
-				else
-				{
-					if(secsAndNotes.second.empty() == false)
-						nextAlarmNote = secsAndNotes.second.front();
-					else qdbg << "error, teoreticaly can't be empty";
-					break;
-				}
-			}
-		}
-	}
+	if(added) JointNotesAlarms(alarmedNotes, nextAlarmsNotes);
 
-	if(nextAlarmNote == nullptr)
+	Note *nextAlarmNote = nullptr;
+	if(nextAlarmsNotes.empty() == false)
 	{
-		if(nextAlarmsNotes.empty() == false and nextAlarmsNotes.begin()->second.empty() == false)
+		if(nextAlarmsNotes.begin()->second.empty() == false)
 			nextAlarmNote = nextAlarmsNotes.begin()->second.front();
+		else qdbg << "logic error nextAlarmsNotes.begin()->second.empty() != false";
 	}
 
 	for(uint i=0; i<notes.size();)
@@ -163,7 +134,6 @@ void WidgetAlarms::AlarmNotes(std::set<Note*> alarmedNotes, std::map<int, vector
 	{
 		static QString text;
 		static QTime t(0,0,0);
-
 
 		auto &name = nextAlarmNote->Name();
 
@@ -186,6 +156,36 @@ void WidgetAlarms::AlarmNotes(std::set<Note*> alarmedNotes, std::map<int, vector
 		}
 	}
 	else hide();
+}
+
+void WidgetAlarms::JointNotesAlarms(std::set<Note*> & alarmedNotes, std::map<int, vectorNotePtr> & nextAlarmsNotes)
+{
+	/// склейка должна быть там, где мы знаем, происходит ли сейчас добавление заметок в уведомления
+	/// и именно к "сейчас", а не первой nextAlarmsNotes
+	/// иначе склейка происходит следующее:
+	///		открываем приложение, срабатывают вышедшие уведомления, и следующее уведомление через _меньше_склеиваемого_интервала_
+
+	if(Settings::AlarmsJoinEnabled == false) return;
+
+	for(auto &secsAndNotes:nextAlarmsNotes)
+	{
+		if(secsAndNotes.first > Settings::AlarmsJoinMaxSecs) break;
+
+		// перенос уведомлений на сейчас
+		for(auto &note:secsAndNotes.second)
+		{
+			note->SetDTPostpone(QDateTime::currentDateTime());
+			alarmedNotes.insert(note);
+			AddNote(note, AddNotePlace::inTop);
+		}
+
+		// очистка списков перенесенных, они только в начале
+		secsAndNotes.second.clear();
+	}
+
+	// удаление с головы мапы тех, что были очищены
+	while(nextAlarmsNotes.empty() == false and nextAlarmsNotes.begin()->second.empty())
+		nextAlarmsNotes.erase(nextAlarmsNotes.begin());
 }
 
 void WidgetAlarms::CreateTableContextMenu()
