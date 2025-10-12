@@ -46,7 +46,7 @@ private:
 
 	bool notChagesNow = false;
 	bool haveChanges = false;
-	void SetHaveChangesTrue(QString widget);
+	void SetHaveChangesTrue(const QString &place);
 	QDateTime lastChagesDid;
 	QDateTime lastSaveDid;
 	int savedCount = 0;

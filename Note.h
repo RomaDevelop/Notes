@@ -14,8 +14,11 @@
 #include "FastActions.h"
 #include "NetClient.h"
 
+struct Note;
+
 using QStringRefWr = std::reference_wrapper<QString>;
 using QStringRefWr_const = std::reference_wrapper<const QString>;
+using vectorNotePtr = std::vector<Note*>;
 
 struct Note
 {

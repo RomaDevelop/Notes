@@ -480,11 +480,11 @@ void WidgetNoteEditor::LoadSettings()
 	}
 }
 
-void WidgetNoteEditor::SetHaveChangesTrue(QString widget)
+void WidgetNoteEditor::SetHaveChangesTrue(const QString &/*place*/)
 {
 	if(notChagesNow) return;
 
-	qdbg << "SetHaveChangesTrue: " + widget;
+	//qdbg << "SetHaveChangesTrue: " + widget;
 
 	haveChanges = true;
 	lastChagesDid = QDateTime::currentDateTime();

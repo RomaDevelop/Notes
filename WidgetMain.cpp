@@ -22,6 +22,7 @@
 #include <QFileDialog>
 #include <QProgressDialog>
 
+#include "MyCppDifferent.h"
 #include "MyQDifferent.h"
 #include "MyQString.h"
 #include "MyQDialogs.h"
@@ -41,6 +42,7 @@
 #include "NetConstants.h"
 #include "DataBase.h"
 #include "WidgetNoteEditor.h"
+#include "Settings.h"
 
 void ToDo(){
 	qdbg << "ToDo in WidgetMain.cpp line " + QSn(__LINE__);
@@ -142,6 +144,7 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 		widgetAlarms = std::make_unique<WidgetAlarms>(this, labelToGetFont->font());
 		delete labelToGetFont;
 
+		MyCppDifferent::any_guard guard(Settings::disableCbPropChanged, true, false);
 		LoadSettings();
 
 		LoadGroupsSubscribes();
@@ -377,27 +380,26 @@ void WidgetMain::CheckNotesForAlarm()
 {
 	if(0) CodeMarkers::to_do("Нужно адекватный алгоритм проверки чтобы не ломалось если будет много задач");
 	QDateTime currentDateTime = QDateTime::currentDateTime();
-	std::vector<Note*> alarmedNotes;
-	Note *nextAlarmNote = nullptr;
-	qint64 secsToNextAlarm = 60*60*8;
+
+	int secsToNextAlarm = 60*60; // в список следующих уведомлений попадают заметки до которых не более часа
+
+	std::set<Note*> alarmedNotes;
+	std::map<int, vectorNotePtr> nextAlarmsNotes;
+
 	for(auto &note:notes)
 	{
 		auto secsToAlarmCurrent = note->note->SecsToAlarm(currentDateTime);
 		if(secsToAlarmCurrent <= 0)
 		{
-			alarmedNotes.emplace_back(note->note.get());
+			alarmedNotes.insert(note->note.get());
 		}
-		else
+		else if(secsToAlarmCurrent <= secsToNextAlarm)
 		{
-			if(secsToAlarmCurrent < secsToNextAlarm)
-			{
-				nextAlarmNote = note->note.get();
-				secsToNextAlarm = secsToAlarmCurrent;
-			}
+			nextAlarmsNotes[secsToAlarmCurrent].emplace_back(note->note.get());
 		}
 	}
 
-	widgetAlarms->AlarmNotes(alarmedNotes, nextAlarmNote);
+	widgetAlarms->AlarmNotes(std::move(alarmedNotes), std::move(nextAlarmsNotes));
 }
 
 bool WidgetMain::DialogGroupsSubscribes()
@@ -463,6 +465,8 @@ void WidgetMain::SlotTest()
 void WidgetMain::SlotMenu(QPushButton *btn)
 {
 	std::vector<MyQDialogs::MenuItem> items;
+	items.emplace_back("Settings", [](){ DialogSettings::Execute(); });
+	items.emplace_back(MyQDialogs::SeparatorMenuItem());
 	items.emplace_back("Net client", [this](){ netClient->widget->showNormal(); netClient->widget->activateWindow(); });
 	items.emplace_back("Synch", [this](){ netClient->request_all_notes_sending(); });
 	items.emplace_back(MyQDialogs::SeparatorMenuItem());
@@ -875,16 +879,20 @@ void WidgetMain::SaveSettings()
 	static QByteArray prevHeaderState;
 	auto newGeo = this->saveGeometry();
 	auto newHeaderState = this->table->horizontalHeader()->saveState();
-	if(prevGeo != newGeo or prevHeaderState != newHeaderState)
+	if(prevGeo != newGeo
+			or prevHeaderState != newHeaderState
+			or Settings::haveNotSavedChanges)
 	{
 		MyQFileDir::WriteFile(settingsFile, "");
 		QSettings settings(settingsFile, QSettings::IniFormat);
 
 		settings.setValue("geoMainWidget", newGeo);
 		settings.setValue("tableHeaderState", newHeaderState);
-
 		prevGeo = newGeo;
 		prevHeaderState = newHeaderState;
+
+		settings.setValue("settings", Settings::SaveToString());
+		Settings::haveNotSavedChanges = false;
 	}
 }
 
@@ -912,6 +920,9 @@ void WidgetMain::LoadSettings()
 
 	if(!tableHeaderRestored)
 		QTimer::singleShot(200,[this]{ DefaultColsWidths(); });
+
+	if(settings.contains("settings"))
+		Settings::LoadFromString(settings.value("settings").toString());
 }
 
 void WidgetMain::LoadGroupsSubscribes()
@@ -1172,7 +1183,7 @@ void WidgetMain::ClearNotesInWidgetMain()
 {
 	while(table->rowCount()) table->removeRow(table->rowCount()-1);
 	notes.clear();
-	if(widgetAlarms) widgetAlarms->AlarmNotes({}, nullptr);
+	if(widgetAlarms) widgetAlarms->AlarmNotes({}, {});
 }
 
 void WidgetMain::DefaultColsWidths()

@@ -22,6 +22,7 @@
 #include "WidgetNoteEditor.h"
 #include "Resources.h"
 #include "DialogInputTime.h"
+#include "Settings.h"
 
 const QString& RescheduleCaption() { static QString str = " Перенести на ... "; return str; }
 const QString& RostponeCaption() { static QString str = " Отложить на ... "; return str; }
@@ -97,32 +98,72 @@ WidgetAlarms::~WidgetAlarms()
 	}
 }
 
-void WidgetAlarms::AlarmNotes(const std::vector<Note *> & notesToAlarm, Note *nextAlarmNote)
+void WidgetAlarms::AlarmNotes(std::set<Note*> alarmedNotes, std::map<int, vectorNotePtr> nextAlarmsNotes)
 {
-	for(uint i=0; i<notes.size();)
-	{
-		if(std::find(notesToAlarm.begin(), notesToAlarm.end(), notes[i]->note) == notesToAlarm.end())
-			RemoveNoteFromWidgetAlarms(i);
-		else ++i;
-	}
+	Note *nextAlarmNote = nullptr;
 
 	bool added = false;
-	for(auto &newNote:notesToAlarm)
+	for(auto &alarmedNote:alarmedNotes)
 	{
-		if(NoteInAlarms *findedNote = FindNote(newNote); findedNote == nullptr)
+		if(NoteInAlarms *findedNote = FindNote(alarmedNote); findedNote == nullptr)
 		{
-			AddNote(newNote, true);
+			AddNote(alarmedNote, AddNotePlace::inTop);
 			added = true;
 		}
 	}
 
+	if(0) CodeMarkers::to_do("рефакторинг механизма склейки уведомлений");
+	/// нужно убрать склейку отсюда в виджет мэин
+	/// алгоритм склейки:
+	/// заметки должны быть отсортированы по уведомлению
+	/// если между заметками менее указанного интервала - дальней выставляется уведомление ближней
+	if(Settings::AlarmsJoinEnabled)
+	{
+		if(added)
+		{
+			for(auto &secsAndNotes:nextAlarmsNotes)
+			{
+				if(secsAndNotes.first <= Settings::AlarmsJoinMaxSecs)
+				{
+					for(auto &note:secsAndNotes.second)
+					{
+						note->SetDTPostpone(QDateTime::currentDateTime());
+						alarmedNotes.insert(note);
+						AddNote(note, AddNotePlace::inTop);
+					}
+				}
+				else
+				{
+					if(secsAndNotes.second.empty() == false)
+						nextAlarmNote = secsAndNotes.second.front();
+					else qdbg << "error, teoreticaly can't be empty";
+					break;
+				}
+			}
+		}
+	}
+
+	if(nextAlarmNote == nullptr)
+	{
+		if(nextAlarmsNotes.empty() == false and nextAlarmsNotes.begin()->second.empty() == false)
+			nextAlarmNote = nextAlarmsNotes.begin()->second.front();
+	}
+
+	for(uint i=0; i<notes.size();)
+	{
+		if(alarmedNotes.count(notes[i]->note) == 0)
+			RemoveNoteFromWidgetAlarms(i);
+		else ++i;
+	}
+
 	setWindowTitle(QSn(notes.size()) + " alarms for notes");
 
-	if(!nextAlarmNote) labelNextAlarm->clear();
+	if(nextAlarmNote == nullptr) labelNextAlarm->clear();
 	else
 	{
 		static QString text;
 		static QTime t(0,0,0);
+
 
 		auto &name = nextAlarmNote->Name();
 
@@ -358,16 +399,17 @@ NoteInAlarms * WidgetAlarms::FindNote(Note * noteToFind)
 {
 	for(auto &note:notes)
 		if(note->note == noteToFind) return note.get();
+	if(0) CodeMarkers::to_do("make map");
 	return nullptr;
 }
 
-void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessage)
+void WidgetAlarms::AddNote(Note * note, AddNotePlace addPlace, bool disableFeatureMessage)
 {
 	auto widget = new QWidget;
 
 	NoteInAlarms *newNoteInAlarmsPtr = nullptr;
 
-	if(addInTop)
+	if(addPlace == AddNotePlace::inTop)
 	{
 		int row = 0;
 		table->insertRow(row);
@@ -376,7 +418,7 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 		notes.insert(notes.begin(), std::make_unique<NoteInAlarms>());
 		newNoteInAlarmsPtr = notes.front().get();
 	}
-	else
+	else if(addPlace == AddNotePlace::inBottom)
 	{
 		int row = table->rowCount();
 		table->setRowCount(row+1);
@@ -384,6 +426,7 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 		table->scrollToBottom();
 		newNoteInAlarmsPtr = notes.emplace_back(std::make_unique<NoteInAlarms>()).get();
 	}
+	else DO_ONCE(QMbError("unrealesed addPlace"));
 
 	if(!newNoteInAlarmsPtr) { QMbError("invalid newNoteInAlarmsPtr"); return; }
 
@@ -488,7 +531,7 @@ void WidgetAlarms::AddNote(Note * note, bool addInTop, bool disableFeatureMessag
 void WidgetAlarms::MoveNoteUp(Note& note)
 {
 	RemoveNoteFromWidgetAlarms(NoteIndex(&note));
-	AddNote(&note, true, true);
+	AddNote(&note, AddNotePlace::inTop, true);
 }
 
 void WidgetAlarms::SetLabelText(NoteInAlarms & note)
@@ -671,7 +714,7 @@ void WidgetAlarms::SlotPostpone(std::set<Note*> notesToPostpone, int delaySecs, 
 		fromValue = DialogInputTimeResult::fromToday;
 	else if(caseCurrent == menuPostponeCase::setPostpone)
 		fromValue = DialogInputTimeResult::fromNow;
-	else { QMbError("Unrealesed caseCurrent"); }
+	else { QMbError("Unrealesed caseCurrent"); return; }
 
 	if(delaySecs == ForPostpone_ns::handInput)
 	{

@@ -34,7 +34,9 @@ public:
 
 	explicit WidgetAlarms(INotesOwner *aNotesOwner, QFont fontForLabels, QWidget *parent = nullptr);
 	~WidgetAlarms();
-	void AlarmNotes(const std::vector<Note*> &notesToAlarm, Note *nextAlarmNote);
+	///\brief nextAlarmsNotes: ключ = интервал до срабатывания уведомления заметки (в секундах)
+	/// значением в мапе выступает вектор, потому что могут быть несколько заметок с одним интервалом
+	void AlarmNotes(std::set<Note*> alarmedNotes, std::map<int, vectorNotePtr> nextAlarmsNotes);
 
 private:
 	QTableWidget *table;
@@ -47,7 +49,8 @@ private:
 
 	std::vector<std::unique_ptr<NoteInAlarms>> notes;
 	NoteInAlarms* FindNote(Note *noteToFind);
-	void AddNote(Note* note, bool addInTop, bool disableFeatureMessage = false);
+	enum class AddNotePlace { inTop, inBottom };
+	void AddNote(Note* note, AddNotePlace addPlace, bool disableFeatureMessage = false);
 	void MoveNoteUp(Note& note);
 	void SetLabelText(NoteInAlarms & note);
 	int NoteIndex(Note* note); // returns -1 if not found

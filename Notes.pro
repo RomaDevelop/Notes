@@ -12,6 +12,7 @@ SOURCES += \
     FastActions.cpp \
     NetClient.cpp \
     Note.cpp \
+    Settings.cpp \
     WidgetAlarms.cpp \
     WidgetMain.cpp \
     WidgetNoteEditor.cpp \
@@ -33,6 +34,7 @@ HEADERS += \
     NetClient.h \
     Note.h \
     Resources.h \
+    Settings.h \
     WidgetAlarms.h \
     WidgetMain.h \
     WidgetNoteEditor.h
