@@ -15,10 +15,13 @@
 #include "NetClient.h"
 
 struct Note;
+struct CompareByDtCreated;
 
 using QStringRefWr = std::reference_wrapper<QString>;
 using QStringRefWr_const = std::reference_wrapper<const QString>;
+
 using vectorNotePtr = std::vector<Note*>;
+using msetNotesOrderedByDTCreated = std::multiset<Note*, CompareByDtCreated>;
 
 struct Note
 {
@@ -140,6 +143,13 @@ private:
 	std::vector<cbAndHandler> cbsBeforeRemoved;
 	static void EmitCbs(const std::vector<cbAndHandler> &cbs) { for(auto &cb:cbs) cb.cb(cb.handler); }
 // cbs end
+};
+
+struct CompareByDtCreated
+{
+	bool operator()(const Note* a, const Note* b) const {
+			return a->DTCreated() < b->DTCreated();
+		}
 };
 
 class INotesOwner

@@ -383,7 +383,7 @@ void WidgetMain::CheckNotesForAlarm()
 
 	int secsToNextAlarm = 60*60; // в список следующих уведомлений попадают заметки до которых не более часа
 
-	std::set<Note*> alarmedNotes;
+	msetNotesOrderedByDTCreated alarmedNotes;
 	std::map<int, vectorNotePtr> nextAlarmsNotes;
 
 	for(auto &note:notes)

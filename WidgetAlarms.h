@@ -36,8 +36,8 @@ public:
 	~WidgetAlarms();
 	///\brief nextAlarmsNotes: ключ = интервал до срабатывания уведомления заметки (в секундах)
 	/// значением в мапе выступает вектор, потому что могут быть несколько заметок с одним интервалом
-	void AlarmNotes(std::set<Note*> alarmedNotes, std::map<int, vectorNotePtr> nextAlarmsNotes);
-	void JointNotesAlarms(std::set<Note*> & alarmedNotes, std::map<int, vectorNotePtr> & nextAlarmsNotes);
+	void AlarmNotes(msetNotesOrderedByDTCreated alarmedNotes, std::map<int, vectorNotePtr> nextAlarmsNotes);
+	void JointNotesAlarms(msetNotesOrderedByDTCreated & alarmedNotes, std::map<int, vectorNotePtr> & nextAlarmsNotes);
 
 private:
 	QTableWidget *table;

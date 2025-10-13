@@ -98,17 +98,27 @@ WidgetAlarms::~WidgetAlarms()
 	}
 }
 
-void WidgetAlarms::AlarmNotes(std::set<Note*> alarmedNotes, std::map<int, vectorNotePtr> nextAlarmsNotes)
+void WidgetAlarms::AlarmNotes(msetNotesOrderedByDTCreated alarmedNotes, std::map<int, vectorNotePtr> nextAlarmsNotes)
 {
 	bool added = false;
 	for(auto &alarmedNote:alarmedNotes)
 	{
 		if(NoteInAlarms *findedNote = FindNote(alarmedNote); findedNote == nullptr)
 		{
+			//notesToAdd[alarmedNote->DTCreated()].emplace_back(alarmedNote);
 			AddNote(alarmedNote, AddNotePlace::inTop);
 			added = true;
 		}
 	}
+
+//	for(auto &p:notesToAdd)
+//	{
+//		for(auto &note:p.second)
+//		{
+//			AddNote(note, AddNotePlace::inTop);
+//			added = true;
+//		}
+//	}
 
 	if(added) JointNotesAlarms(alarmedNotes, nextAlarmsNotes);
 
@@ -158,7 +168,7 @@ void WidgetAlarms::AlarmNotes(std::set<Note*> alarmedNotes, std::map<int, vector
 	else hide();
 }
 
-void WidgetAlarms::JointNotesAlarms(std::set<Note*> & alarmedNotes, std::map<int, vectorNotePtr> & nextAlarmsNotes)
+void WidgetAlarms::JointNotesAlarms(msetNotesOrderedByDTCreated & alarmedNotes, std::map<int, vectorNotePtr> & nextAlarmsNotes)
 {
 	/// склейка должна быть там, где мы знаем, происходит ли сейчас добавление заметок в уведомления
 	/// и именно к "сейчас", а не первой nextAlarmsNotes
