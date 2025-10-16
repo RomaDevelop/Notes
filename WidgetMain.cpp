@@ -641,11 +641,9 @@ bool WidgetMain::GitWorkAtStart(BaseData &base)
 
 	if(CheckGitStatus(statusAfterWork))
 	{
-		QMbInfo("Fetch and pull completed successfully.\n\nPress ok to launch Notes");
-
 		auto answ = MyQDialogs::CustomDialogWithTimer("Git extensions",
-													  "Fetch and pull completed successfully.\n\nPress Launch to launch Notes",
-											 {"Launch", "Abort launch"}, 0, 5);
+									"Fetch and pull completed successfully.\n\nPress Launch to launch Notes",
+									{"Launch", "Abort launch"}, 0, 5);
 		if(answ == "Launch") {}
 		else if(answ == "Abort launch") {
 			return false;
@@ -747,16 +745,17 @@ void WidgetMain::GitWorkCommitAndClose()
 
 	closeNoQuestions = false;
 	QString question = "Add, commit and push completed successfully.\n\nClose app?";
+	int defButtonIndex = 0;
 	if(CheckGitStatus(statusAfterWork) == false)
 	{
 		question = "Work (add, commit, push) completed with.\n\nWARNING:\n\nUnexpected status:"
 				   "\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
 				   +"\n\nClose app?";
-
+		defButtonIndex = -1;
 	}
 
-	auto answ = QMessageBox::question({}, "Work finished", question);
-	if(answ == QMessageBox::Yes)
+	auto answ = MyQDialogs::CustomDialogWithTimer("Finishing work", question, {"Yes", "No"}, defButtonIndex, 5);
+	if(answ == "Yes")
 	{
 		closeNoQuestions = true;
 		close();
