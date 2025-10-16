@@ -42,6 +42,8 @@ public:
 	bool abortClose = false;
 	void closeEvent (QCloseEvent *event) override;
 
+	void CloseApp();
+
 	virtual void CreateNewNote() override;
 	virtual void ShowMainWindow() override;
 	virtual void NotesLists(lists list) override;
@@ -54,7 +56,7 @@ private:
 	NetClient *netClient;
 	QTableWidget *table;
 
-	void GitWorkAtStart(BaseData &base);
+	bool GitWorkAtStart(BaseData &base);
 	void GitWorkCommitAndClose();
 	bool CheckGitStatus(const GitStatus &status);
 

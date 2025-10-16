@@ -103,7 +103,12 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 
 	auto base = DataBase::defineBase(DataBase::client);
 
-	GitWorkAtStart(base);
+	bool continueWork = GitWorkAtStart(base);
+	if(!continueWork)
+	{
+		CloseApp();
+		return;
+	}
 
 	MyQSqlDatabase::Init(base, {},
 							[](const QString &str){ qdbg << str; },
@@ -523,121 +528,145 @@ void WidgetMain::closeEvent(QCloseEvent * event)
 	QApplication::exit();
 }
 
-void WidgetMain::GitWorkAtStart(BaseData &base)
+void WidgetMain::CloseApp()
+{
+	this->deleteLater();
+	QTimer::singleShot(0,[](){ QApplication::exit(); });
+	if(0) CodeMarkers::to_do_afterwards("в этом сценарии вылетает крит");
+}
+
+bool WidgetMain::GitWorkAtStart(BaseData &base)
 {
 #ifdef QT_DEBUG
-	return;
+	return true;
 #endif
 
 	auto answ = MyQDialogs::CustomDialog("Launching Notes", "Do you want to update repo before launching Notes?",
 										 {"Yes, update", "No update", "Abort launch"});
-	if(answ == "No update") {}
-	else if(answ == "Yes, update")
+	if(answ == "No update")
 	{
-		QProgressDialog progress("", "", 0, 3);
-		progress.setWindowTitle("Работа с Git");
-		progress.setLabelText("Выполнение fetch...");
-		progress.setCancelButton({});
-		progress.show();
-		QApplication::processEvents();
-
-		QString fetchRes;
-		while(fetchRes != "finish")
-		{
-			for(int i=0; i<3; i++)
-			{
-				QProcess process;
-				process.setWorkingDirectory(base.pathDataBase);
-				process.start("git", QStringList() << "fetch" << "github");
-				if(!process.waitForStarted(3000))
-				{
-					fetchRes = "error waitForStarted " + (QStringList() << "fetch" << "github").join(" ");
-				}
-				else if(!process.waitForFinished(3000))
-				{
-					fetchRes = "error waitForFinished " + (QStringList() << "fetch" << "github").join(" ");
-				}
-				else fetchRes = process.readAllStandardError();
-
-				if(fetchRes.isEmpty()) break;
-			}
-
-			if(!fetchRes.isEmpty())
-			{
-				auto answ = QMessageBox::question(nullptr, "Fetch errors", "Fetch did with errors:\n\n"+fetchRes+"\n\nTry again?");
-				if(answ == QMessageBox::No) fetchRes = "finish";
-			}
-			else fetchRes = "finish";
-		}
-
-		progress.setLabelText("Выполнение pull");
-		progress.setValue(1);
-		QApplication::processEvents();
-
-		QString pullRes;
-		while(pullRes != "finish")
-		{
-			for(int i=0; i<3; i++)
-			{
-				QProcess process;
-				process.setWorkingDirectory(base.pathDataBase);
-				process.start("git", QStringList() << "pull");
-				if(!process.waitForStarted(3000))
-				{
-					pullRes = "error waitForStarted " + (QStringList() << "pull").join(" ");
-				}
-				else if(!process.waitForFinished(3000))
-				{
-					pullRes = "error waitForFinished " + (QStringList() << "pull").join(" ");
-				}
-				else pullRes = process.readAllStandardError();
-
-				if(pullRes.isEmpty()) break;
-			}
-
-			if(!pullRes.isEmpty())
-			{
-				auto answ = QMessageBox::question(nullptr, "Pull errors", "Pull did with errors:\n\n"+pullRes+"\n\nTry again?");
-				if(answ == QMessageBox::No) pullRes = "finish";
-			}
-			else pullRes = "finish";
-		}
-
-		progress.setLabelText("Получение статуса...");
-		progress.setValue(2);
-		QApplication::processEvents();
-		QString pathRepo = base.pathDataBase;
-		auto statusAfterWork = Git::GetGitStatusForOneDir(pathRepo);
-
-		progress.close();
-		QApplication::processEvents();
-
-		if(CheckGitStatus(statusAfterWork))
-		{
-			QMbInfo("Fetch and pull completed successfully.\n\nPress ok to launch Notes");
-		}
-		else
-		{
-			auto answ = QMessageBox::question({}, "Git extensions", "Fetch and push completed.\n\nWARNING:\n\nUnexpected status:"
-						"\n\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
-											  +"\n\nLaunch Git extensions?");
-
-			if(answ == QMessageBox::Yes)
-			{
-				if(GitExtensionsTool::ExecuteGitExtensions(base.pathDataBase, true, filesPath))
-					QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
-				//else QMbError("Error launching GitExtensions"); // ExecuteGitExtensions выводит ошибку сам
-			}
-		}
+		return true;
 	}
 	else if(answ == "Abort launch")
 	{
-		this->deleteLater();
-		QTimer::singleShot(0,[](){ QApplication::exit(); });
-		if(0) CodeMarkers::to_do_afterwards("в этом сценарии вылетает крит");
-		return;
+		return false;
 	}
-	else QMbError("Unexpacted answ");
+	else if(answ == "Yes, update")
+	{
+		// здесь ничего, код просто идёт дальше, там будет обновление
+	}
+	else
+	{
+		QMbError("Unexpected answ");
+		return true;
+	}
+
+	QProgressDialog progress("", "", 0, 3);
+	progress.setWindowTitle("Работа с Git");
+	progress.setLabelText("Выполнение fetch...");
+	progress.setCancelButton({});
+	progress.show();
+	QApplication::processEvents();
+
+	QString fetchRes;
+	while(fetchRes != "finish")
+	{
+		for(int i=0; i<3; i++)
+		{
+			QProcess process;
+			process.setWorkingDirectory(base.pathDataBase);
+			process.start("git", QStringList() << "fetch" << "github");
+			if(!process.waitForStarted(3000))
+			{
+				fetchRes = "error waitForStarted " + (QStringList() << "fetch" << "github").join(" ");
+			}
+			else if(!process.waitForFinished(3000))
+			{
+				fetchRes = "error waitForFinished " + (QStringList() << "fetch" << "github").join(" ");
+			}
+			else fetchRes = process.readAllStandardError();
+
+			if(fetchRes.isEmpty()) break;
+		}
+
+		if(!fetchRes.isEmpty())
+		{
+			auto answ = QMessageBox::question(nullptr, "Fetch errors", "Fetch did with errors:\n\n"+fetchRes+"\n\nTry again?");
+			if(answ == QMessageBox::No) fetchRes = "finish";
+		}
+		else fetchRes = "finish";
+	}
+
+	progress.setLabelText("Выполнение pull");
+	progress.setValue(1);
+	QApplication::processEvents();
+
+	QString pullRes;
+	while(pullRes != "finish")
+	{
+		for(int i=0; i<3; i++)
+		{
+			QProcess process;
+			process.setWorkingDirectory(base.pathDataBase);
+			process.start("git", QStringList() << "pull");
+			if(!process.waitForStarted(3000))
+			{
+				pullRes = "error waitForStarted " + (QStringList() << "pull").join(" ");
+			}
+			else if(!process.waitForFinished(3000))
+			{
+				pullRes = "error waitForFinished " + (QStringList() << "pull").join(" ");
+			}
+			else pullRes = process.readAllStandardError();
+
+			if(pullRes.isEmpty()) break;
+		}
+
+		if(!pullRes.isEmpty())
+		{
+			auto answ = QMessageBox::question(nullptr, "Pull errors", "Pull did with errors:\n\n"+pullRes+"\n\nTry again?");
+			if(answ == QMessageBox::No) pullRes = "finish";
+		}
+		else pullRes = "finish";
+	}
+
+	progress.setLabelText("Получение статуса...");
+	progress.setValue(2);
+	QApplication::processEvents();
+	QString pathRepo = base.pathDataBase;
+	auto statusAfterWork = Git::GetGitStatusForOneDir(pathRepo);
+
+	progress.close();
+	QApplication::processEvents();
+
+	if(CheckGitStatus(statusAfterWork))
+	{
+		QMbInfo("Fetch and pull completed successfully.\n\nPress ok to launch Notes");
+
+		auto answ = MyQDialogs::CustomDialogWithTimer("Git extensions",
+													  "Fetch and pull completed successfully.\n\nPress Launch to launch Notes",
+											 {"Launch", "Abort launch"}, 0, 5);
+		if(answ == "Launch") {}
+		else if(answ == "Abort launch") {
+			return false;
+		}
+		else QMbError("unexpected answ "+answ);
+	}
+	else
+	{
+		auto answ = QMessageBox::question({}, "Git extensions", "Fetch and push completed.\n\nWARNING:\n\nUnexpected status:"
+					"\n\nCommit status: "+statusAfterWork.commitStatus+"\nPush status: "+statusAfterWork.pushStatus
+										  +"\n\nLaunch Git extensions?");
+
+		if(answ == QMessageBox::Yes)
+		{
+			if(GitExtensionsTool::ExecuteGitExtensions(base.pathDataBase, true, filesPath))
+				QMbInfo("Launching GitExtensions...\n\nPress ok when you finish repo updating.");
+			//else QMbError("Error launching GitExtensions"); // ExecuteGitExtensions выводит ошибку сам
+		}
+	}
+
+	return true;
 }
 
 void WidgetMain::GitWorkCommitAndClose()

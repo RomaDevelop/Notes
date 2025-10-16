@@ -5,6 +5,7 @@
 #include "Resources.h"
 
 #include "MyQDifferent.h"
+#include "MyQDialogs.h"
 #include "LaunchParams.h"
 
 #include "DevNames.h"
@@ -18,6 +19,8 @@ int main(int argc, char *argv[])
 
 	QApplication a(argc, argv);
 	a.setQuitOnLastWindowClosed(false);
+
+	qdbg << MyQDialogs::CustomDialogWithTimer("", "", {"1", "2", "3"}, 0, 5);
 
 	LaunchParams::Init({
 						   LaunchParams::DeveloperData(DevNames::RomaWork(), "TKO3-206", "C:/Work/C++/Notes",
