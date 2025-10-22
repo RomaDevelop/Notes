@@ -63,7 +63,7 @@ private:
 	void CreateRow1(QHBoxLayout *hlo1);
 	void CreateTableContextMenu();
 	void CreateTrayIcon();
-		void TrayIconClose();
+		void TrayIconSlotClose();
 	void CreateNotesAlarmChecker();
 	void CheckNotesForAlarm();
 

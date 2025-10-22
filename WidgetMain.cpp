@@ -334,6 +334,8 @@ void WidgetMain::CreateTrayIcon()
 	connect(menu->actions().back(), &QAction::triggered, this, [this](){ NotesLists(recentOpened); });
 	menu->addAction("Next alarms notes");
 	connect(menu->actions().back(), &QAction::triggered, this, [this](){ NotesLists(nextAlarms); });
+	menu->addAction("Next alarms join");
+	connect(menu->actions().back(), &QAction::triggered, this, [this](){ NotesLists(INotesOwner::nextAlarmsAlarmNow); });
 
 	menu->addSeparator();
 
@@ -344,7 +346,7 @@ void WidgetMain::CreateTrayIcon()
 
 	menu->addAction("Close app");
 	MyQWidget::SetFontBold(menu->actions().back(), true);
-	connect(menu->actions().back(), &QAction::triggered, this, [this](){ TrayIconClose(); });
+	connect(menu->actions().back(), &QAction::triggered, this, [this](){ TrayIconSlotClose(); });
 
 	auto screens = QGuiApplication::screens();
 	if(screens.size() < 2) return;
@@ -358,7 +360,7 @@ void WidgetMain::CreateTrayIcon()
 	connect(addIcon, &ClickableQWidget::clicked, this, [this](){ ShowMainWindow(); });
 }
 
-void WidgetMain::TrayIconClose()
+void WidgetMain::TrayIconSlotClose()
 {
 	auto answ = QMessageBox::question({}, "Завершение работы приложения", "Сделать комит перед завершением работы?");
 	if(answ == QMessageBox::Yes)
