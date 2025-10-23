@@ -98,6 +98,8 @@ WidgetAlarms::~WidgetAlarms()
 	}
 }
 
+//QStringList joinNotesLog;
+
 void WidgetAlarms::AlarmNotes(msetNotesOrderedByDTCreated alarmedNotes, std::map<int, vectorNotePtr> nextAlarmsNotes)
 {
 	bool added = false;
@@ -120,7 +122,9 @@ void WidgetAlarms::AlarmNotes(msetNotesOrderedByDTCreated alarmedNotes, std::map
 //		}
 //	}
 
-	if(added) JointNotesAlarms(alarmedNotes, nextAlarmsNotes);
+	//joinNotesLog += QDateTime::currentDateTime().toString(DateTimeFormat) + " AlarmNotes";
+
+	if(added) JoinNotesAlarms(alarmedNotes, nextAlarmsNotes);
 
 	Note *nextAlarmNote = nullptr;
 	if(nextAlarmsNotes.empty() == false)
@@ -168,12 +172,14 @@ void WidgetAlarms::AlarmNotes(msetNotesOrderedByDTCreated alarmedNotes, std::map
 	else hide();
 }
 
-void WidgetAlarms::JointNotesAlarms(msetNotesOrderedByDTCreated & alarmedNotes, std::map<int, vectorNotePtr> & nextAlarmsNotes)
+void WidgetAlarms::JoinNotesAlarms(msetNotesOrderedByDTCreated & alarmedNotes, std::map<int, vectorNotePtr> & nextAlarmsNotes)
 {
 	/// склейка должна быть там, где мы знаем, происходит ли сейчас добавление заметок в уведомления
 	/// и именно к "сейчас", а не первой nextAlarmsNotes
 	/// иначе склейка происходит следующее:
 	///		открываем приложение, срабатывают вышедшие уведомления, и следующее уведомление через _меньше_склеиваемого_интервала_
+
+	//joinNotesLog += QDateTime::currentDateTime().toString(DateTimeFormat) + " JoinNotesAlarms";
 
 	if(Settings::AlarmsJoinEnabled == false) return;
 
@@ -196,6 +202,11 @@ void WidgetAlarms::JointNotesAlarms(msetNotesOrderedByDTCreated & alarmedNotes, 
 	// удаление с головы мапы тех, что были очищены
 	while(nextAlarmsNotes.empty() == false and nextAlarmsNotes.begin()->second.empty())
 		nextAlarmsNotes.erase(nextAlarmsNotes.begin());
+}
+
+void WidgetAlarms::JoinNotesLogShow()
+{
+	MyQDialogs::ShowText(/*joinNotesLog*/"JoinNotesLog disabled");
 }
 
 void WidgetAlarms::CreateTableContextMenu()
