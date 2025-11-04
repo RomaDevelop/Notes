@@ -373,7 +373,7 @@ void WidgetAlarms::CreateFindSection(QBoxLayout *loMain)
 		tableFind->setRowCount(0);
 		if(text.isEmpty()) return;
 
-		QString textTranslited = MyQString::Translited(text);
+		QString textTranslited = MyQString::TranslitWrongLanguage(text);
 
 // выборка заметок
 		auto notes = notesOwner->Notes([text, textTranslited](Note *note){

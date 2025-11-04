@@ -3,7 +3,7 @@
 
 #include <QMessageBox>
 
-#include "Resource.h"
+#include "ResourcesCreator.h"
 
 DECLARE_RESOURCES(Resources)
 	SET_ERROR_WORKER([](QString str){ QMbError(str); })

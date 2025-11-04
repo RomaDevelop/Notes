@@ -81,6 +81,11 @@ void WidgetNoteEditor::SetReadOnly()
 			QMbError("Unrealesed type to SetReadOnly " + QString(obj->metaObject()->className()));
 		}
 	}
+
+	for(auto &action:actionsToSetReadOnly)
+	{
+		action->setDisabled(true);
+	}
 }
 
 WidgetNoteEditor::WidgetNoteEditor(Note &note, QWidget *parent):
@@ -370,17 +375,22 @@ void WidgetNoteEditor::CreateRow2_buttons(QVBoxLayout *vlo_main)
 
 	hloButtons->addStretch();
 
-	QPushButton *btnSave = new QPushButton(" Save ");
-	hloButtons->addWidget(btnSave);
-	connect(btnSave,&QPushButton::clicked,[this](){
-		SaveNoteFromEditor(true);
+	QPushButton *btnRemove = new QPushButton(" Remove ");
+	hloButtons->addWidget(btnRemove);
+	connect(btnRemove,&QPushButton::clicked,[this](){
+		if(QMessageBox::question(0,"Remove note","Removing note "+note.Name()+"\n\nAre you shure?") == QMessageBox::Yes)
+				note.ExecRemoveNoteWorker(true);
 	});
 
-//	QPushButton *btnTest = new QPushButton(" Test ");
-//	hloButtons->addWidget(btnTest);
-//	connect(btnTest,&QPushButton::clicked, [this, btnDtEditNotifyAdd](){
-//		qdbg << btnDtEditNotifyAdd->height() << dtEditNotify->height();
-//	});
+	QPushButton *btnSave = new QPushButton(" Save ");
+	hloButtons->addWidget(btnSave);
+	connect(btnSave,&QPushButton::clicked,[this](){ SaveNoteFromEditor(true); });
+
+	QPushButton *btnTest = new QPushButton(" Test ");
+	hloButtons->addWidget(btnTest);
+	connect(btnTest,&QPushButton::clicked, [this](){
+		SetReadOnly();
+	});
 }
 
 void WidgetNoteEditor::CreateStatusBar(QLayout *lo_main)
@@ -392,6 +402,11 @@ void WidgetNoteEditor::CreateStatusBar(QLayout *lo_main)
 	statusBar->addWidget(labelGroup);
 	auto UpdateGroupFoo = [labelGroup, this](void *){ labelGroup->setText("Группа: " + note.groupName); };
 	note.AddCBGroupChanged(UpdateGroupFoo, this, cbCounter);
+
+	labelGroup->setContextMenuPolicy(Qt::ActionsContextMenu);
+	labelGroup->addAction(new QAction("Переместить в группу", labelGroup));
+	actionsToSetReadOnly.push_back(labelGroup->actions().back());
+	connect(labelGroup->actions().back(), &QAction::triggered, [this](){ note.DialogMoveToGroup(); });
 
 	labelStatus = new QLabel;
 	statusBar->addWidget(labelStatus);

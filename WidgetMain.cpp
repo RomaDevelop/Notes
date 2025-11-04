@@ -362,18 +362,19 @@ void WidgetMain::CreateTrayIcon()
 
 void WidgetMain::TrayIconSlotClose()
 {
-	auto answ = QMessageBox::question({}, "Завершение работы приложения", "Сделать комит перед завершением работы?");
-	if(answ == QMessageBox::Yes)
-	{
+	auto answ = MyQDialogs::CustomDialog("Завершение работы приложения","Вы уверены, что хотите завершить работу приложения?",
+						{"Завершить без коммита", "Сделать коммит и завершить", "Отменить завершение работы"});
+	if(0){}
+	else if(answ == "Завершить без коммита") { 	closeNoQuestions = true; close(); }
+	else if(answ == "Сделать коммит и завершить") {
 		GitWorkCommitAndClose();
 		if(abortClose) {
 			abortClose = false;
 			return;
 		}
-
 	}
-	closeNoQuestions = true;
-	close();
+	else if(answ == "Отменить завершение работы") { return; }
+	else { QMbc(0,"error", "not realesed button " + answ); }
 }
 
 void WidgetMain::CreateNotesAlarmChecker()
@@ -503,15 +504,13 @@ void WidgetMain::closeEvent(QCloseEvent * event)
 
 	if(!closeNoQuestions)
 	{
-		auto answ = MyQDialogs::CustomDialog("Завершение работы приложения","Вы уверены, что хотите завершить работу приложения?"
-																			"\n\n(уведомления на задачи не будут поступать)"
-																			"\n(можно свернуть в трей, приложение продолжит работать)",
-											 {"Завершить", "Сделать коммит и завершить", "Свернуть в трей", "Ничего не делать"});
+		auto answ = MyQDialogs::CustomDialog("Завершение работы приложения","Вы уверены, что хотите завершить работу приложения?",
+							{"Завершить без коммита", "Сделать коммит и завершить", "Свернуть в трей", "Отменить завершение работы"});
 		if(0){}
-		else if(answ == "Завершить") {/*ничего не делаем*/}
+		else if(answ == "Завершить без коммита") {/*ничего не делаем*/}
 		else if(answ == "Сделать коммит и завершить") { GitWorkCommitAndClose(); }
 		else if(answ == "Свернуть в трей") { hide(); abortClose = true; }
-		else if(answ == "Ничего не делать") { abortClose = true; }
+		else if(answ == "Отменить завершение работы") { abortClose = true; }
 		else { QMbc(0,"error", "not realesed button " + answ); abortClose = true; }
 	}
 
@@ -1139,7 +1138,7 @@ void WidgetMain::UpdateWidgetsFromNote(NoteInMain &note)
 
 void WidgetMain::FilterNotes(const QString &textFilter)
 {
-	QString textFilterTranslited = MyQString::Translited(textFilter);
+	QString textFilterTranslited = MyQString::TranslitWrongLanguage(textFilter);
 
 	for(int row=0; row<table->rowCount(); row++)
 	{

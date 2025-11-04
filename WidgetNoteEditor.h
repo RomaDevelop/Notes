@@ -20,17 +20,20 @@ public:
 	//static WidgetNoteEditor* MakeOrShowNoteEditorTmpNote(Note note);
 		// не стоит делать такой способ ибо в Note коллбеки которые могут копироваться
 
-	void StoreTmpNote(std::shared_ptr<Note> tmpNote) { this->tmpNote = tmpNote; }
-	void SetReadOnly();
-
 private:
 	explicit WidgetNoteEditor(Note &note, QWidget *parent = nullptr);
+public:
+	~WidgetNoteEditor();
+
+private:
 	void CreateRow2_buttons(QVBoxLayout *lo_main);
 	void CreateStatusBar(QLayout *lo_main);
 	void InitTimerNoteSaver();
-public:
-	~WidgetNoteEditor();
-private:
+
+	void StoreTmpNote(std::shared_ptr<Note> tmpNote) { this->tmpNote = tmpNote; }
+	void SetReadOnly();
+	std::vector<QAction*> actionsToSetReadOnly;
+
 	void closeEvent (QCloseEvent *event) override;
 	//void resizeEvent(QResizeEvent * event) override { }
 	//void moveEvent(QMoveEvent * event) override { }
