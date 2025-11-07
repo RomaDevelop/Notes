@@ -689,6 +689,7 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 			continue;
 		}
 
+		QDateTime calculatedDT;
 		if(delay.seconds != ForPostpone_ns::handInput)
 		{
 			if(menuPostponeCaseCurrent == menuPostponeCase::setPostpone)
@@ -699,15 +700,17 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 			{
 				if(notesToDo.size() == 1) // если обрабатываеся одна зазача
 				{
-					delay.text = AddSecsFromToday((*notesToDo.begin())->DTNotify(), delaySecs).toString("dd MMM yyyy hh:mm::ss (ddd)");
+					calculatedDT = AddSecsFromToday((*notesToDo.begin())->DTNotify(), delaySecs);
+					delay.text = calculatedDT.toString("dd MMM yyyy hh:mm::ss (ddd)");
 					if(delaySecs == secondsInDay)
-						delay.text = AddSecsFromToday((*notesToDo.begin())->DTNotify(), delaySecs).toString("завтра hh:mm::ss (ddd)");
+						delay.text = calculatedDT.toString("завтра hh:mm::ss (ddd)");
 					if(delaySecs == secondsInDay*2)
-						delay.text = AddSecsFromToday((*notesToDo.begin())->DTNotify(), delaySecs).toString("послезавтра hh:mm::ss (ddd)");
+						delay.text = calculatedDT.toString("послезавтра hh:mm::ss (ddd)");
 				}
 				else // если обрабатываеся много зазач
 				{
-					delay.text = QDateTime::currentDateTime().addSecs(delaySecs).toString("dd MMM yyyy (ddd)");
+					calculatedDT = QDateTime::currentDateTime().addSecs(delaySecs);
+					delay.text = calculatedDT.toString("dd MMM yyyy (ddd)");
 					if(delaySecs == secondsInDay)
 						delay.text = "завтра";
 					if(delaySecs == secondsInDay*2)
@@ -722,8 +725,10 @@ void WidgetAlarms::ShowMenuPostpone(QPoint pos, menuPostponeCase menuPostponeCas
 		});
 
 		// добавление разделителей
-		if(menu->actions().back()->text().contains("(Вс)"))
+		if(calculatedDT.isNull() == false and calculatedDT.date().dayOfWeek() == 7)
+		{
 			menu->addSeparator();
+		}
 	}
 
 	menu->exec(pos);
