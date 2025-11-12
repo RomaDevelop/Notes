@@ -70,19 +70,19 @@ void Note::DialogMoveToGroup()
 	auto res = MyQDialogs::ListDialog("Moving note to group", list);
 	if(!res.accepted) return;
 
-	res.index -= prependedCount;
+	res.chosenIndex -= prependedCount;
 
-	if(res.index == currentIndex) return;
+	if(res.chosenIndex == currentIndex) return;
 
-	if(res.choosedText == createNew)
+	if(res.chosenText == createNew)
 	{
 		DialogCreateNewGroup();
 		return;
 	}
 
-	if(res.index < 0) Error("unexpacted error res.index < 0");
+	if(res.chosenIndex < 0) Error("unexpacted error res.index < 0");
 
-	MoveToGroup(grDatas[res.index].second);
+	MoveToGroup(grDatas[res.chosenIndex].second);
 }
 
 void Note::DialogEditCurrentGroup()

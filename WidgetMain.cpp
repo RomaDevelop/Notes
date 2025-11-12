@@ -844,7 +844,7 @@ void WidgetMain::NotesLists(lists list)
 		auto answ = MyQDialogs::ListDialog(caption, rows, "Open note", "Close list", 920);
 		if(answ.accepted)
 		{
-			Note &noteRef = *notesToShow[answ.index];
+			Note &noteRef = *notesToShow[answ.chosenIndex];
 			WidgetNoteEditor::MakeOrShowNoteEditor(noteRef);
 		}
 	}
