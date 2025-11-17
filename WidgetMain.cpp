@@ -21,6 +21,7 @@
 #include <QScreen>
 #include <QFileDialog>
 #include <QProgressDialog>
+#include <QStatusBar>
 
 #include "MyCppDifferent.h"
 #include "MyQDifferent.h"
@@ -141,6 +142,8 @@ WidgetMain::WidgetMain(QWidget *parent) : QWidget(parent)
 	});
 
 	CreateTableContextMenu();
+
+	CreateStatusBar(vlo_main);
 
 	auto labelToGetFont = new QLabel("labelToGetFont");
 	vlo_main->addWidget(labelToGetFont);
@@ -299,6 +302,15 @@ void WidgetMain::CreateTableContextMenu()
 	});
 }
 
+void WidgetMain::CreateStatusBar(QBoxLayout *lo)
+{
+	QStatusBar *statusBar = new QStatusBar();
+	lo->addWidget(statusBar);
+
+	labelNextAlarm = new QLabel;
+	statusBar->addWidget(labelNextAlarm);
+}
+
 void WidgetMain::CreateTrayIcon()
 {
 	auto icon = new QSystemTrayIcon(this);
@@ -389,10 +401,13 @@ void WidgetMain::CheckNotesForAlarm()
 	if(0) CodeMarkers::to_do("Нужно адекватный алгоритм проверки чтобы не ломалось если будет много задач");
 	QDateTime currentDateTime = QDateTime::currentDateTime();
 
-	int secsToNextAlarm = 60*60; // в список следующих уведомлений попадают заметки до которых не более часа
+	int secsToNextAlarmMax = 60*60; // в список следующих уведомлений попадают заметки до которых не более часа
 
 	msetNotesOrderedByDTCreated alarmedNotes;
 	std::map<int, vectorNotePtr> nextAlarmsNotes;
+
+	Note *nextAlarmNote = nullptr;
+	qint64 secsToNextAlarmNote = INT64_MAX;
 
 	for(auto &note:notes)
 	{
@@ -401,10 +416,22 @@ void WidgetMain::CheckNotesForAlarm()
 		{
 			alarmedNotes.insert(note->note.get());
 		}
-		else if(secsToAlarmCurrent <= secsToNextAlarm)
+		else
 		{
-			nextAlarmsNotes[secsToAlarmCurrent].emplace_back(note->note.get());
+			if(secsToAlarmCurrent <= secsToNextAlarmMax)
+				nextAlarmsNotes[secsToAlarmCurrent].emplace_back(note->note.get());
+
+			if(secsToNextAlarmNote > secsToAlarmCurrent)
+			{
+				nextAlarmNote = note->note.get();
+				secsToNextAlarmNote = secsToAlarmCurrent;
+			}
 		}
+	}
+
+	if(nextAlarmNote)
+	{
+		WidgetAlarms::SetLabelNextAlarm(*nextAlarmNote, labelNextAlarm);
 	}
 
 	widgetAlarms->AlarmNotes(std::move(alarmedNotes), std::move(nextAlarmsNotes));

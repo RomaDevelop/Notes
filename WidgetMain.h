@@ -55,6 +55,7 @@ public:
 private:
 	NetClient *netClient;
 	QTableWidget *table;
+	QLabel *labelNextAlarm;
 
 	bool GitWorkAtStart(BaseData &base);
 	void GitWorkCommitAndClose();
@@ -62,8 +63,10 @@ private:
 
 	void CreateRow1(QHBoxLayout *hlo1);
 	void CreateTableContextMenu();
+	void CreateStatusBar(QBoxLayout *lo);
 	void CreateTrayIcon();
 		void TrayIconSlotClose();
+
 	void CreateNotesAlarmChecker();
 	void CheckNotesForAlarm();
 

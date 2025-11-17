@@ -146,17 +146,7 @@ void WidgetAlarms::AlarmNotes(msetNotesOrderedByDTCreated alarmedNotes, std::map
 	if(nextAlarmNote == nullptr) labelNextAlarm->clear();
 	else
 	{
-		static QString text;
-		static QTime t(0,0,0);
-
-		auto &name = nextAlarmNote->Name();
-
-		text.clear();
-		text.append("Next alarm in ").append(t.addSecs(nextAlarmNote->SecsToAlarm(QDateTime::currentDateTime())).toString("hh:mm:ss"));
-		text.append(" - ").append(name.size() <= 20 ? name : name.left(18).append("..."));
-
-		labelNextAlarm->setText(text);
-		labelNextAlarm->setToolTip(name);
+		SetLabelNextAlarm(*nextAlarmNote, labelNextAlarm);
 	}
 
 	if(!notes.empty())
@@ -207,6 +197,23 @@ void WidgetAlarms::JoinNotesAlarms(msetNotesOrderedByDTCreated & alarmedNotes, s
 void WidgetAlarms::JoinNotesLogShow()
 {
 	MyQDialogs::ShowText(/*joinNotesLog*/"JoinNotesLog disabled");
+}
+
+void WidgetAlarms::SetLabelNextAlarm(Note &noteNextAlarm, QLabel *label)
+{
+	static QString text;
+	static QTime t(0,0,0);
+
+	auto &name = noteNextAlarm.Name();
+
+	text.clear();
+	text.append("Next alarm in ");
+	text.append(t.addSecs(noteNextAlarm.SecsToAlarm(QDateTime::currentDateTime())).toString("hh:mm:ss"));
+	text.append(" - ").append(name.size() <= 20 ? name : name.left(18).append("..."));
+	text.append(" ");
+
+	label->setText(text);
+	label->setToolTip(name);
 }
 
 void WidgetAlarms::CreateTableContextMenu()

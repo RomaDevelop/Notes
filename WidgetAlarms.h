@@ -40,6 +40,8 @@ public:
 	void JoinNotesAlarms(msetNotesOrderedByDTCreated & alarmedNotes, std::map<int, vectorNotePtr> & nextAlarmsNotes);
 	void JoinNotesLogShow();
 
+	static void SetLabelNextAlarm(Note &noteNextAlarm, QLabel *label);
+
 private:
 	QTableWidget *table;
 	QLabel *labelNextAlarm;

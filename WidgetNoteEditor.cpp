@@ -395,7 +395,7 @@ void WidgetNoteEditor::CreateRow2_buttons(QVBoxLayout *vlo_main)
 
 void WidgetNoteEditor::CreateStatusBar(QLayout *lo_main)
 {
-	QStatusBar *statusBar = new QStatusBar(this);
+	QStatusBar *statusBar = new QStatusBar();
 	lo_main->addWidget(statusBar);
 
 	auto labelGroup = new QLabel("Группа: " + note.groupName);
