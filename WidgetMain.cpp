@@ -43,6 +43,7 @@
 #include "NetConstants.h"
 #include "DataBase.h"
 #include "WidgetNoteEditor.h"
+#include "DialogNextAlarmsJoin.h"
 #include "Settings.h"
 
 void ToDo(){
@@ -853,7 +854,6 @@ void WidgetMain::NotesLists(lists list)
 
 			notesToShow.push_back(noteInMain->note.get());
 		}
-		if(notesToShow.size() == 20) break;
 	}
 
 	QStringList rows;
@@ -877,20 +877,7 @@ void WidgetMain::NotesLists(lists list)
 	}
 	else if(showWayVal == chBoxDialogToAlarmNow)
 	{
-		auto answ = MyQDialogs::CheckBoxDialog("Choose alarms to alarm now", rows, {}, {}, false, 920);
-		if(answ.accepted)
-		{
-			std::vector<Note*> notesToJoinAlarms;
-			for(auto &index:answ.checkedIndexes)
-			{
-				notesToJoinAlarms.push_back(notesToShow[index]);
-			}
-
-			for(auto &note:notesToJoinAlarms)
-			{
-				note->SetDTPostpone(QDateTime::currentDateTime());
-			}
-		}
+		DialogNextAlarmsJoin::Execute(notesToShow);
 	}
 	else { QMbError("Unrealised showWay " + MyQString::AsDebug(showWayVal)); }
 }

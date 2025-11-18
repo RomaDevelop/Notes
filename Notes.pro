@@ -9,6 +9,7 @@ SOURCES += \
     ../include/AdditionalTray.cpp \
     ../include/PlatformDependent.cpp \
     DialogInputTime.cpp \
+    DialogNextAlarmsJoin.cpp \
     FastActions.cpp \
     NetClient.cpp \
     Note.cpp \
@@ -30,6 +31,7 @@ HEADERS += \
     ../include/TextEditCleaner.h \
     DevNames.h \
     DialogInputTime.h \
+    DialogNextAlarmsJoin.h \
     FastActions.h \
     NetClient.h \
     Note.h \

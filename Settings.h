@@ -66,6 +66,7 @@ struct Settings
 
 	inline static property<bool> AlarmsJoinEnabled {false, cbPropChanged};
 	inline static property<int> AlarmsJoinMaxSecs {60*4, cbPropChanged};
+	inline static property<QByteArray> nextAlarmsNowTableHeaderState {{}, cbPropChanged};
 
 	static QString SaveToString();
 	static void LoadFromString(const QString &str);

@@ -11,20 +11,19 @@
 
 QString Settings::SaveToString()
 {
-	return QSn(AlarmsJoinEnabled)+"|"+QSn(AlarmsJoinMaxSecs);
+	QString result = QSn(AlarmsJoinEnabled)+"|"+QSn(AlarmsJoinMaxSecs);
+	if(nextAlarmsNowTableHeaderState.get().isNull() == false)
+		result += "|" + QString::fromUtf8(nextAlarmsNowTableHeaderState.get().toHex());
+	return result;
 }
 
 void Settings::LoadFromString(const QString & str)
 {
 	auto list = str.splitRef("|");
-	if(list.size() != 2)
-	{
-		QMbError("LoadFromString list.size() != 2");
-		return;
-	}
 
-	AlarmsJoinEnabled = list[0].toInt();
-	AlarmsJoinMaxSecs = list[1].toInt();
+	if(list.size() >= 1) AlarmsJoinEnabled = list[0].toInt();
+	if(list.size() >= 2) AlarmsJoinMaxSecs = list[1].toInt();
+	if(list.size() >= 3) nextAlarmsNowTableHeaderState = QByteArray::fromHex(list[2].toUtf8());
 }
 
 void DialogSettings::Execute()
