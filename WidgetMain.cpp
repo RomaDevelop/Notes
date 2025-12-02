@@ -368,6 +368,7 @@ void WidgetMain::CreateTrayIcon()
 	QPoint posOnSct2{1871,1001};
 	QPoint globalPosForIcon = screen2->geometry().topLeft() + posOnSct2;
 
+
 	auto addIcon = new AdditionalTrayIcon(QApplication::style()->standardIcon(QStyle::SP_ArrowForward), globalPosForIcon, this);
 	addIcon->setContextMenu(menu);
 	connect(addIcon, &ClickableQWidget::clicked, this, [this](){ ShowMainWindow(); });
