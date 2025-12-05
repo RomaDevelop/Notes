@@ -379,7 +379,7 @@ void WidgetMain::TrayIconSlotClose()
 	auto answ = MyQDialogs::CustomDialogWithTimer("Завершение работы приложения",
 						"Вы уверены, что хотите завершить работу приложения?",
 						{"Сделать коммит и завершить", "Завершить без коммита", "Отменить завершение работы"},
-						0, 5);
+						0, 10);
 	if(0){}
 	else if(answ == "Завершить без коммита") { 	closeNoQuestions = true; close(); }
 	else if(answ == "Сделать коммит и завершить") {
@@ -390,6 +390,7 @@ void WidgetMain::TrayIconSlotClose()
 		}
 	}
 	else if(answ == "Отменить завершение работы") { return; }
+	else if(answ == "") { return; }
 	else { QMbc(0,"error", "not realesed button " + answ); }
 }
 
@@ -538,13 +539,14 @@ void WidgetMain::closeEvent(QCloseEvent * event)
 		auto answ = MyQDialogs::CustomDialogWithTimer("Завершение работы приложения",
 				"Вы уверены, что хотите завершить работу приложения?",
 				{"Сделать коммит и завершить", "Завершить без коммита", "Свернуть в трей", "Отменить завершение работы"},
-				0, 5);
+				0, 10);
 
 		if(0){}
 		else if(answ == "Завершить без коммита") {/*ничего не делаем*/}
 		else if(answ == "Сделать коммит и завершить") { GitWorkCommitAndClose(); }
 		else if(answ == "Свернуть в трей") { hide(); abortClose = true; }
 		else if(answ == "Отменить завершение работы") { abortClose = true; }
+		else if(answ == "") { abortClose = true; }
 		else { QMbc(0,"error", "not realesed button " + answ); abortClose = true; }
 	}
 
